@@ -1,4 +1,4 @@
-const CACHE_NAME = 'waterway-finder-v3';
+const CACHE_NAME = 'waterway-finder-v4';
 const STATIC_ASSETS = [
   './',
   './index.html',

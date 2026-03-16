@@ -791,6 +791,16 @@ function setupEventListeners() {
       detailPanel.classList.add('hidden');
     }
   });
+
+  // Event delegation for lure card expand/collapse
+  detailPanel.addEventListener('click', (e) => {
+    const card = e.target.closest('.lure-card');
+    if (card) {
+      // Don't toggle if they clicked a link inside
+      if (e.target.closest('a')) return;
+      card.classList.toggle('lure-expanded');
+    }
+  });
 }
 
 // ===== Utilities =====

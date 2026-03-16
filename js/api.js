@@ -7,7 +7,11 @@ import { STORES, getCached, setCache, getMultiCached } from './cache.js';
 
 // ===== Overpass API (Water Bodies) =====
 
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+const OVERPASS_URLS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+];
 
 function buildOverpassQuery(south, west, north, east) {
   const bbox = `${south},${west},${north},${east}`;
@@ -47,6 +51,44 @@ function classifyWaterBody(tags) {
   return 'stream'; // default fallback
 }
 
+// Fetch from Overpass with fallback servers and retry
+async function fetchOverpass(query) {
+  let lastError = null;
+  for (const url of OVERPASS_URLS) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const response = await fetch(url, {
+        method: 'POST',
+        body: `data=${encodeURIComponent(query)}`,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!response.ok) {
+        lastError = new Error(`Overpass ${response.status} from ${url}`);
+        continue;
+      }
+      return await response.json();
+    } catch (e) {
+      lastError = e;
+      console.warn(`Overpass server failed (${url}):`, e.message);
+    }
+  }
+  throw lastError || new Error('All Overpass servers failed');
+}
+
+// Generate a readable name for unnamed water bodies
+let unnamedCounter = 0;
+function generateName(type, lat, lon) {
+  unnamedCounter++;
+  const typeLabels = { lake: 'Lake', pond: 'Pond', river: 'River', stream: 'Creek' };
+  const label = typeLabels[type] || 'Pond';
+  // Use coords to make a short semi-unique ID
+  const id = Math.abs(Math.round((lat * 1000 + lon * 1000) % 10000));
+  return `${label} #${id}-${unnamedCounter}`;
+}
+
 async function fetchWaterBodies(south, west, north, east) {
   // Check cache first for each grid cell
   const { cached, missing } = await getMultiCached(STORES.waterBodies, south, west, north, east);
@@ -55,29 +97,29 @@ async function fetchWaterBodies(south, west, north, east) {
     return { data: dedupeWaterBodies(cached), fromCache: true };
   }
 
-  // Fetch fresh data for the full bbox (Overpass handles it as one query)
+  // Fetch fresh data for the full bbox with fallback servers
   const query = buildOverpassQuery(south, west, north, east);
+  const json = await fetchOverpass(query);
 
-  const response = await fetch(OVERPASS_URL, {
-    method: 'POST',
-    body: `data=${encodeURIComponent(query)}`,
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  });
-
-  if (!response.ok) throw new Error(`Overpass API error: ${response.status}`);
-
-  const json = await response.json();
   const waterBodies = [];
   const seen = new Set();
+  unnamedCounter = 0;
 
   for (const el of json.elements) {
-    const name = el.tags?.name;
-    if (!name) continue; // skip unnamed for cleaner UX
-
     // Use center coords for ways/relations
     const lat = el.center?.lat || el.lat;
     const lon = el.center?.lon || el.lon;
     if (!lat || !lon) continue;
+
+    const type = classifyWaterBody(el.tags || {});
+
+    // Use OSM name if available, otherwise generate one
+    let name = el.tags?.name;
+    if (!name) {
+      // Only include unnamed if it's a way or relation (has area/shape — skip random nodes)
+      if (el.type === 'node') continue;
+      name = generateName(type, lat, lon);
+    }
 
     // Dedupe by name + approximate location
     const dedupeKey = `${name}_${lat.toFixed(3)}_${lon.toFixed(3)}`;
@@ -87,10 +129,10 @@ async function fetchWaterBodies(south, west, north, east) {
     waterBodies.push({
       id: el.id,
       name,
-      type: classifyWaterBody(el.tags),
+      type,
       lat,
       lon,
-      tags: el.tags,
+      tags: el.tags || {},
     });
   }
 
@@ -104,7 +146,6 @@ async function fetchWaterBodies(south, west, north, east) {
   }
 
   for (const [key, items] of Object.entries(gridMap)) {
-    // Parse grid key back to coords
     const [lat, lon] = key.split('_').map(Number);
     await setCache(STORES.waterBodies, lat, lon, items);
   }

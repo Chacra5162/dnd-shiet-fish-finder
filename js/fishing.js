@@ -1447,7 +1447,7 @@ function getRecommendationHtml(rec) {
           ${rec.lures.map((l, i) => {
             if (!l.detail) return `<div class="lure-item-simple"><span class="rec-tag lure-tag">${l.name}</span></div>`;
             return `
-              <div class="lure-card" onclick="this.classList.toggle('lure-expanded')">
+              <div class="lure-card">
                 <div class="lure-card-header">
                   <span class="lure-card-name">${l.name}</span>
                   <span class="lure-card-toggle">+</span>
