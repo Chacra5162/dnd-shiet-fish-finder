@@ -1,4 +1,4 @@
-const CACHE_NAME = 'waterway-finder-v6';
+const CACHE_NAME = 'waterway-finder-v7';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -50,7 +50,8 @@ self.addEventListener('fetch', (event) => {
     url.hostname === 'waterservices.usgs.gov' ||
     url.hostname === 'overpass-api.de' ||
     url.hostname.includes('supabase.co') ||
-    url.hostname === 'api.open-meteo.com'
+    url.hostname === 'api.open-meteo.com' ||
+    url.hostname === 'api.tidesandcurrents.noaa.gov'
   ) {
     event.respondWith(
       fetch(event.request).catch(() => {

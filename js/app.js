@@ -7,7 +7,7 @@
 import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles } from './api.js';
 import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS } from './map.js';
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, getPlaceStatuses, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan } from './supabase.js';
-import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity } from './fishing.js';
+import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml } from './fishing.js';
 import { TIME_WINDOWS, fetchForecast, estimateTraffic, generateGearChecklist, getForecastCardHtml, getTrafficBadgeHtml, getGearChecklistHtml, getTripSummaryCardHtml, friendlyDate } from './tripPlan.js';
 
 // ===== State =====
@@ -394,8 +394,15 @@ async function showWaterDetail(wb, dist) {
     </div>
   `;
 
-  // Weather + recommendation placeholder (loaded async)
+  // Weather + best times + tide placeholder (loaded async)
   html += `<div id="weather-rec-area"><div class="loading-inline">Loading weather data...</div></div>`;
+  html += `<div id="best-times-area"></div>`;
+
+  // Tidal placeholder (only shown for tidal waters)
+  const isTidal = isTidalWater(wb.lat, wb.lon, wb.type);
+  if (isTidal) {
+    html += `<div id="tide-area"><div class="loading-inline">Loading tide data...</div></div>`;
+  }
 
   // Tags info
   if (wb.tags) {
@@ -473,24 +480,49 @@ async function showWaterDetail(wb, dist) {
   detailPanel.classList.remove('hidden');
   panTo(wb.lat, wb.lon, 13);
 
-  // Async: fetch weather and show initial card
-  loadWeatherForDetail(wb.lat, wb.lon);
+  // Async: fetch weather, best times, and tides
+  loadWeatherForDetail(wb.lat, wb.lon, wb.type);
 }
 
-// Fetch weather and render into the detail panel
-async function loadWeatherForDetail(lat, lon) {
+// Fetch weather, best times, and tides for the detail panel
+async function loadWeatherForDetail(lat, lon, waterType) {
   const area = document.getElementById('weather-rec-area');
   if (!area) return;
 
   try {
     const weather = await fetchWeather(lat, lon);
     area.innerHTML = getWeatherCardHtml(weather);
-    // Store weather on window for species selector to use
     window._currentWeather = weather;
+
+    // Best fishing times
+    const timesArea = document.getElementById('best-times-area');
+    if (timesArea) {
+      const times = getBestFishingTimes(weather);
+      timesArea.innerHTML = getBestTimesHtml(times);
+    }
   } catch (e) {
     console.warn('Weather fetch failed:', e);
     area.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">Weather data unavailable</p>';
     window._currentWeather = null;
+  }
+
+  // Load tides if applicable (independent of weather)
+  loadTidesForDetail(lat, lon, waterType);
+}
+
+async function loadTidesForDetail(lat, lon, waterType) {
+  const tideArea = document.getElementById('tide-area');
+  if (!tideArea) return;
+
+  const station = findNearestTideStation(lat, lon);
+  if (!station) { tideArea.innerHTML = ''; return; }
+
+  try {
+    const tideData = await fetchTidePredictions(station.id);
+    tideArea.innerHTML = getTideHtml(tideData, station.name);
+  } catch (e) {
+    console.warn('Tide fetch failed:', e);
+    tideArea.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">Tide data unavailable</p>';
   }
 }
 

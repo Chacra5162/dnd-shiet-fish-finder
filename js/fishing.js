@@ -159,6 +159,294 @@ function getMoonPhase(date) {
 }
 
 
+// ===== Best Fishing Times =====
+
+function getBestFishingTimes(weather, date) {
+  const moon = getMoonPhase(date);
+  const isOvercast = weather.cloudCover > 65;
+  const isRainy = weather.precipitation > 0.02;
+
+  // Solunar-inspired: major periods around moon overhead/underfoot (~every 12.4h)
+  // Minor periods at moonrise/moonset
+  // We approximate using the moon's day in cycle
+  const moonTransitOffset = (moon.dayInCycle % 1) * 24; // rough hour offset
+  const majorPeriod1 = Math.round(moonTransitOffset) % 24;
+  const majorPeriod2 = (majorPeriod1 + 12) % 24;
+  const minorPeriod1 = (majorPeriod1 + 6) % 24;
+  const minorPeriod2 = (majorPeriod1 + 18) % 24;
+
+  // Rate each hour 5AM - 9PM
+  const hours = [];
+  for (let h = 5; h <= 21; h++) {
+    let score = 30;
+
+    // Dawn/dusk golden hours
+    if (h >= 5 && h <= 7) score += 25;
+    else if (h >= 6 && h <= 9) score += 18;
+    else if (h >= 17 && h <= 19) score += 22;
+    else if (h >= 19 && h <= 21) score += 15;
+    else if (h >= 11 && h <= 14) score -= 10; // midday slump
+
+    // Overcast = midday penalty reduced
+    if (isOvercast && h >= 10 && h <= 15) score += 12;
+
+    // Light rain boosts anytime
+    if (isRainy) score += 5;
+
+    // Solunar major/minor periods (+/- 1 hour window)
+    const isNearMajor = Math.abs(h - majorPeriod1) <= 1 || Math.abs(h - majorPeriod2) <= 1;
+    const isNearMinor = Math.abs(h - minorPeriod1) <= 1 || Math.abs(h - minorPeriod2) <= 1;
+    if (isNearMajor) score += 15;
+    else if (isNearMinor) score += 8;
+
+    // New/full moon amplifies solunar
+    if ((moon.name === 'New Moon' || moon.name === 'Full Moon') && (isNearMajor || isNearMinor)) {
+      score += 5;
+    }
+
+    hours.push({
+      hour: h,
+      label: formatHour(h),
+      score: Math.max(5, Math.min(95, score)),
+    });
+  }
+
+  // Find the best windows
+  const sorted = [...hours].sort((a, b) => b.score - a.score);
+  const bestWindow = sorted[0];
+  const secondBest = sorted.find(h => Math.abs(h.hour - bestWindow.hour) > 2) || sorted[1];
+
+  return {
+    hours,
+    bestWindow,
+    secondBest,
+    majorPeriods: [majorPeriod1, majorPeriod2].filter(h => h >= 5 && h <= 21).map(formatHour),
+    minorPeriods: [minorPeriod1, minorPeriod2].filter(h => h >= 5 && h <= 21).map(formatHour),
+    moon,
+  };
+}
+
+function formatHour(h) {
+  if (h === 0 || h === 24) return '12 AM';
+  if (h === 12) return '12 PM';
+  return h > 12 ? `${h - 12} PM` : `${h} AM`;
+}
+
+function getBestTimesHtml(times) {
+  const maxScore = Math.max(...times.hours.map(h => h.score));
+
+  return `
+    <div class="detail-section">
+      <h3>Best Times to Fish Today</h3>
+      <div class="best-times-summary">
+        <span class="best-time-badge best">Best: ${times.bestWindow.label}</span>
+        ${times.secondBest ? `<span class="best-time-badge good">Also good: ${times.secondBest.label}</span>` : ''}
+      </div>
+      <div class="times-chart">
+        ${times.hours.map(h => {
+          const pct = Math.round((h.score / maxScore) * 100);
+          const color = h.score >= 65 ? '#2ecc71' : h.score >= 45 ? '#f39c12' : '#e74c3c';
+          return `<div class="times-bar-col">
+            <div class="times-bar" style="height:${pct}%;background:${color};" title="${h.label}: ${h.score}/100"></div>
+            <span class="times-label">${h.hour % 12 || 12}${h.hour >= 12 ? 'p' : 'a'}</span>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="solunar-info">
+        <span class="solunar-badge">${times.moon.emoji} ${times.moon.name}</span>
+        ${times.majorPeriods.length ? `<span class="solunar-item">Major: ${times.majorPeriods.join(', ')}</span>` : ''}
+        ${times.minorPeriods.length ? `<span class="solunar-item">Minor: ${times.minorPeriods.join(', ')}</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+
+// ===== Tidal Detection & NOAA Tides =====
+
+// VA/NC NOAA tide stations — hardcoded for the region
+const TIDE_STATIONS = [
+  { id: '8638610', name: 'Sewells Point', lat: 36.9467, lon: -76.3300 },
+  { id: '8638863', name: 'Chesapeake Bay Bridge Tunnel', lat: 36.9667, lon: -76.1133 },
+  { id: '8632200', name: 'Kiptopeke', lat: 37.1667, lon: -75.9883 },
+  { id: '8637689', name: 'Yorktown USCG', lat: 37.2267, lon: -76.4783 },
+  { id: '8635750', name: 'Lewisetta', lat: 37.9950, lon: -76.4633 },
+  { id: '8636580', name: 'Windmill Point', lat: 37.6150, lon: -76.2900 },
+  { id: '8639348', name: 'Money Point', lat: 36.7767, lon: -76.3017 },
+  { id: '8631044', name: 'Wachapreague', lat: 37.6078, lon: -75.6858 },
+  { id: '8652587', name: 'Oregon Inlet', lat: 35.7956, lon: -75.5481 },
+  { id: '8656483', name: 'Beaufort, NC', lat: 34.7200, lon: -76.6700 },
+  { id: '8658120', name: 'Wilmington, NC', lat: 34.2267, lon: -77.9533 },
+  { id: '8654467', name: 'Hatteras, NC', lat: 35.2094, lon: -75.6903 },
+  { id: '8637624', name: 'Gloucester Point', lat: 37.2467, lon: -76.5000 },
+  { id: '8638511', name: 'Dominion Terminal', lat: 36.9600, lon: -76.4200 },
+];
+
+function isTidalWater(lat, lon, waterType) {
+  // Only rivers, streams, and some lakes near the coast can be tidal
+  if (waterType === 'pond') return false;
+
+  // Eastern VA/NC — roughly east of the fall line
+  // VA fall line is ~lon -77.5, NC ~lon -78
+  if (lon < -78.5) return false;
+  if (lat < 33.5 || lat > 39) return false;
+
+  // Must be within ~40 miles of a tide station
+  const nearest = findNearestTideStation(lat, lon);
+  return nearest && nearest.dist < 40;
+}
+
+function findNearestTideStation(lat, lon) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const s of TIDE_STATIONS) {
+    const R = 3959;
+    const dLat = (s.lat - lat) * Math.PI / 180;
+    const dLon = (s.lon - lon) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(s.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    if (dist < bestDist) { bestDist = dist; best = { ...s, dist }; }
+  }
+  return best;
+}
+
+async function fetchTidePredictions(stationId, date) {
+  const d = date ? new Date(date + 'T00:00:00') : new Date();
+  const beginDate = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  // Fetch 24 hours of predictions
+  const endD = new Date(d);
+  endD.setDate(endD.getDate() + 1);
+  const endDate = `${endD.getFullYear()}${String(endD.getMonth()+1).padStart(2,'0')}${String(endD.getDate()).padStart(2,'0')}`;
+
+  const params = new URLSearchParams({
+    product: 'predictions',
+    datum: 'MLLW',
+    time_zone: 'lst_ldt',
+    units: 'english',
+    format: 'json',
+    station: stationId,
+    begin_date: beginDate,
+    end_date: endDate,
+    interval: '6', // every 6 minutes for smooth chart
+  });
+
+  const res = await fetch(`https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?${params}`);
+  if (!res.ok) throw new Error(`NOAA API error: ${res.status}`);
+
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message);
+
+  const predictions = (json.predictions || []).map(p => ({
+    time: p.t,
+    height: parseFloat(p.v),
+  }));
+
+  // Find highs and lows
+  const highsLows = findHighsLows(predictions);
+
+  return { predictions, highsLows, stationId };
+}
+
+function findHighsLows(predictions) {
+  const results = [];
+  for (let i = 1; i < predictions.length - 1; i++) {
+    const prev = predictions[i - 1].height;
+    const curr = predictions[i].height;
+    const next = predictions[i + 1].height;
+    if (curr > prev && curr > next) {
+      results.push({ type: 'high', time: predictions[i].time, height: curr });
+    } else if (curr < prev && curr < next) {
+      results.push({ type: 'low', time: predictions[i].time, height: curr });
+    }
+  }
+  return results;
+}
+
+function getTideHtml(tideData, stationName) {
+  const { predictions, highsLows } = tideData;
+  if (!predictions.length) return '';
+
+  // Next high and low from now
+  const now = new Date();
+  const upcoming = highsLows.filter(hl => new Date(hl.time) > now);
+  const nextHigh = upcoming.find(hl => hl.type === 'high');
+  const nextLow = upcoming.find(hl => hl.type === 'low');
+
+  // Build SVG chart — 24 hours of tide data
+  const minH = Math.min(...predictions.map(p => p.height));
+  const maxH = Math.max(...predictions.map(p => p.height));
+  const range = maxH - minH || 1;
+  const chartW = 300;
+  const chartH = 80;
+  const padY = 5;
+
+  const points = predictions.map((p, i) => {
+    const x = (i / (predictions.length - 1)) * chartW;
+    const y = padY + (chartH - 2 * padY) * (1 - (p.height - minH) / range);
+    return `${x},${y}`;
+  }).join(' ');
+
+  // Current time marker
+  const firstTime = new Date(predictions[0].time);
+  const lastTime = new Date(predictions[predictions.length - 1].time);
+  const nowPct = Math.max(0, Math.min(1, (now - firstTime) / (lastTime - firstTime)));
+  const nowX = nowPct * chartW;
+
+  // High/low markers on chart
+  const markers = highsLows.map(hl => {
+    const t = new Date(hl.time);
+    const pct = (t - firstTime) / (lastTime - firstTime);
+    if (pct < 0 || pct > 1) return '';
+    const x = pct * chartW;
+    const idx = Math.round(pct * (predictions.length - 1));
+    const y = padY + (chartH - 2 * padY) * (1 - (predictions[idx]?.height - minH) / range);
+    const color = hl.type === 'high' ? '#3498db' : '#e67e22';
+    return `<circle cx="${x}" cy="${y}" r="4" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
+  }).join('');
+
+  const formatTideTime = (t) => {
+    const d = new Date(t);
+    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  };
+
+  return `
+    <div class="detail-section">
+      <h3>Tides — ${stationName}</h3>
+      <div class="tide-next">
+        ${nextHigh ? `<div class="tide-next-item">
+          <span class="tide-type high-tide">Next High</span>
+          <span class="tide-time">${formatTideTime(nextHigh.time)}</span>
+          <span class="tide-height">${nextHigh.height.toFixed(1)} ft</span>
+        </div>` : ''}
+        ${nextLow ? `<div class="tide-next-item">
+          <span class="tide-type low-tide">Next Low</span>
+          <span class="tide-time">${formatTideTime(nextLow.time)}</span>
+          <span class="tide-height">${nextLow.height.toFixed(1)} ft</span>
+        </div>` : ''}
+      </div>
+      <div class="tide-chart-wrap">
+        <svg class="tide-chart" viewBox="0 0 ${chartW} ${chartH}" preserveAspectRatio="none">
+          <polyline points="${points}" fill="none" stroke="#3498db" stroke-width="2" stroke-linejoin="round"/>
+          <polygon points="0,${chartH} ${points} ${chartW},${chartH}" fill="rgba(52,152,219,0.12)"/>
+          <line x1="${nowX}" y1="0" x2="${nowX}" y2="${chartH}" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="3 3"/>
+          ${markers}
+        </svg>
+        <div class="tide-chart-labels">
+          <span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>12 AM</span>
+        </div>
+      </div>
+      <div class="tide-all-times">
+        ${highsLows.map(hl => `
+          <span class="tide-hl-badge ${hl.type === 'high' ? 'high-tide' : 'low-tide'}">
+            ${hl.type === 'high' ? 'H' : 'L'} ${formatTideTime(hl.time)} (${hl.height.toFixed(1)}ft)
+          </span>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+
 // ===== Detailed Lure Database =====
 // Each lure: { name, weight, size, colors:{clear,stained,muddy}, rig, retrieve, hookSize? }
 // Colors keyed by water clarity for weather-aware color picks
@@ -1570,4 +1858,10 @@ export {
   getWaterClarity,
   degToCompass,
   getMoonPhase,
+  getBestFishingTimes,
+  getBestTimesHtml,
+  isTidalWater,
+  findNearestTideStation,
+  fetchTidePredictions,
+  getTideHtml,
 };

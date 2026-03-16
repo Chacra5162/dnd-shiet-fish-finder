@@ -1227,6 +1227,142 @@ a { color: var(--accent); }
   background: var(--accent);
 }
 
+/* ===== Best Fishing Times Chart ===== */
+.best-times-summary {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.best-time-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.best-time-badge.best {
+  background: rgba(46,204,113,0.15);
+  color: #2ecc71;
+}
+.best-time-badge.good {
+  background: rgba(243,156,18,0.15);
+  color: #f39c12;
+}
+.times-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 70px;
+  padding: 4px 0;
+}
+.times-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+.times-bar {
+  width: 100%;
+  min-height: 4px;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.3s;
+}
+.times-label {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+.solunar-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.78rem;
+}
+.solunar-badge {
+  padding: 3px 10px;
+  border-radius: 10px;
+  background: rgba(52,152,219,0.1);
+  color: var(--accent);
+}
+.solunar-item {
+  color: var(--text-muted);
+  padding: 3px 0;
+}
+
+/* ===== Tide Chart ===== */
+.tide-next {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.tide-next-item {
+  flex: 1;
+  background: var(--bg-surface);
+  padding: 8px 12px;
+  border-radius: 8px;
+  text-align: center;
+}
+.tide-type {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+.high-tide { color: #3498db; }
+.low-tide { color: #e67e22; }
+.tide-time {
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.tide-height {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.tide-chart-wrap {
+  background: var(--bg-surface);
+  border-radius: 8px;
+  padding: 8px 10px 4px;
+  overflow: hidden;
+}
+.tide-chart {
+  width: 100%;
+  height: 80px;
+  display: block;
+}
+.tide-chart-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.tide-all-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.tide-hl-badge {
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.tide-hl-badge.high-tide {
+  background: rgba(52,152,219,0.12);
+}
+.tide-hl-badge.low-tide {
+  background: rgba(230,126,34,0.12);
+}
+
 /* ===== Lure Detail Cards ===== */
 .clarity-badge {
   display: inline-block;
