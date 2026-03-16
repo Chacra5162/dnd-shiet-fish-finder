@@ -48,6 +48,7 @@ const placesList = $('#places-list');
 const toastContainer = $('#toast-container');
 const radiusSlider = $('#radius-slider');
 const radiusValue = $('#radius-value');
+const licensePanel = $('#license-panel');
 
 // ===== Water Type Preferences =====
 // Stored in localStorage so user only picks once (can change via filter)
@@ -410,6 +411,51 @@ window._saveNotes = async function(btn) {
   }
 };
 
+// ===== Trout License Warning =====
+
+const TROUT_SPECIES = ['Rainbow Trout', 'Brown Trout', 'Brook Trout'];
+// Track dismissed warnings per session so they don't nag repeatedly
+const troutWarningDismissed = new Set();
+
+function isTroutLocation(wb) {
+  const species = getCommonSpecies(wb.type, wb.lat, wb.lon);
+  return species.some(s => TROUT_SPECIES.includes(s));
+}
+
+function isTroutStockedName(name) {
+  const n = (name || '').toLowerCase();
+  return n.includes('trout') || n.includes('stocked') || n.includes('hatchery');
+}
+
+function getTroutWarningHtml(wb, context = 'detail') {
+  const species = getCommonSpecies(wb.type, wb.lat, wb.lon);
+  const troutFound = species.filter(s => TROUT_SPECIES.includes(s));
+  const nameHint = isTroutStockedName(wb.name);
+
+  if (troutFound.length === 0 && !nameHint) return '';
+  if (troutWarningDismissed.has(context + '_' + wb.name)) return '';
+
+  const inVA = wb.lat >= 36.54 && wb.lat <= 39.47 && wb.lon >= -83.68 && wb.lon <= -75.24;
+  const stateLabel = inVA ? 'Virginia' : 'North Carolina';
+  const troutList = troutFound.length > 0 ? troutFound.join(', ') : 'Trout (stocked area)';
+
+  return `
+    <div class="trout-license-warning" id="trout-warn-${context}">
+      <div class="trout-license-inner">
+        <svg viewBox="0 0 24 24" width="20" height="20" style="flex-shrink:0;"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" fill="#f39c12"/></svg>
+        <div>
+          <strong>Trout License Required</strong>
+          <p>This location has <strong>${escapeHtml(troutList)}</strong>. ${stateLabel} requires a separate <strong>trout fishing license</strong> in addition to your regular fishing license to target or keep trout.</p>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button class="btn-secondary" style="flex:0;padding:6px 12px;font-size:0.78rem;" onclick="this.closest('.trout-license-warning').remove()">Dismiss</button>
+            <button class="btn-secondary" style="flex:0;padding:6px 12px;font-size:0.78rem;color:var(--accent);border-color:var(--accent);" onclick="document.getElementById('btn-licenses')?.click()">My Licenses</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 // ===== Access Info (Fishing / Bank-Pier / Boat) =====
 
 function getAccessInfoHtml(wb) {
@@ -560,6 +606,9 @@ async function showWaterDetail(wb, dist) {
       </div>
     `;
   }
+
+  // Trout license warning
+  html += getTroutWarningHtml(wb, 'detail');
 
   // Place actions (favorite / visited / avoid)
   html += getPlaceStatusHtml(wb);
@@ -1157,6 +1206,15 @@ async function handleGetForecast() {
     ).join('');
     tripWizard.selectedSpecies = [];
 
+    // Trout warning in trip planner
+    if (isTroutLocation(wb)) {
+      const warnHtml = getTroutWarningHtml(wb, 'trip');
+      if (warnHtml) {
+        const warnDiv = document.getElementById('trip-trout-warn');
+        if (warnDiv) warnDiv.innerHTML = warnHtml;
+      }
+    }
+
     showTripStep(2);
   } catch (e) {
     console.error('Forecast error:', e);
@@ -1510,6 +1568,14 @@ function setupEventListeners() {
     });
   });
 
+  // === License Wallet ===
+  $('#btn-licenses').addEventListener('click', () => {
+    openLicensePanel();
+  });
+  $('#btn-close-licenses').addEventListener('click', () => {
+    licensePanel.classList.add('hidden');
+  });
+
   // === Arsenal ===
   $('#btn-arsenal').addEventListener('click', async () => {
     await loadArsenal();
@@ -1775,6 +1841,140 @@ function toast(msg, isError = false) {
   toastContainer.appendChild(el);
   setTimeout(() => el.remove(), 3000);
 }
+
+// ===== License Wallet (localStorage, on-device) =====
+
+const LICENSE_KEY = 'wwf_licenses';
+const MAX_LICENSES = 4;
+
+function getLicenses() {
+  try {
+    return JSON.parse(localStorage.getItem(LICENSE_KEY)) || [];
+  } catch { return []; }
+}
+
+function saveLicenses(licenses) {
+  localStorage.setItem(LICENSE_KEY, JSON.stringify(licenses));
+}
+
+function openLicensePanel() {
+  licensePanel.classList.remove('hidden');
+  renderLicenseSlots();
+}
+
+function renderLicenseSlots() {
+  const licenses = getLicenses();
+  const slotsEl = document.getElementById('license-slots');
+  if (!slotsEl) return;
+
+  let html = '';
+
+  // Render existing licenses
+  for (let i = 0; i < licenses.length; i++) {
+    const lic = licenses[i];
+    html += `
+      <div class="license-slot" data-idx="${i}">
+        <div class="license-slot-header">
+          <span>License ${i + 1}</span>
+          <button class="license-slot-remove" onclick="window._removeLicense(${i})">Remove</button>
+        </div>
+        <div class="license-photo-area" onclick="window._changeLicensePhoto(${i})">
+          ${lic.photo
+            ? `<img src="${lic.photo}" alt="License ${i + 1}">`
+            : `<div class="license-photo-placeholder">
+                <svg viewBox="0 0 24 24" width="32" height="32"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" fill="currentColor"/></svg>
+                Tap to add photo
+              </div>`
+          }
+        </div>
+        <input type="text" class="license-label-input" placeholder="Label (e.g. VA Fishing License, Trout Stamp...)"
+          value="${escapeAttr(lic.label || '')}" onchange="window._updateLicenseLabel(${i}, this.value)">
+      </div>
+    `;
+  }
+
+  // Add slot button if under max
+  if (licenses.length < MAX_LICENSES) {
+    html += `
+      <button class="btn-primary" style="width:100%;" onclick="window._addLicenseSlot()">
+        + Add License (${licenses.length}/${MAX_LICENSES})
+      </button>
+    `;
+  }
+
+  if (licenses.length === 0) {
+    html = `
+      <p class="places-empty">No licenses saved yet</p>
+      <button class="btn-primary" style="width:100%;margin-top:8px;" onclick="window._addLicenseSlot()">
+        + Add Your First License
+      </button>
+    `;
+  }
+
+  slotsEl.innerHTML = html;
+}
+
+window._addLicenseSlot = function() {
+  const licenses = getLicenses();
+  if (licenses.length >= MAX_LICENSES) { toast('Maximum 4 licenses', true); return; }
+  licenses.push({ photo: null, label: '' });
+  saveLicenses(licenses);
+  renderLicenseSlots();
+};
+
+window._removeLicense = function(idx) {
+  const licenses = getLicenses();
+  licenses.splice(idx, 1);
+  saveLicenses(licenses);
+  renderLicenseSlots();
+  toast('License removed');
+};
+
+window._updateLicenseLabel = function(idx, value) {
+  const licenses = getLicenses();
+  if (licenses[idx]) {
+    licenses[idx].label = value;
+    saveLicenses(licenses);
+  }
+};
+
+window._changeLicensePhoto = function(idx) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'environment';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Resize to keep localStorage manageable (max ~800px wide)
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 800;
+        const scale = img.width > maxW ? maxW / img.width : 1;
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+        const licenses = getLicenses();
+        if (licenses[idx]) {
+          licenses[idx].photo = dataUrl;
+          saveLicenses(licenses);
+          renderLicenseSlots();
+          toast('Photo saved');
+        }
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+};
 
 // ===== Prevent Page Zoom (allow map zoom only) =====
 
