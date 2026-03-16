@@ -5,7 +5,7 @@
 
 import {
   getRecommendation, SPECIES_DATA, rateFishActivity,
-  getTempBracket, getWaterClarity, degToCompass,
+  getTempBracket, getWaterClarity, degToCompass, getMoonPhase,
 } from './fishing.js';
 
 // ===== Hourly Forecast =====
@@ -211,9 +211,10 @@ function generateGearChecklist(speciesList, forecast, waterType) {
 // ===== HTML Renderers =====
 
 function getForecastCardHtml(forecast) {
-  const actColor = forecast.fishActivity >= 70 ? '#2ecc71' : forecast.fishActivity >= 45 ? '#f39c12' : '#e74c3c';
-  const actLabel = forecast.fishActivity >= 70 ? 'Excellent' : forecast.fishActivity >= 55 ? 'Good' : forecast.fishActivity >= 40 ? 'Fair' : 'Poor';
+  const actColor = forecast.fishActivity >= 65 ? '#2ecc71' : forecast.fishActivity >= 45 ? '#f39c12' : '#e74c3c';
+  const actLabel = forecast.fishActivity >= 65 ? 'Excellent' : forecast.fishActivity >= 55 ? 'Good' : forecast.fishActivity >= 40 ? 'Fair' : 'Poor';
   const windDir = degToCompass(forecast.windDir);
+  const moon = getMoonPhase(forecast.date);
 
   return `
     <div class="forecast-card">
@@ -227,7 +228,7 @@ function getForecastCardHtml(forecast) {
         <div class="data-card"><div class="label">Conditions</div><div class="value" style="font-size:0.9rem">${forecast.conditions}</div></div>
         <div class="data-card"><div class="label">Rain Chance</div><div class="value" style="font-size:0.9rem">${forecast.precipProbability || 0}%</div></div>
         <div class="data-card"><div class="label">Wind</div><div class="value" style="font-size:0.9rem">${forecast.windSpeed} mph ${windDir}</div><div style="font-size:0.65rem;color:var(--text-muted)">Gusts ${forecast.windGusts} mph</div></div>
-        <div class="data-card"><div class="label">Pressure</div><div class="value" style="font-size:0.9rem">${forecast.pressureMsl} mb</div><div style="font-size:0.65rem;color:var(--text-muted)">${forecast.pressureTrend}</div></div>
+        <div class="data-card"><div class="label">Moon Phase</div><div class="value" style="font-size:1.2rem">${moon.emoji}</div><div style="font-size:0.65rem;color:var(--text-muted)">${moon.name} (${moon.illumination}%)</div></div>
       </div>
     </div>
   `;

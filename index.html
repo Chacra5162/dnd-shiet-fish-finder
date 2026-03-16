@@ -28,6 +28,49 @@
     </div>
   </div>
 
+  <!-- Water Type Chooser (first run) -->
+  <div id="water-type-chooser" class="chooser-overlay hidden">
+    <div class="chooser-card">
+      <h2>What are you looking for?</h2>
+      <p class="chooser-subtitle">Pick the types of water you want to explore. You can always change this later in the filter menu.</p>
+      <div class="chooser-options">
+        <label class="chooser-option">
+          <input type="checkbox" data-type="lake" checked>
+          <div class="chooser-option-card">
+            <span class="chooser-icon" style="background:#2980b9;">~</span>
+            <span class="chooser-label">Lakes &amp; Reservoirs</span>
+            <span class="chooser-desc">Large bodies of water, boat fishing, bank fishing</span>
+          </div>
+        </label>
+        <label class="chooser-option">
+          <input type="checkbox" data-type="river" checked>
+          <div class="chooser-option-card">
+            <span class="chooser-icon" style="background:#1abc9c;">~</span>
+            <span class="chooser-label">Rivers</span>
+            <span class="chooser-desc">Major waterways, wade fishing, kayak fishing</span>
+          </div>
+        </label>
+        <label class="chooser-option">
+          <input type="checkbox" data-type="stream">
+          <div class="chooser-option-card">
+            <span class="chooser-icon" style="background:#27ae60;">~</span>
+            <span class="chooser-label">Streams &amp; Creeks</span>
+            <span class="chooser-desc">Small waterways, trout streams, wading</span>
+          </div>
+        </label>
+        <label class="chooser-option">
+          <input type="checkbox" data-type="pond">
+          <div class="chooser-option-card">
+            <span class="chooser-icon" style="background:#8e44ad;">~</span>
+            <span class="chooser-label">Ponds</span>
+            <span class="chooser-desc">Small still water, bank fishing, neighborhood spots</span>
+          </div>
+        </label>
+      </div>
+      <button id="btn-chooser-go" class="btn-primary" style="margin-top:16px;width:100%;">Show Me the Water</button>
+    </div>
+  </div>
+
   <!-- Auth Modal -->
   <div id="auth-modal" class="modal hidden">
     <div class="modal-content auth-modal-content">

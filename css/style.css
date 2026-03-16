@@ -542,6 +542,78 @@ a { color: var(--accent); }
   color: var(--stream);
 }
 
+/* ===== Water Type Chooser ===== */
+.chooser-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.chooser-overlay.hidden { display: none; }
+.chooser-card {
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+.chooser-card h2 {
+  color: var(--accent);
+  font-size: 1.4rem;
+  margin-bottom: 6px;
+}
+.chooser-subtitle {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 20px;
+}
+.chooser-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.chooser-option {
+  cursor: pointer;
+}
+.chooser-option input { display: none; }
+.chooser-option-card {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  grid-template-rows: auto auto;
+  gap: 0 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 2px solid rgba(255,255,255,0.08);
+  background: var(--bg-card);
+  transition: all 0.2s;
+}
+.chooser-option input:checked + .chooser-option-card {
+  border-color: var(--accent);
+  background: rgba(52,152,219,0.08);
+}
+.chooser-icon {
+  grid-row: 1/3;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: bold;
+  font-size: 14px;
+}
+.chooser-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.chooser-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 /* ===== Auth Modal ===== */
 .auth-modal-content {
   max-width: 400px;

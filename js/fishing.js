@@ -75,29 +75,87 @@ function describeWeatherCode(code) {
 }
 
 function getPressureTrend(msl) {
-  if (msl > 1022) return 'high';
-  if (msl > 1013) return 'stable';
-  if (msl > 1005) return 'falling';
+  if (msl > 1025) return 'high';
+  if (msl > 1018) return 'rising';
+  if (msl > 1010) return 'stable';
+  if (msl > 1003) return 'falling';
   return 'low';
 }
 
 function rateFishActivity(w) {
-  let score = 50;
-  if (w.pressureTrend === 'stable') score += 15;
-  else if (w.pressureTrend === 'falling') score += 10;
-  else if (w.pressureTrend === 'high') score -= 5;
-  else score -= 10;
-  if (w.cloudCover > 70) score += 15;
-  else if (w.cloudCover > 40) score += 10;
+  // Base 40, max realistic ~85, bad days ~20-35
+  let score = 40;
+
+  // Barometric pressure — falling is best (pre-front feeding), stable is OK
+  if (w.pressureTrend === 'falling') score += 18;
+  else if (w.pressureTrend === 'stable') score += 8;
+  else if (w.pressureTrend === 'rising') score -= 2;
+  else if (w.pressureTrend === 'high') score -= 10; // bluebird post-front
+  else score -= 8; // low
+
+  // Cloud cover — overcast is best for most species
+  if (w.cloudCover > 80) score += 12;
+  else if (w.cloudCover > 50) score += 6;
+  else if (w.cloudCover > 25) score += 0;
+  else score -= 8; // bright bluebird
+
+  // Wind — light to moderate best
+  if (w.windSpeed >= 5 && w.windSpeed <= 12) score += 7;
+  else if (w.windSpeed > 12 && w.windSpeed <= 20) score += 2;
+  else if (w.windSpeed > 20) score -= 12;
+  else if (w.windSpeed < 3) score -= 4; // dead calm = tough
+
+  // Precipitation
+  if (w.precipitation > 0 && w.precipitation < 0.08) score += 8; // light rain
+  else if (w.precipitation >= 0.08 && w.precipitation < 0.2) score += 2;
+  else if (w.precipitation >= 0.3) score -= 8; // downpour
+
+  // Temperature sweet spot
+  if (w.temp >= 60 && w.temp <= 75) score += 8;
+  else if (w.temp >= 50 && w.temp <= 85) score += 3;
+  else if (w.temp < 38) score -= 15;
+  else if (w.temp > 95) score -= 12;
   else score -= 5;
-  if (w.windSpeed >= 5 && w.windSpeed <= 15) score += 10;
-  else if (w.windSpeed > 20) score -= 15;
-  if (w.precipitation > 0 && w.precipitation < 0.1) score += 10;
-  else if (w.precipitation > 0.3) score -= 10;
-  if (w.temp >= 55 && w.temp <= 80) score += 10;
-  else if (w.temp < 40 || w.temp > 95) score -= 15;
-  if (w.weatherCode >= 95) score -= 25;
-  return Math.max(0, Math.min(100, score));
+
+  // Time of day bonus
+  const hour = new Date().getHours();
+  if ((hour >= 5 && hour <= 9) || (hour >= 17 && hour <= 21)) score += 6;
+  else if (hour >= 11 && hour <= 14) score -= 4;
+
+  // Moon phase influence
+  const moon = getMoonPhase();
+  if (moon.name === 'New Moon' || moon.name === 'Full Moon') score += 5;
+  else if (moon.name === 'First Quarter' || moon.name === 'Last Quarter') score -= 2;
+
+  // Thunderstorms — bad + dangerous
+  if (w.weatherCode >= 95) score -= 20;
+
+  return Math.max(5, Math.min(95, score));
+}
+
+// ===== Moon Phase =====
+
+function getMoonPhase(date) {
+  const d = date ? new Date(date) : new Date();
+  // Compute days since known new moon (Jan 6, 2000 18:14 UTC)
+  const knownNew = new Date('2000-01-06T18:14:00Z');
+  const diffDays = (d - knownNew) / (1000 * 60 * 60 * 24);
+  const lunarCycle = 29.53059;
+  const phase = ((diffDays % lunarCycle) + lunarCycle) % lunarCycle;
+  const pct = Math.round((phase / lunarCycle) * 100);
+  const illumination = Math.round(50 - 50 * Math.cos(2 * Math.PI * phase / lunarCycle));
+
+  let name, emoji;
+  if (phase < 1.85)       { name = 'New Moon';        emoji = '\u{1F311}'; }
+  else if (phase < 7.38)  { name = 'Waxing Crescent'; emoji = '\u{1F312}'; }
+  else if (phase < 9.23)  { name = 'First Quarter';   emoji = '\u{1F313}'; }
+  else if (phase < 14.77) { name = 'Waxing Gibbous';  emoji = '\u{1F314}'; }
+  else if (phase < 16.61) { name = 'Full Moon';        emoji = '\u{1F315}'; }
+  else if (phase < 22.15) { name = 'Waning Gibbous';  emoji = '\u{1F316}'; }
+  else if (phase < 24.00) { name = 'Last Quarter';    emoji = '\u{1F317}'; }
+  else                     { name = 'Waning Crescent'; emoji = '\u{1F318}'; }
+
+  return { name, emoji, illumination, dayInCycle: Math.round(phase * 10) / 10 };
 }
 
 
@@ -1414,9 +1472,10 @@ function getRecommendation(species, weather) {
 // ===== HTML Renderers =====
 
 function getWeatherCardHtml(weather) {
-  const activityColor = weather.fishActivity >= 70 ? '#2ecc71' : weather.fishActivity >= 45 ? '#f39c12' : '#e74c3c';
-  const activityLabel = weather.fishActivity >= 70 ? 'Excellent' : weather.fishActivity >= 55 ? 'Good' : weather.fishActivity >= 40 ? 'Fair' : 'Poor';
+  const activityColor = weather.fishActivity >= 65 ? '#2ecc71' : weather.fishActivity >= 45 ? '#f39c12' : '#e74c3c';
+  const activityLabel = weather.fishActivity >= 65 ? 'Excellent' : weather.fishActivity >= 55 ? 'Good' : weather.fishActivity >= 40 ? 'Fair' : 'Poor';
   const windDirLabel = degToCompass(weather.windDir);
+  const moon = getMoonPhase();
 
   return `
     <div class="detail-section">
@@ -1427,7 +1486,7 @@ function getWeatherCardHtml(weather) {
         <div class="data-card"><div class="label">Conditions</div><div class="value" style="font-size:0.9rem">${weather.conditions}</div></div>
         <div class="data-card"><div class="label">Wind</div><div class="value" style="font-size:0.9rem">${weather.windSpeed} mph ${windDirLabel}</div><div style="font-size:0.65rem;color:var(--text-muted)">Gusts ${weather.windGusts} mph</div></div>
         <div class="data-card"><div class="label">Pressure</div><div class="value" style="font-size:0.9rem">${weather.pressureMsl} mb</div><div style="font-size:0.65rem;color:var(--text-muted)">${weather.pressureTrend}</div></div>
-        <div class="data-card"><div class="label">Cloud Cover</div><div class="value" style="font-size:0.9rem">${weather.cloudCover}%</div></div>
+        <div class="data-card"><div class="label">Moon Phase</div><div class="value" style="font-size:1.2rem">${moon.emoji}</div><div style="font-size:0.65rem;color:var(--text-muted)">${moon.name} (${moon.illumination}%)</div></div>
       </div>
     </div>
   `;
@@ -1510,4 +1569,5 @@ export {
   getTempBracket,
   getWaterClarity,
   degToCompass,
+  getMoonPhase,
 };

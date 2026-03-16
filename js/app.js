@@ -41,11 +41,56 @@ const toastContainer = $('#toast-container');
 const radiusSlider = $('#radius-slider');
 const radiusValue = $('#radius-value');
 
+// ===== Water Type Preferences =====
+// Stored in localStorage so user only picks once (can change via filter)
+const PREF_KEY = 'wwf_water_prefs';
+let waterTypePrefs = null; // null = not chosen yet, array = chosen types
+
+function loadPrefs() {
+  try {
+    const stored = localStorage.getItem(PREF_KEY);
+    if (stored) waterTypePrefs = JSON.parse(stored);
+  } catch {}
+}
+
+function savePrefs(types) {
+  waterTypePrefs = types;
+  localStorage.setItem(PREF_KEY, JSON.stringify(types));
+  // Also sync the filter panel checkboxes
+  filterPanel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    const t = cb.dataset.type;
+    if (t === 'usgs') { cb.checked = true; return; }
+    cb.checked = types.includes(t);
+  });
+}
+
+function showWaterTypeChooser() {
+  return new Promise((resolve) => {
+    const chooser = $('#water-type-chooser');
+    chooser.classList.remove('hidden');
+
+    const submit = $('#btn-chooser-go');
+    const handler = () => {
+      const checked = [...chooser.querySelectorAll('input:checked')].map(c => c.dataset.type);
+      if (checked.length === 0) {
+        toast('Pick at least one type', true);
+        return;
+      }
+      submit.removeEventListener('click', handler);
+      chooser.classList.add('hidden');
+      savePrefs(checked);
+      resolve(checked);
+    };
+    submit.addEventListener('click', handler);
+  });
+}
+
 // ===== Init =====
 async function init() {
   registerServiceWorker();
   setupEventListeners();
   setupAuth();
+  loadPrefs();
 
   // Geolocate
   loadingStatus.textContent = 'Finding your location...';
@@ -62,15 +107,18 @@ async function init() {
     userLon = -77.43;
   }
 
-  loadingStatus.textContent = 'Loading map...';
-  initMap(userLat, userLon, radiusMiles);
-
-  loadingStatus.textContent = 'Fetching water bodies...';
-  await loadData();
-
-  // Hide loading
+  // Hide loading screen before showing chooser
   loadingScreen.classList.add('fade-out');
   setTimeout(() => { loadingScreen.style.display = 'none'; }, 600);
+
+  // If first time, ask what they want to see
+  if (!waterTypePrefs) {
+    await showWaterTypeChooser();
+  }
+
+  initMap(userLat, userLon, radiusMiles);
+
+  await loadData();
 }
 
 // ===== Auth =====
@@ -162,10 +210,12 @@ async function loadData() {
       usgsSites = [];
     }
 
-    // Filter to within radius
-    waterBodies = waterBodies.filter(wb =>
-      distanceMiles(userLat, userLon, wb.lat, wb.lon) <= radiusMiles
-    );
+    // Filter to within radius and user type preferences
+    waterBodies = waterBodies.filter(wb => {
+      if (distanceMiles(userLat, userLon, wb.lat, wb.lon) > radiusMiles) return false;
+      if (waterTypePrefs && !waterTypePrefs.includes(wb.type)) return false;
+      return true;
+    });
     usgsSites = usgsSites.filter(s =>
       distanceMiles(userLat, userLon, s.lat, s.lon) <= radiusMiles
     );
@@ -881,6 +931,9 @@ function setupEventListeners() {
   filterPanel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
     cb.addEventListener('change', () => {
       const active = [...filterPanel.querySelectorAll('input:checked')].map(c => c.dataset.type);
+      // Save water type prefs (exclude usgs from pref, it's always available)
+      const waterTypes = active.filter(t => t !== 'usgs');
+      if (waterTypes.length > 0) savePrefs(waterTypes);
       updateFilters(active, userLat, userLon, showWaterDetail, showUSGSDetail);
     });
   });
