@@ -307,7 +307,6 @@ function getBestFishingTimes(weather, lat, lon, date) {
     if (isNewOrFull) score += 3;
 
     // Solunar boost: check if this hour falls within any major or minor period
-    const hourStart = new Date(solunar ? solunar.majorPeriods[0]?.start || new Date() : new Date());
     if (solunar) {
       const ref = new Date(solunar.moonOverhead || solunar.moonUnderfoot || new Date());
       const dayBase = new Date(ref);
@@ -387,8 +386,8 @@ function getBestTimesHtml(times) {
     const events = [];
     if (sol.moonRise) events.push(`Moonrise ${formatTimeShort(sol.moonRise)}`);
     if (sol.moonSet) events.push(`Moonset ${formatTimeShort(sol.moonSet)}`);
-    if (sol.moonOverhead) events.push(`Transit ${formatTimeShort(sol.moonOverhead)}`);
-    if (sol.moonUnderfoot) events.push(`Underfoot ${formatTimeShort(sol.moonUnderfoot)}`);
+    if (sol.moonOverhead) events.push(`Moon Overhead ${formatTimeShort(sol.moonOverhead)}`);
+    if (sol.moonUnderfoot) events.push(`Moon Below ${formatTimeShort(sol.moonUnderfoot)}`);
     moonEvents = events.map(e => `<span class="solunar-event">${e}</span>`).join('');
   }
 

@@ -592,7 +592,7 @@ function getSpecialRegulations(name, lat, lon) {
       regs.push({ rule: 'Muskie: 42" minimum, 1 per day', type: 'size' });
     }
     if (n.includes('james river')) {
-      regs.push({ rule: 'Striped Bass: 20-28" slot limit (1 per day), or over 36" (1 per day)', type: 'slot' });
+      regs.push({ rule: 'Striped Bass: 20-28" protected slot (must release), keep 1 over 28" or 1 over 36" per day', type: 'slot' });
       if (lon > -77.5) regs.push({ rule: 'Blue Catfish: No daily limit below the fall line', type: 'creel' });
     }
     if (n.includes('smith mountain')) {
@@ -605,7 +605,6 @@ function getSpecialRegulations(name, lat, lon) {
     }
     if (n.includes('kerr') || n.includes('buggs island')) {
       regs.push({ rule: 'Striped Bass: 20" minimum, 4 per day', type: 'size' });
-      regs.push({ rule: 'Largemouth Bass: 14" minimum in tournaments', type: 'size' });
     }
     if (n.includes('lake anna')) {
       regs.push({ rule: 'Striped Bass: 20" minimum, 2 per day', type: 'size' });
@@ -620,6 +619,16 @@ function getSpecialRegulations(name, lat, lon) {
     if (n.includes('rapidan') || n.includes('staunton river') || n.includes('moorman') || n.includes('north fork moormans')) {
       regs.push({ rule: 'Special trout regulations — catch and release only, single hook, artificial only', type: 'special' });
     }
+    if (n.includes('rappahannock')) {
+      regs.push({ rule: 'Striped Bass: check current season — moratorium or restricted harvest may apply', type: 'special' });
+    }
+    if (n.includes('potomac')) {
+      regs.push({ rule: 'Smallmouth Bass: 15" minimum (shared VA/MD waters)', type: 'size' });
+      regs.push({ rule: 'Striped Bass: check PRFC regulations — separate from VA DWR', type: 'special' });
+    }
+    if (n.includes('clinch')) {
+      regs.push({ rule: 'Smallmouth Bass: special regulations apply — check VA DWR', type: 'special' });
+    }
   }
 
   // NC special regulations
@@ -631,7 +640,10 @@ function getSpecialRegulations(name, lat, lon) {
       regs.push({ rule: 'Striped Bass: must immediately release all fish 20-26"', type: 'slot' });
     }
     if (n.includes('nantahala') || n.includes('tuckasegee')) {
-      regs.push({ rule: 'Delayed harvest trout water — catch and release Oct 1 - Jun 1', type: 'special' });
+      regs.push({ rule: 'Delayed harvest trout water — catch and release Oct 1 through first Saturday in June', type: 'special' });
+    }
+    if (n.includes('wilson creek') || n.includes('watauga') || n.includes('south toe')) {
+      regs.push({ rule: 'Delayed harvest trout water — catch and release Oct 1 through first Saturday in June', type: 'special' });
     }
   }
 
@@ -1188,6 +1200,7 @@ function getWaterTempChartHtml(temps) {
   // Downsample to ~48 points (one per 3-4 hours over 7 days)
   const step = Math.max(1, Math.floor(temps.length / 48));
   const sampled = temps.filter((_, i) => i % step === 0);
+  if (sampled.length < 2) return '';
 
   const values = sampled.map(t => t.temp);
   const min = Math.min(...values);
@@ -1218,6 +1231,7 @@ function getWaterTempChartHtml(temps) {
         <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px;display:block;" preserveAspectRatio="none">
           <polyline points="${points}" fill="none" stroke="#e67e22" stroke-width="2" stroke-linejoin="round"/>
           <polygon points="${pad},${h} ${points} ${w - pad},${h}" fill="rgba(230,126,34,0.1)"/>
+          ${(min <= 68 && max >= 50) ? (() => { const y68 = pad + (h - 2 * pad) * (1 - (68 - min) / range); return `<line x1="${pad}" y1="${y68}" x2="${w - pad}" y2="${y68}" stroke="#e74c3c" stroke-width="1" stroke-dasharray="4 3" opacity="0.5"/><text x="${w - pad}" y="${y68 - 3}" text-anchor="end" fill="#e74c3c" font-size="7" opacity="0.7">68\u00B0F stress</text>`; })() : ''}
         </svg>
         <div style="display:flex;justify-content:space-between;font-size:0.6rem;color:var(--text-muted);margin-top:2px;">
           <span>7 days ago</span><span>Now</span>

@@ -150,6 +150,12 @@ async function init() {
 
   initMap(userLat, userLon, radiusMiles);
 
+  // Show header hint for first-time users
+  if (!localStorage.getItem('wwf_header_hint_seen')) {
+    const hint = document.getElementById('header-hint');
+    if (hint) hint.classList.remove('hidden');
+  }
+
   await loadData();
 }
 
@@ -476,7 +482,16 @@ window._dismissTroutWarning = function(btn, key) {
 
 // ===== Shad Run Calendar =====
 
+const shadDismissed = new Set();
+
+window._dismissShadRun = function(btn, name) {
+  shadDismissed.add(name);
+  const el = btn.closest('.detail-section');
+  if (el) el.remove();
+};
+
 function getShadRunHtml(wb) {
+  if (shadDismissed.has(wb.name)) return '';
   // Shad runs happen March through May on eastern VA/NC rivers
   const month = new Date().getMonth() + 1; // 1-12
   if (month < 3 || month > 5) return '';
@@ -489,7 +504,7 @@ function getShadRunHtml(wb) {
 
   // Known shad rivers
   const name = (wb.name || '').toLowerCase();
-  const shadRivers = ['james', 'rappahannock', 'roanoke', 'potomac', 'york', 'mattaponi', 'pamunkey', 'appomattox', 'neuse', 'tar', 'cape fear', 'roanoke'];
+  const shadRivers = ['james', 'rappahannock', 'roanoke', 'potomac', 'york', 'mattaponi', 'pamunkey', 'appomattox', 'neuse', 'tar', 'cape fear'];
   const isKnownShadRiver = shadRivers.some(r => name.includes(r));
 
   if (!isKnownShadRiver) return '';
@@ -508,6 +523,7 @@ function getShadRunHtml(wb) {
         </div>
         <p style="font-size:0.82rem;color:var(--text);margin:0;line-height:1.4;">${peakText}</p>
         <p style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 0;">Use shad darts (white/chartreuse/pink) on ultralight gear below dams and rapids. VA trout license NOT required for shad.</p>
+        <button class="btn-secondary" style="margin-top:6px;padding:4px 10px;font-size:0.75rem;" onclick="window._dismissShadRun(this, '${escapeAttr(wb.name)}')">Dismiss</button>
       </div>
     </div>
   `;
@@ -725,6 +741,7 @@ function getRegulationsHtml(wb) {
   let html = '<div class="detail-section"><h3>Regulations</h3>';
 
   if (regs.length > 0) {
+    let slotExplained = false;
     html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">';
     for (const reg of regs) {
       const icon = reg.type === 'size' ? '\u{1F4CF}' : reg.type === 'slot' ? '\u{1F504}' : reg.type === 'creel' ? '\u{1FAA3}' : '\u26A0\uFE0F';
@@ -732,6 +749,10 @@ function getRegulationsHtml(wb) {
         <span style="flex-shrink:0;">${icon}</span>
         <span>${escapeHtml(reg.rule)}</span>
       </div>`;
+      if (reg.type === 'slot' && !slotExplained) {
+        html += '<div style="font-size:0.7rem;color:var(--text-muted);padding:0 12px;font-style:italic;">Slot limit = fish in this size range must be released</div>';
+        slotExplained = true;
+      }
     }
     html += '</div>';
   }
@@ -764,6 +785,13 @@ async function showWaterDetail(wb, dist) {
     <h2>${escapeHtml(wb.name)}</h2>
     <span class="detail-type-badge badge-${wb.type}">${typeLabel[wb.type] || wb.type}</span>
     <span style="color:var(--text-muted); font-size:0.85rem; margin-left:8px;">${dist.toFixed(1)} mi away</span>
+  `;
+
+  html += `
+    <div style="display:flex;gap:6px;margin-top:8px;">
+      <a href="${escapeAttr(`https://www.google.com/maps/dir/?api=1&destination=${wb.lat},${wb.lon}`)}" target="_blank" rel="noopener" class="btn-secondary" style="flex:1;text-align:center;font-size:0.82rem;text-decoration:none;padding:8px;">Google Maps</a>
+      <a href="${escapeAttr(`https://maps.apple.com/?daddr=${wb.lat},${wb.lon}&dirflg=d`)}" target="_blank" rel="noopener" class="btn-secondary" style="flex:1;text-align:center;font-size:0.82rem;text-decoration:none;padding:8px;">Apple Maps</a>
+    </div>
   `;
 
   // Private property warning
