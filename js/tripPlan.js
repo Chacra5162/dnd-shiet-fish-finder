@@ -8,6 +8,16 @@ import {
   getTempBracket, getWaterClarity, degToCompass, getMoonPhase,
 } from './fishing.js';
 
+function escapeHtml(str) {
+  return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function fetchWithTimeout(url, ms) {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  return fetch(url, { signal: c.signal }).finally(() => clearTimeout(t));
+}
+
 // ===== Hourly Forecast =====
 
 const TIME_WINDOWS = {
@@ -37,7 +47,7 @@ async function fetchForecast(lat, lon, date, timeWindow) {
     end_date: dateStr,
   });
 
-  const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+  const res = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?${params}`, 15000);
   if (!res.ok) throw new Error(`Forecast API error: ${res.status}`);
 
   const json = await res.json();
@@ -382,18 +392,18 @@ function getTripSummaryCardHtml(plan) {
     <div class="trip-summary-card" data-trip-id="${plan.id}">
       <div class="trip-summary-header">
         <div>
-          <div class="trip-summary-name">${plan.place_name}</div>
-          <div class="trip-summary-date">${friendlyDate(plan.trip_date)} &middot; ${(TIME_WINDOWS[plan.time_window] || {}).label || plan.time_window}</div>
+          <div class="trip-summary-name">${escapeHtml(plan.place_name)}</div>
+          <div class="trip-summary-date">${friendlyDate(plan.trip_date)} &middot; ${(TIME_WINDOWS[plan.time_window] || {}).label || escapeHtml(plan.time_window)}</div>
         </div>
-        <span class="trip-status-badge trip-status-${plan.status}">${plan.status}</span>
+        <span class="trip-status-badge trip-status-${escapeHtml(plan.status)}">${escapeHtml(plan.status)}</span>
       </div>
       <div class="trip-summary-meta">
         ${plan.forecast ? `<span class="trip-meta-item temp">${plan.forecast.temp}°F ${plan.forecast.conditions}</span>` : ''}
-        <span class="trip-meta-item" style="color:${trafficColors[traffic.level || plan.traffic_estimate]}">${(traffic.level || plan.traffic_estimate || 'unknown')} traffic</span>
+        <span class="trip-meta-item" style="color:${trafficColors[traffic.level || plan.traffic_estimate]}">${escapeHtml(traffic.description || ((traffic.level || plan.traffic_estimate || 'unknown') + ' traffic'))}</span>
         ${plan.forecast ? `<span class="trip-meta-item" style="color:${plan.forecast.fishActivity >= 55 ? '#2ecc71' : '#f39c12'}">Activity: ${plan.forecast.fishActivity}/100</span>` : ''}
       </div>
-      ${plan.species?.length ? `<div class="trip-species-chips">${plan.species.map(s => `<span class="species-chip-small">${s}</span>`).join('')}</div>` : ''}
-      ${plan.notes ? `<div class="trip-notes-preview">${plan.notes}</div>` : ''}
+      ${plan.species?.length ? `<div class="trip-species-chips">${plan.species.map(s => `<span class="species-chip-small">${escapeHtml(s)}</span>`).join('')}</div>` : ''}
+      ${plan.notes ? `<div class="trip-notes-preview">${escapeHtml(plan.notes)}</div>` : ''}
     </div>
   `;
 }

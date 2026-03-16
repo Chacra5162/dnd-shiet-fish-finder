@@ -6,7 +6,7 @@
 
 import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml } from './api.js';
 import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers } from './map.js';
-import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, getPlaceStatuses, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan } from './supabase.js';
+import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan } from './supabase.js';
 import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml } from './fishing.js';
 import { TIME_WINDOWS, fetchForecast, estimateTraffic, generateGearChecklist, getForecastCardHtml, getTrafficBadgeHtml, getGearChecklistHtml, getTripSummaryCardHtml, friendlyDate } from './tripPlan.js';
 import { CATEGORIES, getArsenalItems, addArsenalItem, updateArsenalItem, deleteArsenalItem, getPhotoUrl, filterItems, getUniqueColors, getUniqueWeights } from './arsenal.js';
@@ -779,7 +779,7 @@ async function showWaterDetail(wb, dist) {
       <h3>Resources</h3>
       <div class="detail-links">
         ${links.map(l => `
-          <a href="${l.url}" target="_blank" rel="noopener" class="detail-link">
+          <a href="${escapeAttr(l.url)}" target="_blank" rel="noopener" class="detail-link">
             ${linkIcon}
             ${escapeHtml(l.label)}
           </a>
@@ -1128,7 +1128,7 @@ function renderSocialFeed(container) {
     }
 
     return `
-      <div class="social-feed-card" data-lat="${post.water_body_lat}" data-lon="${post.water_body_lon}" data-name="${escapeAttr(post.water_body_name)}" onclick="window._goToSocialPost(this)">
+      <div class="social-feed-card" data-lat="${escapeAttr(String(post.water_body_lat))}" data-lon="${escapeAttr(String(post.water_body_lon))}" data-name="${escapeAttr(post.water_body_name)}" onclick="window._goToSocialPost(this)">
         <div class="community-post-header">
           <div class="community-avatar">${escapeHtml(initials)}</div>
           <div style="flex:1;min-width:0;">
@@ -1291,7 +1291,7 @@ function showUSGSDetail(site, dist) {
           ${linkIcon} NWS River Forecast Hydrograph
         </a>
         ${links.map(l => `
-          <a href="${l.url}" target="_blank" rel="noopener" class="detail-link">
+          <a href="${escapeAttr(l.url)}" target="_blank" rel="noopener" class="detail-link">
             ${linkIcon} ${escapeHtml(l.label)}
           </a>
         `).join('')}
@@ -1925,7 +1925,7 @@ function setupEventListeners() {
           userPlaces = [];
           userTrips = [];
           toast('Signed out');
-        })
+        }).catch(e => toast('Sign out failed — try again', true))
       );
     } else {
       authModal.classList.remove('hidden');
@@ -1986,7 +1986,7 @@ function setupEventListeners() {
         toast('Signed in!');
       }
     } catch (err) {
-      errorEl.textContent = err.message || 'Authentication failed';
+      errorEl.textContent = isSignUp ? (err.message || 'Sign up failed') : 'Incorrect email or password';
       errorEl.style.background = '';
       errorEl.style.borderColor = '';
       errorEl.style.color = '';
@@ -2066,9 +2066,11 @@ function setupEventListeners() {
       renderArsenal();
     });
   });
+  let arsenalSearchTimer = null;
   $('#arsenal-search').addEventListener('input', () => {
     arsenalFilters.search = $('#arsenal-search').value;
-    renderArsenal();
+    clearTimeout(arsenalSearchTimer);
+    arsenalSearchTimer = setTimeout(renderArsenal, 150);
   });
 
   // Arsenal photo preview
@@ -2263,9 +2265,7 @@ function showUnnamedSuggestion(count) {
 // ===== Utilities =====
 
 function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str || '';
-  return div.innerHTML;
+  return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function escapeAttr(str) {
@@ -2352,7 +2352,7 @@ function renderLicenseSlots() {
         </div>
         <div class="license-photo-area" onclick="window._changeLicensePhoto(${i})">
           ${lic.photo
-            ? `<img src="${lic.photo}" alt="License ${i + 1}">`
+            ? `<img src="${escapeAttr(lic.photo)}" alt="License ${i + 1}">`
             : `<div class="license-photo-placeholder">
                 <svg viewBox="0 0 24 24" width="32" height="32"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" fill="currentColor"/></svg>
                 Tap to add photo

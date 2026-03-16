@@ -32,6 +32,7 @@ async function addCommunityPost(userId, displayName, waterBody, postData, photoF
   let photoPath = null;
 
   if (photoFile) {
+    if (photoFile.size > 10 * 1024 * 1024) throw new Error('Photo must be under 10 MB');
     const ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
     const rawExt = photoFile.name.split('.').pop().toLowerCase();
     const ext = ALLOWED_EXTS.includes(rawExt) ? rawExt : 'jpg';

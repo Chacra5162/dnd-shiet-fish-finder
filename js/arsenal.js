@@ -44,6 +44,7 @@ async function addArsenalItem(userId, item, photoFile) {
 
   // Upload photo if provided
   if (photoFile) {
+    if (photoFile.size > 10 * 1024 * 1024) throw new Error('Photo must be under 10 MB');
     const ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
     const rawExt = photoFile.name.split('.').pop().toLowerCase();
     const ext = ALLOWED_EXTS.includes(rawExt) ? rawExt : 'jpg';
@@ -76,6 +77,7 @@ async function addArsenalItem(userId, item, photoFile) {
 
 async function updateArsenalItem(userId, itemId, updates, newPhotoFile, oldPhotoPath) {
   if (newPhotoFile) {
+    if (newPhotoFile.size > 10 * 1024 * 1024) throw new Error('Photo must be under 10 MB');
     // Delete old photo if replacing
     if (oldPhotoPath) {
       await client().storage.from('arsenal-photos').remove([oldPhotoPath]).catch(() => {});

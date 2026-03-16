@@ -30,7 +30,8 @@ async function initAuth(onAuthChange) {
   });
 
   // Check existing session
-  const { data: { session } } = await client.auth.getSession();
+  const { data: { session }, error: sessError } = await client.auth.getSession();
+  if (sessError) console.warn('Session restore error:', sessError.message);
   currentUser = session?.user || null;
   if (onAuthChangeCallback) onAuthChangeCallback(currentUser, 'INITIAL');
   return currentUser;
@@ -242,7 +243,6 @@ export {
   savePlace,
   removePlace,
   updatePlaceNotes,
-  getPlaceStatuses,
   saveTripPlan,
   getUserTripPlans,
   updateTripPlan,

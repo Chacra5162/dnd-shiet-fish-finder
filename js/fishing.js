@@ -6,6 +6,12 @@
 
 import { distanceMiles } from './api.js';
 
+function fetchWithTimeout(url, ms) {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  return fetch(url, { signal: c.signal }).finally(() => clearTimeout(t));
+}
+
 // ===== Weather via Open-Meteo =====
 
 let weatherCache = null;
@@ -34,7 +40,7 @@ async function fetchWeather(lat, lon) {
     timezone: 'America/New_York',
   });
 
-  const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+  const res = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?${params}`, 10000);
   if (!res.ok) throw new Error(`Weather API error: ${res.status}`);
 
   const json = await res.json();
@@ -339,7 +345,7 @@ async function fetchTidePredictions(stationId, date) {
     interval: '6', // every 6 minutes for smooth chart
   });
 
-  const res = await fetch(`https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?${params}`);
+  const res = await fetchWithTimeout(`https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?${params}`, 10000);
   if (!res.ok) throw new Error(`NOAA API error: ${res.status}`);
 
   const json = await res.json();
@@ -1624,27 +1630,6 @@ const SPECIES_DATA = {
     depthTips: { cold: 'Deep structure 15-30ft, slow jigging presentations', mild: 'Transition banks 8-15ft, trolling crankbaits', warm: 'Points and humps 10-20ft, bottom bouncers', hot: 'Deepest structure 20-35ft, early morning or night fishing' },
     tips: ['Best bite is low light — dawn, dusk, and overcast days', 'Claytor Lake (VA) is the primary VA walleye fishery', 'Slow presentations in cold water — barely move the bait', 'Trolling crankbaits along creek channels in spring is very effective'],
   },
-  'Hickory Shad': {
-    tempBrackets: { cold: [45, 55], mild: [55, 65], warm: [65, 72], hot: [72, 85] },
-    lures: { cold: ['Small Shad Dart', 'Gold Spoon'], mild: ['Shad Dart', 'Small Jig', 'Gold Spoon'], warm: ['Shad Dart', 'Small Inline Spinner'], hot: ['Shad Dart'] },
-    baits: ['Small pieces of shad', 'Bloodworms'],
-    depthTips: { cold: 'Deep pools below dams 8-15ft', mild: 'Mid-depth runs 4-8ft below rapids', warm: 'Current seams near dam tailraces', hot: 'Deep holes near cold water inputs' },
-    tips: ['Fish below dams during spring run (March-May)', 'Use ultralight gear — 4-6lb test', 'Shad darts in white, chartreuse, or pink are standard', 'Cast upstream and let drift through current'],
-  },
-  'Spotted Bass': {
-    tempBrackets: { cold: [42, 55], mild: [55, 68], warm: [68, 80], hot: [80, 90] },
-    lures: { cold: ['Ned Rig', 'Small Jerkbait', 'Hair Jig'], mild: ['Grub', 'Small Crankbait', 'Drop Shot'], warm: ['Topwater', 'Crankbait', 'Swimbait'], hot: ['Deep Crankbait', 'Drop Shot', 'Ned Rig'] },
-    baits: ['Crawfish', 'Hellgrammites', 'Minnows'],
-    depthTips: { cold: 'Deep bluffs and ledges 12-25ft', mild: 'Rocky points and current breaks 6-15ft', warm: 'Current seams, rocky banks 3-10ft', hot: 'Deep ledges and shade 15-25ft' },
-    tips: ['Common in New River, upper James, and Roanoke River', 'Prefer more current than largemouth — fish the flow', 'Smaller profile baits — downsize everything vs largemouth', 'Often mixed with smallmouth in rocky river sections'],
-  },
-  'Carp': {
-    tempBrackets: { cold: [40, 55], mild: [55, 68], warm: [68, 80], hot: [80, 95] },
-    lures: { cold: ['Small Hair Jig'], mild: ['Bread Fly', 'Corn Fly'], warm: ['Surface Bread', 'Corn Fly'], hot: ['Surface Bread'] },
-    baits: ['Sweet corn (canned)', 'Bread', 'Boilies', 'Dough balls', 'Nightcrawlers'],
-    depthTips: { cold: 'Deep slow pools 6-12ft, bottom rigs', mild: 'Shallow flats 2-6ft, bottom feeding', warm: 'Visible cruising fish in shallows 1-4ft', hot: 'Shaded banks, deeper pools, early morning flats' },
-    tips: ['Pack bait (ground corn mix) to attract fish', 'Hair rig for best hookup ratio', 'Strong gear needed — 15-20lb line for big James River carp', 'Sight fishing with bread on surface is exciting in warm months'],
-  },
   'Muskie': {
     lures: {
       cold: ['Jerkbait (slow)', 'Large Sucker Rig', 'Glide Bait'],
@@ -1996,14 +1981,12 @@ export {
   getWeatherCardHtml,
   getRecommendationHtml,
   SPECIES_DATA,
-  LURE_DB,
   rateFishActivity,
   getTempBracket,
   getWaterClarity,
   degToCompass,
   getMoonPhase,
   getPressureTrend,
-  getTroutStressWarning,
   getBestFishingTimes,
   getBestTimesHtml,
   isTidalWater,

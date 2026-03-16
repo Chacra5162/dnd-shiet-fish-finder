@@ -124,4 +124,4 @@ async function getMultiCached(storeName, south, west, north, east) {
   return { cached, missing, allCells: cells };
 }
 
-export { STORES, getCached, setCache, getGridCells, getMultiCached, gridKey };
+export { STORES, getCached, setCache, getMultiCached, gridKey };

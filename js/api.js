@@ -437,7 +437,7 @@ async function fetchUSGSTile(south, west, north, east) {
     siteStatus: 'active',
   });
 
-  const response = await fetch(`${USGS_BASE}?${params}`);
+  const response = await fetchWithTimeout(`${USGS_BASE}?${params}`, 15000);
   if (!response.ok) {
     console.warn(`USGS tile error ${response.status} for bbox ${west},${south},${east},${north}`);
     return [];
@@ -745,7 +745,7 @@ function extractFloodStage(gauge) {
   const thresholds = {};
   if (floodCats) {
     if (floodCats.action?.stage != null) thresholds.action = floodCats.action.stage;
-    if (floodCats.flood?.stage != null) thresholds.flood = floodCats.flood.stage;
+    if (floodCats.minor?.stage != null) thresholds.minor = floodCats.minor.stage;
     if (floodCats.moderate?.stage != null) thresholds.moderate = floodCats.moderate.stage;
     if (floodCats.major?.stage != null) thresholds.major = floodCats.major.stage;
   }
@@ -763,7 +763,7 @@ function getFloodCategory(gaugeHeight, thresholds) {
   if (!thresholds || gaugeHeight == null) return null;
   if (thresholds.major != null && gaugeHeight >= thresholds.major) return 'major';
   if (thresholds.moderate != null && gaugeHeight >= thresholds.moderate) return 'moderate';
-  if (thresholds.flood != null && gaugeHeight >= thresholds.flood) return 'flood';
+  if (thresholds.minor != null && gaugeHeight >= thresholds.minor) return 'flood';
   if (thresholds.action != null && gaugeHeight >= thresholds.action) return 'action';
   return 'normal';
 }
@@ -833,8 +833,8 @@ async function extractNWSForecast(gauge) {
     const upcoming = forecasts
       .map(pt => ({
         time: new Date(pt.validTime || pt.time).getTime(),
-        stage: pt.primary?.value ?? pt.stage ?? pt.value ?? null,
-        flow: pt.secondary?.value ?? pt.flow ?? null,
+        stage: (typeof pt.primary === 'number' ? pt.primary : pt.primary?.value) ?? pt.stage ?? pt.value ?? null,
+        flow: (typeof pt.secondary === 'number' ? pt.secondary : pt.secondary?.value) ?? pt.flow ?? null,
       }))
       .filter(pt => pt.time >= now && pt.time <= sixHoursOut && pt.stage != null)
       .sort((a, b) => a.time - b.time);
@@ -922,7 +922,7 @@ function getFloodStageHtml(floodData, gaugeHeight) {
     html += `<div class="flood-thresholds" style="display:flex;flex-wrap:wrap;gap:6px;">`;
     const stages = [
       { key: 'action', label: 'Action', color: '#f1c40f' },
-      { key: 'flood', label: 'Flood', color: '#f39c12' },
+      { key: 'minor', label: 'Minor Flood', color: '#f39c12' },
       { key: 'moderate', label: 'Moderate', color: '#e74c3c' },
       { key: 'major', label: 'Major', color: '#c0392b' },
     ];
