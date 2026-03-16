@@ -1783,6 +1783,13 @@ a { color: var(--accent); }
   background: #e74c3c;
 }
 
+/* ===== Filter Apply Button ===== */
+.filter-apply-btn {
+  width: 100%;
+  margin-top: 12px;
+  font-size: 0.95rem;
+}
+
 /* ===== Filter Divider ===== */
 .filter-divider {
   height: 1px;

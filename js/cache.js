@@ -13,8 +13,8 @@ const STORES = {
 
 // Cache TTLs in milliseconds
 const TTL = {
-  waterBodies: 7 * 24 * 60 * 60 * 1000,  // 7 days
-  usgs: 7 * 24 * 60 * 60 * 1000,           // 7 days (site locations)
+  waterBodies: 30 * 24 * 60 * 60 * 1000,  // 30 days (water body locations rarely change)
+  usgs: 30 * 24 * 60 * 60 * 1000,          // 30 days (site locations)
   usgsCurrent: 60 * 60 * 1000,             // 1 hour (real-time data)
 };
 
@@ -88,13 +88,17 @@ function getGridCells(south, west, north, east) {
 }
 
 // Get cached data for multiple grid cells, return { cached, missing }
+// Reads all cells in parallel for speed
 async function getMultiCached(storeName, south, west, north, east) {
   const cells = getGridCells(south, west, north, east);
   const cached = [];
   const missing = [];
 
-  for (const cell of cells) {
-    const data = await getCached(storeName, cell.lat, cell.lon);
+  const results = await Promise.all(
+    cells.map(cell => getCached(storeName, cell.lat, cell.lon).then(data => ({ cell, data })))
+  );
+
+  for (const { cell, data } of results) {
     if (data) {
       cached.push(...data);
     } else {

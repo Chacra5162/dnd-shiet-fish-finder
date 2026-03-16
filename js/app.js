@@ -1211,36 +1211,45 @@ function setupEventListeners() {
     filterPanel.classList.add('hidden');
   });
 
-  // Filter checkboxes
-  filterPanel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const active = [...filterPanel.querySelectorAll('input:checked')].map(c => c.dataset.type).filter(Boolean);
-      // Save water type prefs (exclude usgs from pref, it's always available)
-      const waterTypes = active.filter(t => t !== 'usgs');
-      if (waterTypes.length > 0) savePrefs(waterTypes);
-      updateFilters(active, userLat, userLon, showWaterDetail, showUSGSDetail);
-    });
-  });
-
-  // Unnamed filter checkbox
+  // Unnamed filter checkbox — sync initial state
   const unnamedCb = document.getElementById('filter-hide-unnamed');
   if (unnamedCb) {
     unnamedCb.checked = hideUnnamed;
-    unnamedCb.addEventListener('change', () => {
-      hideUnnamed = unnamedCb.checked;
-      localStorage.setItem('wwf_hide_unnamed', hideUnnamed ? 'true' : 'false');
-      loadData();
-    });
   }
 
-  // Radius slider
+  // Radius slider — live label update only (no apply until Go button)
   radiusSlider.addEventListener('input', () => {
     radiusValue.textContent = radiusSlider.value;
   });
-  radiusSlider.addEventListener('change', async () => {
-    radiusMiles = parseInt(radiusSlider.value);
-    updateRadius(radiusMiles, userLat, userLon);
-    await loadData();
+
+  // Apply Filters button — single point of apply + close
+  $('#btn-apply-filters').addEventListener('click', () => {
+    // Read filter checkboxes
+    const active = [...filterPanel.querySelectorAll('.filter-options input:checked')].map(c => c.dataset.type).filter(Boolean);
+    const waterTypes = active.filter(t => t !== 'usgs');
+    if (waterTypes.length > 0) savePrefs(waterTypes);
+    updateFilters(active, userLat, userLon, showWaterDetail, showUSGSDetail);
+
+    // Read unnamed toggle
+    const unCb = document.getElementById('filter-hide-unnamed');
+    const newHideUnnamed = unCb ? unCb.checked : hideUnnamed;
+    const unnamedChanged = newHideUnnamed !== hideUnnamed;
+    hideUnnamed = newHideUnnamed;
+    localStorage.setItem('wwf_hide_unnamed', hideUnnamed ? 'true' : 'false');
+
+    // Read radius
+    const newRadius = parseInt(radiusSlider.value);
+    const radiusChanged = newRadius !== radiusMiles;
+    radiusMiles = newRadius;
+    if (radiusChanged) updateRadius(radiusMiles, userLat, userLon);
+
+    // Reload data if radius or unnamed filter changed
+    if (radiusChanged || unnamedChanged) {
+      loadData();
+    }
+
+    // Close the panel
+    filterPanel.classList.add('hidden');
   });
 
   // Detail panel close

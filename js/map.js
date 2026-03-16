@@ -1,10 +1,12 @@
 /**
  * Leaflet map management — markers, layers, radius circle.
+ * Uses canvas renderer + circleMarkers for performance with many markers.
  */
 
 import { distanceMiles } from './api.js';
 
 let map = null;
+let canvasRenderer = null;
 let userMarker = null;
 let radiusCircle = null;
 let waterLayer = null;
@@ -14,17 +16,19 @@ let allWaterBodies = [];
 let allUSGSSites = [];
 let activeFilters = new Set(['lake', 'river', 'stream', 'pond', 'boat_landing', 'fishing_pier', 'usgs']);
 
-const MARKER_ICONS = {
-  lake: { emoji: '~', cls: 'marker-lake' },
-  river: { emoji: '~', cls: 'marker-river' },
-  stream: { emoji: '~', cls: 'marker-stream' },
-  pond: { emoji: '~', cls: 'marker-pond' },
-  boat_landing: { emoji: '⚓', cls: 'marker-boat-landing' },
-  fishing_pier: { emoji: '🎣', cls: 'marker-fishing-pier' },
-  usgs: { emoji: '!', cls: 'marker-usgs' },
+// Color + size config for each water body type (used by circleMarkers on canvas)
+const MARKER_STYLES = {
+  lake:          { color: '#2980b9', radius: 10, weight: 2 },
+  river:         { color: '#1abc9c', radius: 8,  weight: 2 },
+  stream:        { color: '#27ae60', radius: 6,  weight: 2 },
+  pond:          { color: '#8e44ad', radius: 7,  weight: 2 },
+  boat_landing:  { color: '#e67e22', radius: 9,  weight: 2 },
+  fishing_pier:  { color: '#9b59b6', radius: 9,  weight: 2 },
+  usgs:          { color: '#e74c3c', radius: 9,  weight: 2 },
 };
+const DEFAULT_STYLE = { color: '#27ae60', radius: 6, weight: 2 };
 
-// SVG icons for user place statuses
+// SVG divIcons only for user place markers (small count, need distinct shapes)
 const USER_PLACE_ICONS = {
   favorite: {
     svg: '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="#1a1a2e" stroke="#1a1a2e" stroke-width="0.5"/></svg>',
@@ -40,28 +44,6 @@ const USER_PLACE_ICONS = {
   },
 };
 
-const MARKER_SIZES = {
-  lake: [28, 28],
-  usgs: [26, 26],
-  boat_landing: [26, 26],
-  fishing_pier: [26, 26],
-  river: [24, 24],
-  pond: [22, 22],
-};
-const DEFAULT_MARKER_SIZE = [20, 20];
-
-function createMarkerIcon(type) {
-  const cfg = MARKER_ICONS[type] || MARKER_ICONS.stream;
-  const size = MARKER_SIZES[type] || DEFAULT_MARKER_SIZE;
-  const anchor = [size[0] / 2, size[1] / 2];
-  return L.divIcon({
-    className: `marker-water ${cfg.cls}`,
-    html: `<span class="marker-icon-inner">${cfg.emoji}</span>`,
-    iconSize: size,
-    iconAnchor: anchor,
-  });
-}
-
 function createUserPlaceIcon(status) {
   const cfg = USER_PLACE_ICONS[status] || USER_PLACE_ICONS.favorite;
   return L.divIcon({
@@ -73,11 +55,15 @@ function createUserPlaceIcon(status) {
 }
 
 function initMap(lat, lon, radiusMiles) {
+  // Canvas renderer — draws all circleMarkers to a single <canvas>, much faster than DOM
+  canvasRenderer = L.canvas({ padding: 0.5 });
+
   map = L.map('map', {
     center: [lat, lon],
     zoom: 11,
     zoomControl: true,
     attributionControl: true,
+    preferCanvas: true,
   });
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -150,41 +136,55 @@ function renderMarkers(userLat, userLon, onClickWater, onClickUSGS) {
   waterLayer.clearLayers();
   usgsLayer.clearLayers();
 
-  // Water bodies
+  // Water bodies — canvas circleMarkers (fast)
   for (const wb of allWaterBodies) {
     if (!activeFilters.has(wb.type)) continue;
 
-    const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
-    const marker = L.marker([wb.lat, wb.lon], {
-      icon: createMarkerIcon(wb.type),
-      title: wb.name,
+    const style = MARKER_STYLES[wb.type] || DEFAULT_STYLE;
+    const marker = L.circleMarker([wb.lat, wb.lon], {
+      renderer: canvasRenderer,
+      radius: style.radius,
+      fillColor: style.color,
+      fillOpacity: 0.85,
+      color: '#fff',
+      weight: style.weight,
     });
 
     marker.bindTooltip(wb.name, {
       direction: 'top',
-      offset: [0, -10],
+      offset: [0, -style.radius],
       className: 'leaflet-tooltip',
     });
 
-    marker.on('click', () => onClickWater(wb, dist));
+    marker.on('click', () => {
+      const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
+      onClickWater(wb, dist);
+    });
     waterLayer.addLayer(marker);
   }
 
-  // USGS sites
+  // USGS sites — canvas circleMarkers
   if (activeFilters.has('usgs')) {
+    const usgsStyle = MARKER_STYLES.usgs;
     for (const site of allUSGSSites) {
-      const dist = distanceMiles(userLat, userLon, site.lat, site.lon);
-      const marker = L.marker([site.lat, site.lon], {
-        icon: createMarkerIcon('usgs'),
-        title: site.name,
+      const marker = L.circleMarker([site.lat, site.lon], {
+        renderer: canvasRenderer,
+        radius: usgsStyle.radius,
+        fillColor: usgsStyle.color,
+        fillOpacity: 0.85,
+        color: '#fff',
+        weight: usgsStyle.weight,
       });
 
       marker.bindTooltip(`USGS: ${site.name}`, {
         direction: 'top',
-        offset: [0, -10],
+        offset: [0, -usgsStyle.radius],
       });
 
-      marker.on('click', () => onClickUSGS(site, dist));
+      marker.on('click', () => {
+        const dist = distanceMiles(userLat, userLon, site.lat, site.lon);
+        onClickUSGS(site, dist);
+      });
       usgsLayer.addLayer(marker);
     }
   }
@@ -214,6 +214,7 @@ function panTo(lat, lon, zoom) {
 }
 
 // Render user place markers (favorites, visited, avoid) on the map
+// These use divIcons (small count) so they get distinct shapes
 function setUserPlaceMarkers(places, onClickPlace) {
   if (!userPlacesLayer) return;
   userPlacesLayer.clearLayers();
@@ -223,7 +224,7 @@ function setUserPlaceMarkers(places, onClickPlace) {
     const marker = L.marker([place.lat, place.lon], {
       icon,
       title: `${place.place_name} (${place.status})`,
-      zIndexOffset: 500, // above regular markers
+      zIndexOffset: 500,
     });
 
     const statusLabel = place.status === 'favorite' ? 'Favorite' : place.status === 'visited' ? 'Visited' : 'Avoid';
