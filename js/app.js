@@ -838,6 +838,7 @@ function openArsenalForm(editItem) {
     $('#af-submit').textContent = 'Add Item';
   }
 
+  arsenalPanel.classList.add('hidden');
   arsenalFormModal.classList.remove('hidden');
 }
 
@@ -1296,8 +1297,16 @@ function setupEventListeners() {
   });
   $('#btn-close-arsenal').addEventListener('click', () => arsenalPanel.classList.add('hidden'));
   $('#btn-arsenal-add').addEventListener('click', () => openArsenalForm(null));
-  $('#btn-close-arsenal-form').addEventListener('click', () => arsenalFormModal.classList.add('hidden'));
-  arsenalFormModal.addEventListener('click', (e) => { if (e.target === arsenalFormModal) arsenalFormModal.classList.add('hidden'); });
+  $('#btn-close-arsenal-form').addEventListener('click', () => {
+    arsenalFormModal.classList.add('hidden');
+    arsenalPanel.classList.remove('hidden');
+  });
+  arsenalFormModal.addEventListener('click', (e) => {
+    if (e.target === arsenalFormModal) {
+      arsenalFormModal.classList.add('hidden');
+      arsenalPanel.classList.remove('hidden');
+    }
+  });
 
   // Arsenal filters
   ['arsenal-cat-filter', 'arsenal-color-filter', 'arsenal-weight-filter'].forEach(id => {
@@ -1360,6 +1369,7 @@ function setupEventListeners() {
         toast('Item added to arsenal!');
       }
       arsenalFormModal.classList.add('hidden');
+      arsenalPanel.classList.remove('hidden');
       populateArsenalFilters();
       renderArsenal();
     } catch (err) {
