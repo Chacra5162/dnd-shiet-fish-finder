@@ -1,0 +1,108 @@
+/**
+ * Location-based IndexedDB cache.
+ * Keys are grid cells (~5 mile squares) so we only cache data near the user.
+ */
+
+const DB_NAME = 'waterway-finder';
+const DB_VERSION = 1;
+const STORES = {
+  waterBodies: 'water_bodies',
+  usgs: 'usgs_sites',
+  usgsCurrent: 'usgs_current',
+};
+
+// Cache TTLs in milliseconds
+const TTL = {
+  waterBodies: 7 * 24 * 60 * 60 * 1000,  // 7 days
+  usgs: 7 * 24 * 60 * 60 * 1000,           // 7 days (site locations)
+  usgsCurrent: 60 * 60 * 1000,             // 1 hour (real-time data)
+};
+
+// Grid cell size in degrees (~5 miles ≈ 0.07 degrees)
+const GRID_SIZE = 0.07;
+
+function gridKey(lat, lon) {
+  const gLat = (Math.round(lat / GRID_SIZE) * GRID_SIZE).toFixed(3);
+  const gLon = (Math.round(lon / GRID_SIZE) * GRID_SIZE).toFixed(3);
+  return `${gLat}_${gLon}`;
+}
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      for (const store of Object.values(STORES)) {
+        if (!db.objectStoreNames.contains(store)) {
+          db.createObjectStore(store, { keyPath: 'gridKey' });
+        }
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function getCached(storeName, lat, lon) {
+  const db = await openDB();
+  const key = gridKey(lat, lon);
+  return new Promise((resolve) => {
+    const tx = db.transaction(storeName, 'readonly');
+    const store = tx.objectStore(storeName);
+    const req = store.get(key);
+    req.onsuccess = () => {
+      const record = req.result;
+      if (!record) return resolve(null);
+      const ttl = TTL[Object.keys(STORES).find(k => STORES[k] === storeName)] || TTL.waterBodies;
+      if (Date.now() - record.timestamp > ttl) {
+        resolve(null); // expired
+      } else {
+        resolve(record.data);
+      }
+    };
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function setCache(storeName, lat, lon, data) {
+  const db = await openDB();
+  const key = gridKey(lat, lon);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    store.put({ gridKey: key, data, timestamp: Date.now() });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// Get all grid cells that cover a bounding box
+function getGridCells(south, west, north, east) {
+  const cells = [];
+  for (let lat = south; lat <= north; lat += GRID_SIZE) {
+    for (let lon = west; lon <= east; lon += GRID_SIZE) {
+      cells.push({ lat, lon, key: gridKey(lat, lon) });
+    }
+  }
+  return cells;
+}
+
+// Get cached data for multiple grid cells, return { cached, missing }
+async function getMultiCached(storeName, south, west, north, east) {
+  const cells = getGridCells(south, west, north, east);
+  const cached = [];
+  const missing = [];
+
+  for (const cell of cells) {
+    const data = await getCached(storeName, cell.lat, cell.lon);
+    if (data) {
+      cached.push(...data);
+    } else {
+      missing.push(cell);
+    }
+  }
+
+  return { cached, missing, allCells: cells };
+}
+
+export { STORES, getCached, setCache, getGridCells, getMultiCached, gridKey };
