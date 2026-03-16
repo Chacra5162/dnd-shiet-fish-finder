@@ -7,6 +7,7 @@
 import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles } from './api.js';
 import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS } from './map.js';
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, getPlaceStatuses } from './supabase.js';
+import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA } from './fishing.js';
 
 // ===== State =====
 let userLat = 37.54; // Default: Richmond, VA
@@ -300,7 +301,7 @@ window._saveNotes = async function(btn) {
 
 // ===== Detail Panels =====
 
-function showWaterDetail(wb, dist) {
+async function showWaterDetail(wb, dist) {
   const nearbyUSGS = findNearbyUSGS(wb.lat, wb.lon, 10);
   const links = getFishingLinks(wb.lat, wb.lon, wb.type, wb.name);
   const species = getCommonSpecies(wb.type, wb.lat, wb.lon);
@@ -315,15 +316,18 @@ function showWaterDetail(wb, dist) {
   // Place actions (favorite / visited / avoid)
   html += getPlaceStatusHtml(wb);
 
-  // Common species
+  // Species selector — clickable chips that load tackle recs
   html += `
     <div class="detail-section">
-      <h3>Common Species (${wb.type === 'lake' || wb.type === 'pond' ? 'Freshwater' : 'In Area'})</h3>
-      <div style="display:flex; flex-wrap:wrap; gap:6px;">
-        ${species.map(s => `<span style="background:var(--bg-surface); padding:4px 10px; border-radius:6px; font-size:0.85rem;">${escapeHtml(s)}</span>`).join('')}
+      <h3>Species — Tap for What to Use</h3>
+      <div class="species-selector" id="species-selector">
+        ${species.map((s, i) => `<button class="species-chip" data-species="${escapeAttr(s)}" onclick="window._selectSpecies(this, ${wb.lat}, ${wb.lon})">${escapeHtml(s)}</button>`).join('')}
       </div>
     </div>
   `;
+
+  // Weather + recommendation placeholder (loaded async)
+  html += `<div id="weather-rec-area"><div class="loading-inline">Loading weather data...</div></div>`;
 
   // Tags info
   if (wb.tags) {
@@ -375,14 +379,15 @@ function showWaterDetail(wb, dist) {
     `;
   }
 
-  // Links
+  // Links with separate Google & Apple Maps
+  const linkIcon = `<svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" fill="currentColor"/></svg>`;
   html += `
     <div class="detail-section">
       <h3>Resources</h3>
       <div class="detail-links">
         ${links.map(l => `
           <a href="${l.url}" target="_blank" rel="noopener" class="detail-link">
-            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" fill="currentColor"/></svg>
+            ${linkIcon}
             ${escapeHtml(l.label)}
           </a>
         `).join('')}
@@ -399,7 +404,73 @@ function showWaterDetail(wb, dist) {
   detailContent.innerHTML = html;
   detailPanel.classList.remove('hidden');
   panTo(wb.lat, wb.lon, 13);
+
+  // Async: fetch weather and show initial card
+  loadWeatherForDetail(wb.lat, wb.lon);
 }
+
+// Fetch weather and render into the detail panel
+async function loadWeatherForDetail(lat, lon) {
+  const area = document.getElementById('weather-rec-area');
+  if (!area) return;
+
+  try {
+    const weather = await fetchWeather(lat, lon);
+    area.innerHTML = getWeatherCardHtml(weather);
+    // Store weather on window for species selector to use
+    window._currentWeather = weather;
+  } catch (e) {
+    console.warn('Weather fetch failed:', e);
+    area.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">Weather data unavailable</p>';
+    window._currentWeather = null;
+  }
+}
+
+// Species chip click handler
+window._selectSpecies = async function(btn, lat, lon) {
+  // Toggle active state
+  const wasActive = btn.classList.contains('species-active');
+  document.querySelectorAll('.species-chip').forEach(c => c.classList.remove('species-active'));
+
+  // Remove any existing recommendation
+  const existing = document.getElementById('species-rec');
+  if (existing) existing.remove();
+
+  if (wasActive) return; // just deselect
+
+  btn.classList.add('species-active');
+  const species = btn.dataset.species;
+
+  // Get or fetch weather
+  let weather = window._currentWeather;
+  if (!weather) {
+    try {
+      weather = await fetchWeather(lat, lon);
+      window._currentWeather = weather;
+      // Also update weather card if it failed before
+      const area = document.getElementById('weather-rec-area');
+      if (area && area.querySelector('.loading-inline')) {
+        area.innerHTML = getWeatherCardHtml(weather);
+      }
+    } catch {
+      // Show rec without weather-specific tips
+      weather = { temp: 65, cloudCover: 50, windSpeed: 5, pressureMsl: 1015, pressureTrend: 'stable', fishActivity: 50, precipitation: 0, windGusts: 8 };
+    }
+  }
+
+  const rec = getRecommendation(species, weather);
+  if (!rec) return;
+
+  // Insert recommendation after the species selector section
+  const recDiv = document.createElement('div');
+  recDiv.id = 'species-rec';
+  recDiv.innerHTML = getRecommendationHtml(rec);
+
+  const selector = document.getElementById('species-selector');
+  if (selector && selector.parentElement) {
+    selector.parentElement.after(recDiv);
+  }
+};
 
 function showUSGSDetail(site, dist) {
   const links = getFishingLinks(site.lat, site.lon, 'river', site.name);

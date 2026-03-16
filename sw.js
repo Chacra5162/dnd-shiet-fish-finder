@@ -1,4 +1,4 @@
-const CACHE_NAME = 'waterway-finder-v2';
+const CACHE_NAME = 'waterway-finder-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const STATIC_ASSETS = [
   './js/cache.js',
   './js/map.js',
   './js/supabase.js',
+  './js/fishing.js',
   './manifest.json',
   './icons/favicon.svg',
 ];
@@ -47,7 +48,8 @@ self.addEventListener('fetch', (event) => {
   if (
     url.hostname === 'waterservices.usgs.gov' ||
     url.hostname === 'overpass-api.de' ||
-    url.hostname.includes('supabase.co')
+    url.hostname.includes('supabase.co') ||
+    url.hostname === 'api.open-meteo.com'
   ) {
     event.respondWith(
       fetch(event.request).catch(() => {

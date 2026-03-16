@@ -359,10 +359,16 @@ function getFishingLinks(lat, lon, waterType, waterName) {
     });
   }
 
-  // Google Maps directions
+  // Directions
   links.push({
-    label: `Directions to ${waterName}`,
+    label: `Google Maps Directions`,
     url: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`,
+    icon: 'google',
+  });
+  links.push({
+    label: `Apple Maps Directions`,
+    url: `https://maps.apple.com/?daddr=${lat},${lon}&dirflg=d`,
+    icon: 'apple',
   });
 
   return links;
