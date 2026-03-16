@@ -165,10 +165,6 @@ function panTo(lat, lon, zoom) {
   }
 }
 
-function getMap() {
-  return map;
-}
-
 // Find USGS sites near a given water body
 function findNearbyUSGS(lat, lon, maxMiles = 5) {
   return allUSGSSites
@@ -188,6 +184,5 @@ export {
   updateRadius,
   recenter,
   panTo,
-  getMap,
   findNearbyUSGS,
 };

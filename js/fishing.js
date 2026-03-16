@@ -165,44 +165,28 @@ function getBestFishingTimes(weather, date) {
   const moon = getMoonPhase(date);
   const isOvercast = weather.cloudCover > 65;
   const isRainy = weather.precipitation > 0.02;
+  const isNewOrFull = moon.name === 'New Moon' || moon.name === 'Full Moon';
 
-  // Solunar-inspired: major periods around moon overhead/underfoot (~every 12.4h)
-  // Minor periods at moonrise/moonset
-  // We approximate using the moon's day in cycle
-  const moonTransitOffset = (moon.dayInCycle % 1) * 24; // rough hour offset
-  const majorPeriod1 = Math.round(moonTransitOffset) % 24;
-  const majorPeriod2 = (majorPeriod1 + 12) % 24;
-  const minorPeriod1 = (majorPeriod1 + 6) % 24;
-  const minorPeriod2 = (majorPeriod1 + 18) % 24;
-
-  // Rate each hour 5AM - 9PM
+  // Rate each hour 5AM - 9PM based on proven factors
   const hours = [];
   for (let h = 5; h <= 21; h++) {
     let score = 30;
 
-    // Dawn/dusk golden hours
-    if (h >= 5 && h <= 7) score += 25;
-    else if (h >= 6 && h <= 9) score += 18;
-    else if (h >= 17 && h <= 19) score += 22;
-    else if (h >= 19 && h <= 21) score += 15;
-    else if (h >= 11 && h <= 14) score -= 10; // midday slump
+    // Dawn/dusk golden hours — the most reliable fishing pattern
+    if (h >= 5 && h <= 7) score += 25;       // prime dawn
+    else if (h >= 6 && h <= 9) score += 18;   // early morning
+    else if (h >= 17 && h <= 19) score += 22;  // prime dusk
+    else if (h >= 19 && h <= 21) score += 15;  // late evening
+    else if (h >= 11 && h <= 14) score -= 10;  // midday slump
 
-    // Overcast = midday penalty reduced
+    // Overcast skies extend the bite window through midday
     if (isOvercast && h >= 10 && h <= 15) score += 12;
 
-    // Light rain boosts anytime
+    // Light rain boosts action anytime
     if (isRainy) score += 5;
 
-    // Solunar major/minor periods (+/- 1 hour window)
-    const isNearMajor = Math.abs(h - majorPeriod1) <= 1 || Math.abs(h - majorPeriod2) <= 1;
-    const isNearMinor = Math.abs(h - minorPeriod1) <= 1 || Math.abs(h - minorPeriod2) <= 1;
-    if (isNearMajor) score += 15;
-    else if (isNearMinor) score += 8;
-
-    // New/full moon amplifies solunar
-    if ((moon.name === 'New Moon' || moon.name === 'Full Moon') && (isNearMajor || isNearMinor)) {
-      score += 5;
-    }
+    // New/full moon = generally more active feeding overall
+    if (isNewOrFull) score += 4;
 
     hours.push({
       hour: h,
@@ -220,8 +204,6 @@ function getBestFishingTimes(weather, date) {
     hours,
     bestWindow,
     secondBest,
-    majorPeriods: [majorPeriod1, majorPeriod2].filter(h => h >= 5 && h <= 21).map(formatHour),
-    minorPeriods: [minorPeriod1, minorPeriod2].filter(h => h >= 5 && h <= 21).map(formatHour),
     moon,
   };
 }
@@ -254,8 +236,7 @@ function getBestTimesHtml(times) {
       </div>
       <div class="solunar-info">
         <span class="solunar-badge">${times.moon.emoji} ${times.moon.name}</span>
-        ${times.majorPeriods.length ? `<span class="solunar-item">Major: ${times.majorPeriods.join(', ')}</span>` : ''}
-        ${times.minorPeriods.length ? `<span class="solunar-item">Minor: ${times.minorPeriods.join(', ')}</span>` : ''}
+        <span class="solunar-item">Dawn &amp; dusk are peak feeding windows</span>
       </div>
     </div>
   `;
@@ -1843,7 +1824,7 @@ function getWeatherCardHtml(weather) {
       <h3>Current Weather</h3>
       <div class="data-grid">
         <div class="data-card"><div class="label">Temperature</div><div class="value temp">${weather.temp}°F</div><div style="font-size:0.65rem;color:var(--text-muted)">Feels ${weather.feelsLike}°F</div></div>
-        <div class="data-card"><div class="label">Fish Activity</div><div class="value" style="color:${activityColor}">${weather.fishActivity}/100</div><div style="font-size:0.65rem;color:${activityColor}">${activityLabel}</div></div>
+        <div class="data-card"><div class="label">Fish Activity <span class="info-tip" title="Based on barometric pressure, cloud cover, wind, temperature, moon phase, and time of day">?</span></div><div class="value" style="color:${activityColor}">${weather.fishActivity}/100</div><div style="font-size:0.65rem;color:${activityColor}">${activityLabel}</div></div>
         <div class="data-card"><div class="label">Conditions</div><div class="value" style="font-size:0.9rem">${weather.conditions}</div></div>
         <div class="data-card"><div class="label">Wind</div><div class="value" style="font-size:0.9rem">${weather.windSpeed} mph ${windDirLabel}</div><div style="font-size:0.65rem;color:var(--text-muted)">Gusts ${weather.windGusts} mph</div></div>
         <div class="data-card"><div class="label">Pressure</div><div class="value" style="font-size:0.9rem">${weather.pressureMsl} mb</div><div style="font-size:0.65rem;color:var(--text-muted)">${weather.pressureTrend}</div></div>

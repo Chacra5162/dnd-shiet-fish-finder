@@ -602,6 +602,8 @@ window._selectSpecies = async function(btn, lat, lon) {
   const selector = document.getElementById('species-selector');
   if (selector && selector.parentElement) {
     selector.parentElement.after(recDiv);
+    // Scroll into view on mobile
+    setTimeout(() => recDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
   }
 };
 

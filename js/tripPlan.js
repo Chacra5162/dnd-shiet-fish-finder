@@ -106,11 +106,50 @@ function friendlyDate(dateStr) {
 
 // ===== Traffic Estimation =====
 
-const HOLIDAYS_2026 = [
-  '2026-01-01','2026-01-19','2026-02-16','2026-05-25',
-  '2026-07-03','2026-07-04','2026-07-05',
-  '2026-09-07','2026-11-26','2026-11-27','2026-12-25',
-];
+// Compute US federal holidays algorithmically (works for any year)
+function getUSHolidays(year) {
+  const holidays = [];
+  // New Year's Day
+  holidays.push(`${year}-01-01`);
+  // MLK Day — 3rd Monday in January
+  holidays.push(nthWeekday(year, 0, 1, 3));
+  // Presidents' Day — 3rd Monday in February
+  holidays.push(nthWeekday(year, 1, 1, 3));
+  // Memorial Day — last Monday in May
+  holidays.push(lastWeekday(year, 4, 1));
+  // July 4th + surrounding days
+  holidays.push(`${year}-07-03`, `${year}-07-04`, `${year}-07-05`);
+  // Labor Day — 1st Monday in September
+  holidays.push(nthWeekday(year, 8, 1, 1));
+  // Thanksgiving — 4th Thursday in November + Friday
+  const tg = nthWeekday(year, 10, 4, 4);
+  holidays.push(tg);
+  const tgDate = new Date(tg + 'T12:00:00');
+  tgDate.setDate(tgDate.getDate() + 1);
+  holidays.push(tgDate.toISOString().split('T')[0]);
+  // Christmas
+  holidays.push(`${year}-12-25`);
+  return holidays;
+}
+
+function nthWeekday(year, month, dow, n) {
+  let count = 0;
+  for (let day = 1; day <= 31; day++) {
+    const d = new Date(year, month, day);
+    if (d.getMonth() !== month) break;
+    if (d.getDay() === dow) { count++; if (count === n) return d.toISOString().split('T')[0]; }
+  }
+  return null;
+}
+
+function lastWeekday(year, month, dow) {
+  for (let day = 31; day >= 1; day--) {
+    const d = new Date(year, month, day);
+    if (d.getMonth() !== month) continue;
+    if (d.getDay() === dow) return d.toISOString().split('T')[0];
+  }
+  return null;
+}
 
 function estimateTraffic(dateStr, timeWindow) {
   const d = new Date(dateStr + 'T12:00:00');
@@ -118,7 +157,7 @@ function estimateTraffic(dateStr, timeWindow) {
   const month = d.getMonth(); // 0-indexed
   const isWeekend = dow === 0 || dow === 6;
   const isFriday = dow === 5;
-  const isHoliday = HOLIDAYS_2026.includes(dateStr);
+  const isHoliday = getUSHolidays(d.getFullYear()).includes(dateStr);
   const isSummer = month >= 4 && month <= 8; // May-Sep
 
   let score = 30; // baseline
@@ -222,7 +261,7 @@ function getForecastCardHtml(forecast) {
       </div>
       <div class="data-grid">
         <div class="data-card"><div class="label">Temperature</div><div class="value temp">${forecast.temp}°F</div><div style="font-size:0.65rem;color:var(--text-muted)">Feels ${forecast.feelsLike}°F</div></div>
-        <div class="data-card"><div class="label">Fish Activity</div><div class="value" style="color:${actColor}">${forecast.fishActivity}/100</div><div style="font-size:0.65rem;color:${actColor}">${actLabel}</div></div>
+        <div class="data-card"><div class="label">Fish Activity <span class="info-tip" title="Based on barometric pressure, cloud cover, wind, temperature, moon phase, and time of day">?</span></div><div class="value" style="color:${actColor}">${forecast.fishActivity}/100</div><div style="font-size:0.65rem;color:${actColor}">${actLabel}</div></div>
         <div class="data-card"><div class="label">Conditions</div><div class="value" style="font-size:0.9rem">${forecast.conditions}</div></div>
         <div class="data-card"><div class="label">Rain Chance</div><div class="value" style="font-size:0.9rem">${forecast.precipProbability || 0}%</div></div>
         <div class="data-card"><div class="label">Wind</div><div class="value" style="font-size:0.9rem">${forecast.windSpeed} mph ${windDir}</div><div style="font-size:0.65rem;color:var(--text-muted)">Gusts ${forecast.windGusts} mph</div></div>

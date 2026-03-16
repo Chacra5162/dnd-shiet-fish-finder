@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dnd-shiet-fish-finder-v5';
+const CACHE_NAME = 'dnd-shiet-fish-finder-v6';
 const STATIC_ASSETS = [
   './',
   './index.html',

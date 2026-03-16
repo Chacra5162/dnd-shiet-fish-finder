@@ -14,7 +14,7 @@
   --bg-card: #1b2838;
   --bg-surface: #1e3044;
   --text: #ecf0f1;
-  --text-muted: #95a5a6;
+  --text-muted: #aab7b8;
   --radius: 12px;
   --shadow: 0 4px 20px rgba(0,0,0,0.4);
   --safe-top: env(safe-area-inset-top, 0px);
@@ -479,7 +479,8 @@ a { color: var(--accent); }
   box-shadow: var(--shadow);
   border: 1px solid rgba(52,152,219,0.2);
   animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
-  white-space: nowrap;
+  max-width: 90vw;
+  text-align: center;
 }
 .toast.error {
   border-color: var(--usgs);
@@ -1584,6 +1585,23 @@ a { color: var(--accent); }
   background: rgba(230,126,34,0.12);
 }
 
+/* ===== Info Tooltip ===== */
+.info-tip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(52,152,219,0.2);
+  color: var(--accent);
+  font-size: 0.6rem;
+  font-weight: 700;
+  cursor: help;
+  vertical-align: middle;
+  margin-left: 3px;
+}
+
 /* ===== Trout Stress Warning ===== */
 .trout-stress-warning {
   padding: 10px 14px;
@@ -1650,7 +1668,7 @@ a { color: var(--accent); }
   color: #5dade2;
 }
 .lure-card-toggle {
-  color: var(--text-muted);
+  color: var(--accent);
   font-size: 1.2rem;
   font-weight: bold;
   transition: transform 0.2s;

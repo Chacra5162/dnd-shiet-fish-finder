@@ -70,18 +70,6 @@ function getUser() {
 
 // ===== User Places =====
 
-async function getUserPlaces() {
-  if (!currentUser) return [];
-  const client = getClient();
-  const { data, error } = await client
-    .from('user_places')
-    .select('*')
-    .eq('user_id', currentUser.id)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
-
 // Get places near a location (for showing on map)
 async function getUserPlacesNear(lat, lon, radiusDeg = 0.3) {
   if (!currentUser) return [];
@@ -245,7 +233,6 @@ export {
   signIn,
   signOut,
   getUser,
-  getUserPlaces,
   getUserPlacesNear,
   savePlace,
   removePlace,
