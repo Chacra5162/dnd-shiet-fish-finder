@@ -287,6 +287,7 @@ function getPlaceStatusHtml(wb) {
     </div>
     <div class="place-notes-section">
       <textarea class="place-notes-input" placeholder="Add personal notes about this spot..." data-wb-name="${escapeAttr(wb.name)}" data-wb-lat="${wb.lat}" data-wb-lon="${wb.lon}">${escapeHtml(notes)}</textarea>
+      ${statusSet.size === 0 ? '<div class="notes-hint">Mark as favorite, visited, or avoid first to save notes</div>' : ''}
       <button class="place-notes-save" onclick="window._saveNotes(this)">Save Notes</button>
     </div>
   `;
@@ -800,7 +801,7 @@ function renderArsenal() {
         <div class="arsenal-card-info">
           <div class="arsenal-card-name">${escapeHtml(item.name)}</div>
           ${meta ? `<div class="arsenal-card-meta">${escapeHtml(meta)}</div>` : ''}
-          <span class="arsenal-card-cat">${catLabel}</span>
+          <span class="arsenal-card-cat">${escapeHtml(catLabel)}</span>
         </div>
       </div>
     `;
@@ -855,7 +856,7 @@ window._viewArsenalItem = function(itemId) {
   detailContent.innerHTML = `
     ${photoUrl ? `<div style="margin:-20px -20px 12px;"><img src="${photoUrl}" alt="${escapeAttr(item.name)}" style="width:100%;max-height:250px;object-fit:cover;border-radius:12px 12px 0 0;"></div>` : ''}
     <h2>${escapeHtml(item.name)}</h2>
-    <span class="detail-type-badge" style="background:var(--accent);color:#fff;">${catLabel}</span>
+    <span class="detail-type-badge" style="background:var(--accent);color:#fff;">${escapeHtml(catLabel)}</span>
     ${item.brand ? `<span style="color:var(--text-muted);font-size:0.85rem;margin-left:8px;">${escapeHtml(item.brand)}</span>` : ''}
 
     <div class="data-grid" style="margin-top:12px;">
@@ -887,8 +888,8 @@ window._backToArsenal = function() {
   arsenalPanel.classList.remove('hidden');
 };
 
-window._deleteArsenalItem = async function(itemId, photoPath) {
-  if (!confirm('Delete this item from your arsenal?')) return;
+window._deleteArsenalItem = function(itemId, photoPath) {
+  showInlineConfirm('Delete this item?', 'Delete', async () => {
   const user = getUser();
   if (!user) return;
   try {
@@ -902,6 +903,7 @@ window._deleteArsenalItem = async function(itemId, photoPath) {
   } catch (e) {
     toast(`Error: ${e.message}`, true);
   }
+  });
 };
 
 // ===== Trip Planner =====
@@ -1119,14 +1121,15 @@ window._completeTripAction = async function(id) {
   } catch (e) { toast(`Error: ${e.message}`, true); }
 };
 
-window._deleteTripAction = async function(id) {
-  if (!confirm('Delete this trip?')) return;
-  try {
-    await deleteTripPlan(id);
-    userTrips = userTrips.filter(t => t.id !== id);
-    renderTripsList();
-    toast('Trip deleted');
-  } catch (e) { toast(`Error: ${e.message}`, true); }
+window._deleteTripAction = function(id) {
+  showInlineConfirm('Delete this trip?', 'Delete', async () => {
+    try {
+      await deleteTripPlan(id);
+      userTrips = userTrips.filter(t => t.id !== id);
+      renderTripsList();
+      toast('Trip deleted');
+    } catch (e) { toast(`Error: ${e.message}`, true); }
+  });
 };
 
 window._viewTripGear = function(id) {
@@ -1196,13 +1199,16 @@ function setupEventListeners() {
     const user = getUser();
     if (user) {
       // Show sign-out option
-      if (confirm(`Signed in as ${user.email}\n\nSign out?`)) {
-        signOut().then(() => {
+      showInlineConfirm(
+        `Signed in as ${user.email}`,
+        'Sign Out',
+        () => signOut().then(() => {
           updateAuthUI(null);
           userPlaces = [];
+          userTrips = [];
           toast('Signed out');
-        });
-      }
+        })
+      );
     } else {
       authModal.classList.remove('hidden');
     }
@@ -1484,6 +1490,35 @@ function escapeHtml(str) {
 
 function escapeAttr(str) {
   return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// In-app confirm dialog — replaces window.confirm() which is broken on iOS PWA
+function showInlineConfirm(message, actionLabel, onConfirm) {
+  // Remove any existing confirm
+  const existing = document.getElementById('inline-confirm');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'inline-confirm';
+  overlay.className = 'modal';
+  overlay.style.zIndex = '5000';
+  overlay.innerHTML = `
+    <div class="modal-content" style="max-width:340px;text-align:center;">
+      <p style="margin-bottom:16px;font-size:0.95rem;">${escapeHtml(message)}</p>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-secondary" style="flex:1;" id="confirm-cancel">Cancel</button>
+        <button class="btn-primary" style="flex:1;background:#e74c3c;" id="confirm-action">${escapeHtml(actionLabel)}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#confirm-cancel').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('#confirm-action').addEventListener('click', () => {
+    overlay.remove();
+    onConfirm();
+  });
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 }
 
 function toast(msg, isError = false) {

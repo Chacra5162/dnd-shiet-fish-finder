@@ -3,7 +3,7 @@
  * Only fetches data relevant to the user's current location.
  */
 
-import { STORES, getCached, setCache, getMultiCached } from './cache.js';
+import { STORES, getCached, setCache, getMultiCached, gridKey } from './cache.js';
 
 // ===== Overpass API (Water Bodies) =====
 
@@ -164,15 +164,13 @@ async function fetchOverpass(query) {
   throw lastError || new Error('All Overpass servers failed');
 }
 
-// Generate a readable name for unnamed water bodies
-let unnamedCounter = 0;
+// Generate a deterministic name for unnamed water bodies (same coords = same name always)
 function generateName(type, lat, lon) {
-  unnamedCounter++;
   const typeLabels = { lake: 'Lake', pond: 'Pond', river: 'River', stream: 'Creek' };
   const label = typeLabels[type] || 'Pond';
-  // Use coords to make a short semi-unique ID
-  const id = Math.abs(Math.round((lat * 1000 + lon * 1000) % 10000));
-  return `${label} #${id}-${unnamedCounter}`;
+  // Deterministic hash from coordinates — no counter, stable across calls
+  const hash = Math.abs(Math.round(lat * 10000) * 31 + Math.round(lon * 10000)) % 100000;
+  return `${label} #${hash}`;
 }
 
 async function fetchWaterBodies(south, west, north, east) {
@@ -189,7 +187,6 @@ async function fetchWaterBodies(south, west, north, east) {
 
   const waterBodies = [];
   const seen = new Set();
-  unnamedCounter = 0;
 
   for (const el of json.elements) {
     // Use center coords for ways/relations
@@ -225,8 +222,7 @@ async function fetchWaterBodies(south, west, north, east) {
   // Cache per grid cell
   const gridMap = {};
   for (const wb of waterBodies) {
-    const { getCellKey } = await import('./cache.js').then(m => ({ getCellKey: m.gridKey }));
-    const key = getCellKey(wb.lat, wb.lon);
+    const key = gridKey(wb.lat, wb.lon);
     if (!gridMap[key]) gridMap[key] = [];
     gridMap[key].push(wb);
   }
@@ -337,7 +333,6 @@ async function fetchUSGSSites(south, west, north, east) {
   // Cache site locations per grid cell
   const gridMap = {};
   for (const site of allSites) {
-    const { gridKey } = await import('./cache.js');
     const key = gridKey(site.lat, site.lon);
     if (!gridMap[key]) gridMap[key] = [];
     gridMap[key].push(site);
@@ -353,7 +348,6 @@ async function fetchUSGSSites(south, west, north, east) {
 
 async function enrichUSGSData(sites, south, west, north, east) {
   // Check if we have recent current data
-  const cacheKey = `current_${south.toFixed(2)}_${west.toFixed(2)}`;
   const cachedCurrent = await getCached(STORES.usgsCurrent, (south + north) / 2, (west + east) / 2);
 
   if (cachedCurrent) {

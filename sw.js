@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dnd-shiet-fish-finder-v3';
+const CACHE_NAME = 'dnd-shiet-fish-finder-v4';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -22,14 +22,13 @@ const EXTERNAL_ASSETS = [
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
 ];
 
-// Install: cache static assets
+// Install: cache static assets, then activate
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll([...STATIC_ASSETS, ...EXTERNAL_ASSETS]);
-    })
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll([...STATIC_ASSETS, ...EXTERNAL_ASSETS]))
+      .then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 // Activate: clean old caches

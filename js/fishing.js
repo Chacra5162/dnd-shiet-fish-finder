@@ -89,7 +89,7 @@ function rateFishActivity(w) {
   // Barometric pressure — falling is best (pre-front feeding), stable is OK
   if (w.pressureTrend === 'falling') score += 18;
   else if (w.pressureTrend === 'stable') score += 8;
-  else if (w.pressureTrend === 'rising') score -= 2;
+  else if (w.pressureTrend === 'rising') score -= 12; // post-front = toughest fishing
   else if (w.pressureTrend === 'high') score -= 10; // bluebird post-front
   else score -= 8; // low
 
@@ -286,10 +286,12 @@ function isTidalWater(lat, lon, waterType) {
   // Only rivers, streams, and some lakes near the coast can be tidal
   if (waterType === 'pond') return false;
 
-  // Eastern VA/NC — roughly east of the fall line
-  // VA fall line is ~lon -77.5, NC ~lon -78
-  if (lon < -78.5) return false;
+  // East of the fall line — split by state
+  // VA fall line: Richmond (-77.44), Fredericksburg (-77.47), Petersburg (-77.40)
+  // NC fall line: Raleigh (-78.64), Fayetteville (-78.88)
   if (lat < 33.5 || lat > 39) return false;
+  const fallLine = lat >= 36.54 ? -77.5 : -78.0; // VA vs NC
+  if (lon < fallLine) return false;
 
   // Must be within ~40 miles of a tide station
   const nearest = findNearestTideStation(lat, lon);
@@ -1709,21 +1711,49 @@ const SPECIES_DATA = {
   },
 };
 
-function getTempBracket(airTemp) {
-  if (airTemp < 45) return 'cold';
-  if (airTemp < 65) return 'mild';
-  if (airTemp < 85) return 'warm';
+// Accept optional waterTemp (from USGS) — use it when available, fall back to adjusted air temp.
+// Water temp thresholds: <50 cold, 50-65 mild, 65-78 warm, >78 hot
+// Air temp thresholds (proxy): <50 cold, 50-68 mild, 68-82 warm, >82 hot
+function getTempBracket(airTemp, waterTemp) {
+  const t = waterTemp != null ? waterTemp : airTemp;
+  const thresholds = waterTemp != null
+    ? [50, 65, 78]   // water temp boundaries
+    : [50, 68, 82];  // air temp proxy boundaries
+  if (t < thresholds[0]) return 'cold';
+  if (t < thresholds[1]) return 'mild';
+  if (t < thresholds[2]) return 'warm';
   return 'hot';
 }
 
-function getRecommendation(species, weather) {
+// Check if trout species are at thermal stress risk
+function getTroutStressWarning(weather, species, waterTemp) {
+  const troutSpecies = ['Rainbow Trout', 'Brown Trout', 'Brook Trout'];
+  if (!troutSpecies.includes(species)) return null;
+  const effectiveTemp = waterTemp != null ? waterTemp : weather.temp;
+  // Water temp thresholds; use air temp as rough proxy if no water data
+  const stressThreshold = waterTemp != null ? 68 : 75; // 68°F water = stress, ~75°F air proxy
+  if (effectiveTemp >= stressThreshold) {
+    return {
+      level: effectiveTemp >= (waterTemp != null ? 72 : 82) ? 'critical' : 'warning',
+      message: waterTemp != null
+        ? `Water temperature is ${waterTemp}°F — trout are thermally stressed above 68°F. Consider not fishing for trout to avoid fish mortality.`
+        : `Air temperature is ${weather.temp}°F — water may exceed 68°F. Check water temp before targeting trout. Trout die from catch-and-release stress in warm water.`,
+    };
+  }
+  return null;
+}
+
+function getRecommendation(species, weather, waterTemp) {
   const data = SPECIES_DATA[species];
   if (!data) return null;
 
-  const bracket = getTempBracket(weather.temp);
+  const bracket = getTempBracket(weather.temp, waterTemp);
   const lureNames = data.lures[bracket] || data.lures.mild;
   const depthTip = data.depthTips[bracket] || '';
   const clarity = getWaterClarity(weather);
+
+  // Trout thermal stress check
+  const troutStress = getTroutStressWarning(weather, species, waterTemp);
 
   // Build detailed lure list with specs
   const lures = lureNames.map(name => {
@@ -1754,7 +1784,7 @@ function getRecommendation(species, weather) {
   else if (hour >= 17 && hour <= 20) tips.push('Evening — fish moving shallow to feed');
   else if (hour >= 11 && hour <= 14) tips.push('Midday — fish often deeper or holding tight to structure');
 
-  return { species, bracket, lures, baits: data.baits, depthTip, tips, activity: weather.fishActivity, clarity };
+  return { species, bracket, lures, baits: data.baits, depthTip, tips, activity: weather.fishActivity, clarity, troutStress };
 }
 
 // ===== HTML Renderers =====
@@ -1783,9 +1813,14 @@ function getWeatherCardHtml(weather) {
 function getRecommendationHtml(rec) {
   const clarityLabel = { clear: 'Clear Water', stained: 'Stained Water', muddy: 'Muddy Water' };
 
+  const stressHtml = rec.troutStress
+    ? `<div class="trout-stress-warning ${rec.troutStress.level === 'critical' ? 'stress-critical' : 'stress-warning'}">${rec.troutStress.message}</div>`
+    : '';
+
   return `
     <div class="detail-section tackle-rec">
       <h3>Recommended for ${rec.species}</h3>
+      ${stressHtml}
       <div class="clarity-badge">${clarityLabel[rec.clarity] || 'Clear Water'} — colors adjusted</div>
 
       <div class="rec-subsection">
@@ -1858,6 +1893,7 @@ export {
   getWaterClarity,
   degToCompass,
   getMoonPhase,
+  getTroutStressWarning,
   getBestFishingTimes,
   getBestTimesHtml,
   isTidalWater,

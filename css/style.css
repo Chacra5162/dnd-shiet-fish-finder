@@ -1580,6 +1580,34 @@ a { color: var(--accent); }
   background: rgba(230,126,34,0.12);
 }
 
+/* ===== Trout Stress Warning ===== */
+.trout-stress-warning {
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.stress-warning {
+  background: rgba(243,156,18,0.12);
+  border: 1px solid rgba(243,156,18,0.3);
+  color: #f39c12;
+}
+.stress-critical {
+  background: rgba(231,76,60,0.15);
+  border: 1px solid rgba(231,76,60,0.3);
+  color: #e74c3c;
+}
+
+/* Notes hint */
+.notes-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 4px 0;
+}
+
 /* ===== Lure Detail Cards ===== */
 .clarity-badge {
   display: inline-block;
