@@ -459,111 +459,200 @@ function getTroutWarningHtml(wb, context = 'detail') {
 
 // ===== Access Info (Fishing / Bank-Pier / Boat) =====
 
-function getAccessInfoHtml(wb) {
+// Determine access for fishing, bank/pier, and boat with deep heuristics.
+// Returns { fishing, bankPier, boat } each as 'yes' | 'likely' | 'no' | 'unlikely' | 'unknown'
+function assessAccess(wb) {
   const tags = wb.tags || {};
   const name = (wb.name || '').toLowerCase();
   const type = wb.type;
+  const op = (tags.operator || '').toLowerCase();
+  const ownr = (tags.ownership || '').toLowerCase();
 
-  // --- Fishing ---
+  // Helpers
+  const isPublicAccess = tags.access === 'yes' || tags.access === 'public' || tags.access === 'permissive';
+  const isPrivateAccess = tags.access === 'private' || tags.access === 'no' || tags.access === 'members';
+  const isPublicLand = tags.leisure === 'park' || tags.leisure === 'nature_reserve' ||
+    tags.boundary === 'national_park' || tags.boundary === 'protected_area' ||
+    ownr === 'public' || ownr === 'national' || ownr === 'state' || ownr === 'municipal' || ownr === 'federal' ||
+    op.includes('wildlife') || op.includes('park') || op.includes('corps of engineers') ||
+    op.includes('forest service') || op.includes('national forest') || op.includes('game commission') ||
+    op.includes('fish and') || op.includes('dwr') || op.includes('dgif') || op.includes('ncwrc');
+  const isGolfClub = tags.leisure === 'golf_course' || tags.club || name.includes('golf') || name.includes('country club');
+  const isResidential = tags.landuse === 'residential' || tags.landuse === 'farmland' || tags.landuse === 'farmyard';
+  const isCommercial = tags.landuse === 'commercial' || tags.landuse === 'industrial';
+
+  // Name-based signals — comprehensive keyword matching
+  const publicNames = [
+    'state park', 'national', 'wildlife', 'management area', 'wma', 'public',
+    'county park', 'city park', 'memorial', 'recreation', 'reservoir',
+    'army corps', 'national forest', 'game land', 'state forest',
+    'conservation', 'refuge', 'sportsman', 'access area', 'public landing',
+    'boat access', 'fish hatchery', 'stocking', 'community lake',
+    'municipal', 'town lake', 'city lake', 'county lake',
+  ];
+  const privateNames = [
+    'farm', 'estate', 'ranch', 'private', 'country club', 'golf',
+    'subdivision', 'hoa', 'homeowner', 'community pond', 'retention',
+    'stormwater', 'sewage', 'treatment', 'cooling', 'industrial',
+  ];
+  const boatNames = [
+    'boat ramp', 'boat landing', 'boat launch', 'launch ramp', 'slipway',
+    'marina', 'boat access', 'public landing', 'landing', 'ramp',
+  ];
+  const pierNames = [
+    'pier', 'dock', 'jetty', 'wharf', 'boardwalk', 'fishing platform',
+    'observation deck', 'overlook',
+  ];
+
+  const hasPublicName = publicNames.some(p => name.includes(p));
+  const hasPrivateName = privateNames.some(p => name.includes(p));
+  const hasBoatName = boatNames.some(p => name.includes(p));
+  const hasPierName = pierNames.some(p => name.includes(p));
+
+  // VA/NC major managed reservoirs and rivers (almost always have full public access + boat ramps)
+  const majorWaters = [
+    'james river', 'roanoke river', 'new river', 'shenandoah', 'rappahannock',
+    'york river', 'appomattox', 'dan river', 'staunton river', 'jackson river',
+    'smith mountain', 'lake anna', 'buggs island', 'kerr', 'gaston', 'jordan lake',
+    'falls lake', 'high rock', 'badin lake', 'lake norman', 'lake wylie',
+    'claytor lake', 'philpott', 'leesville', 'lake moomaw', 'lake chesdin',
+    'briery creek', 'sandy river', 'occoneechee', 'lake prince', 'western branch',
+    'back bay', 'currituck', 'albemarle', 'neuse river', 'tar river', 'cape fear',
+    'catawba river', 'yadkin river', 'hiwassee', 'nantahala', 'fontana',
+    'lake murray', 'smith river', 'south holston', 'watauga',
+  ];
+  const isMajorWater = majorWaters.some(w => name.includes(w));
+
+  // Is this a named reservoir? Reservoirs almost always have public access + boat ramps
+  const isReservoir = name.includes('reservoir') || name.includes('lake') && (
+    tags.water === 'reservoir' || name.includes('dam') || op.includes('corps') || op.includes('power') || op.includes('utility')
+  );
+
+  // --- FISHING ---
   let fishing = 'unknown';
-  if (tags.fishing === 'yes' || tags.sport === 'fishing' || tags.leisure === 'fishing') {
-    fishing = 'yes';
-  } else if (tags.fishing === 'no') {
-    fishing = 'no';
-  } else if (type === 'fishing_pier') {
-    fishing = 'yes';
-  } else if (name.includes('fishing') || name.includes('fish ')) {
-    fishing = 'yes';
-  } else if (tags.access === 'private' || tags.access === 'no') {
-    fishing = 'no';
-  } else if (type === 'boat_landing') {
-    fishing = 'yes'; // boat landings imply fishing access
-  } else if (['lake', 'river', 'stream', 'pond'].includes(type)) {
-    // Public water bodies generally allow fishing unless tagged otherwise
-    if (tags.access === 'yes' || tags.access === 'public' || tags.access === 'permissive' ||
-        tags.leisure === 'park' || tags.boundary === 'national_park') {
-      fishing = 'yes';
-    }
+  // Explicit tags
+  if (tags.fishing === 'yes' || tags.sport === 'fishing' || tags.leisure === 'fishing') fishing = 'yes';
+  else if (tags.fishing === 'no') fishing = 'no';
+  // Type-based certainties
+  else if (type === 'fishing_pier' || type === 'boat_landing') fishing = 'yes';
+  // Name
+  else if (name.includes('fishing') || name.includes('fish hatchery') || name.includes('stocking')) fishing = 'yes';
+  // Explicit private
+  else if (isPrivateAccess) fishing = 'no';
+  else if (isGolfClub) fishing = 'no';
+  else if (isCommercial) fishing = 'no';
+  // Public land / managed areas
+  else if (isPublicLand || isPublicAccess) fishing = 'yes';
+  else if (hasPublicName || isMajorWater) fishing = 'yes';
+  // Regional heuristics — VA/NC specific
+  else if (type === 'river' || type === 'stream') {
+    // In VA and NC, all navigable waterways allow fishing (public trust doctrine)
+    fishing = 'likely';
+  } else if (type === 'lake' && isReservoir) {
+    fishing = 'likely';
+  } else if (type === 'lake' && !hasPrivateName && !isResidential) {
+    // Named lakes that aren't obviously private are usually fishable
+    fishing = name ? 'likely' : 'unknown';
+  } else if (type === 'pond') {
+    fishing = (hasPrivateName || isResidential) ? 'unlikely' : 'unknown';
+  } else if (hasPrivateName || isResidential) {
+    fishing = 'unlikely';
   }
 
-  // --- Bank / Pier Access ---
+  // --- BANK / PIER ACCESS ---
   let bankPier = 'unknown';
-  if (type === 'fishing_pier') {
-    bankPier = 'yes';
-  } else if (tags.man_made === 'pier' || tags['fishing:pier'] === 'yes') {
-    bankPier = 'yes';
-  } else if (name.includes('pier') || name.includes('dock') || name.includes('jetty')) {
-    bankPier = 'yes';
-  } else if (tags.access === 'private' || tags.access === 'no') {
-    bankPier = 'no';
-  } else if (type === 'lake' || type === 'pond' || type === 'river' || type === 'stream') {
-    // Most public water has some bank access
-    if (tags.access === 'yes' || tags.access === 'public' || tags.access === 'permissive' ||
-        tags.leisure === 'park' || tags.sport === 'fishing') {
-      bankPier = 'yes';
-    } else if (type === 'river' || type === 'stream') {
-      bankPier = 'yes'; // rivers/streams generally have bank access at public points
-    }
-  } else if (type === 'boat_landing') {
-    bankPier = 'yes'; // boat landings have shore access
+  // Explicit tags
+  if (type === 'fishing_pier' || tags.man_made === 'pier' || tags['fishing:pier'] === 'yes') bankPier = 'yes';
+  else if (hasPierName) bankPier = 'yes';
+  else if (type === 'boat_landing') bankPier = 'yes';
+  // Explicit private
+  else if (isPrivateAccess) bankPier = 'no';
+  else if (isGolfClub || isCommercial) bankPier = 'no';
+  // Public land
+  else if (isPublicLand || isPublicAccess) bankPier = 'yes';
+  else if (hasPublicName) bankPier = 'yes';
+  // Rivers and streams — Virginia follows the "low water mark" doctrine,
+  // so bank access depends on public land along the shore. Major rivers usually have public access points.
+  else if (type === 'river') {
+    bankPier = isMajorWater ? 'yes' : 'likely';
+  } else if (type === 'stream') {
+    bankPier = 'likely';
+  }
+  // Lakes and reservoirs
+  else if (type === 'lake') {
+    if (isMajorWater || isReservoir) bankPier = 'likely';
+    else if (hasPrivateName || isResidential) bankPier = 'unlikely';
+    else bankPier = name ? 'likely' : 'unknown';
+  }
+  // Ponds
+  else if (type === 'pond') {
+    bankPier = (hasPublicName || tags.sport === 'fishing') ? 'likely' : (hasPrivateName || isResidential) ? 'unlikely' : 'unknown';
   }
 
-  // --- Boat Access ---
+  // --- BOAT ACCESS ---
   let boat = 'unknown';
-  if (type === 'boat_landing') {
-    boat = 'yes';
-  } else if (tags.boat === 'yes' || tags.boat === 'motor' || tags.boat === 'public' ||
-             tags.leisure === 'slipway' || tags.waterway === 'boat_ramp' ||
-             tags['seamark:type'] === 'harbour') {
-    boat = 'yes';
-  } else if (tags.boat === 'no' || tags.boat === 'private') {
-    boat = 'no';
-  } else if (name.includes('boat ramp') || name.includes('boat landing') || name.includes('launch') || name.includes('marina')) {
-    boat = 'yes';
-  } else if (type === 'pond' || type === 'stream') {
-    boat = 'no'; // ponds and streams generally don't have boat access
-  } else if (type === 'fishing_pier') {
-    boat = 'no';
-  } else if (type === 'lake' || type === 'river') {
-    // Lakes and rivers may have boat access
-    if (tags.access === 'yes' || tags.access === 'public') {
-      boat = 'unknown'; // can't be sure without boat-specific tag
-    }
+  // Explicit tags
+  if (type === 'boat_landing') boat = 'yes';
+  else if (tags.boat === 'yes' || tags.boat === 'motor' || tags.boat === 'public' ||
+           tags.leisure === 'slipway' || tags.waterway === 'boat_ramp' ||
+           tags['seamark:type'] === 'harbour' || tags['seamark:type'] === 'marina') boat = 'yes';
+  else if (tags.boat === 'no' || tags.boat === 'private') boat = 'no';
+  // Name
+  else if (hasBoatName || name.includes('marina')) boat = 'yes';
+  // Type-based
+  else if (type === 'fishing_pier') boat = 'no';
+  else if (type === 'stream') boat = 'no';
+  else if (type === 'pond') boat = (hasPublicName && name.includes('lake')) ? 'unlikely' : 'no';
+  // Private
+  else if (isPrivateAccess || isGolfClub) boat = 'no';
+  // Major waters and reservoirs almost always have boat ramps
+  else if (isMajorWater) boat = 'likely';
+  else if (type === 'lake' && isReservoir) boat = 'likely';
+  // Rivers — larger rivers in VA/NC often have public access points
+  else if (type === 'river') {
+    boat = isMajorWater ? 'likely' : 'unknown';
+  }
+  // General lakes
+  else if (type === 'lake') {
+    if (isPublicLand || isPublicAccess || hasPublicName) boat = 'likely';
+    else if (hasPrivateName || isResidential) boat = 'no';
+    // Named lakes over default size are likely to have ramps
+    else if (name && !hasPrivateName) boat = 'unknown';
   }
 
-  const icon = (status) => {
-    if (status === 'yes') return '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="#2ecc71"/></svg>';
-    if (status === 'no') return '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="#e74c3c"/></svg>';
-    return '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="#f39c12"/></svg>';
+  return { fishing, bankPier, boat };
+}
+
+function getAccessInfoHtml(wb) {
+  const { fishing, bankPier, boat } = assessAccess(wb);
+
+  const iconSvg = {
+    yes: '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="#2ecc71"/></svg>',
+    likely: '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="#2ecc71" opacity="0.6"/></svg>',
+    no: '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="#e74c3c"/></svg>',
+    unlikely: '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="#e74c3c" opacity="0.6"/></svg>',
+    unknown: '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="#f39c12"/></svg>',
   };
-  const label = (status) => status === 'yes' ? 'Yes' : status === 'no' ? 'No' : 'Unknown';
-  const color = (status) => status === 'yes' ? '#2ecc71' : status === 'no' ? '#e74c3c' : '#f39c12';
+  const labels = { yes: 'Yes', likely: 'Likely', no: 'No', unlikely: 'Unlikely', unknown: 'Unknown' };
+  const colors = { yes: '#2ecc71', likely: '#2ecc71', no: '#e74c3c', unlikely: '#e74c3c', unknown: '#f39c12' };
+
+  const cell = (status, label) => `
+    <div class="access-info-item">
+      ${iconSvg[status]}
+      <div>
+        <div class="access-info-label">${label}</div>
+        <div class="access-info-value" style="color:${colors[status]}">${labels[status]}</div>
+      </div>
+    </div>
+  `;
 
   return `
     <div class="detail-section">
       <h3>Access Info</h3>
       <div class="access-info-grid">
-        <div class="access-info-item">
-          ${icon(fishing)}
-          <div>
-            <div class="access-info-label">Fishing</div>
-            <div class="access-info-value" style="color:${color(fishing)}">${label(fishing)}</div>
-          </div>
-        </div>
-        <div class="access-info-item">
-          ${icon(bankPier)}
-          <div>
-            <div class="access-info-label">Bank / Pier</div>
-            <div class="access-info-value" style="color:${color(bankPier)}">${label(bankPier)}</div>
-          </div>
-        </div>
-        <div class="access-info-item">
-          ${icon(boat)}
-          <div>
-            <div class="access-info-label">Boat Access</div>
-            <div class="access-info-value" style="color:${color(boat)}">${label(boat)}</div>
-          </div>
-        </div>
+        ${cell(fishing, 'Fishing')}
+        ${cell(bankPier, 'Bank / Pier')}
+        ${cell(boat, 'Boat Access')}
       </div>
     </div>
   `;
