@@ -1505,4 +1505,9 @@ export {
   getWeatherCardHtml,
   getRecommendationHtml,
   SPECIES_DATA,
+  LURE_DB,
+  rateFishActivity,
+  getTempBracket,
+  getWaterClarity,
+  degToCompass,
 };

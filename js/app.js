@@ -6,8 +6,9 @@
 
 import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles } from './api.js';
 import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS } from './map.js';
-import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, getPlaceStatuses } from './supabase.js';
-import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA } from './fishing.js';
+import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, getPlaceStatuses, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan } from './supabase.js';
+import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity } from './fishing.js';
+import { TIME_WINDOWS, fetchForecast, estimateTraffic, generateGearChecklist, getForecastCardHtml, getTrafficBadgeHtml, getGearChecklistHtml, getTripSummaryCardHtml, friendlyDate } from './tripPlan.js';
 
 // ===== State =====
 let userLat = 37.54; // Default: Richmond, VA
@@ -17,6 +18,10 @@ let waterBodies = [];
 let usgsSites = [];
 let userPlaces = []; // cached user places for current area
 let currentPlacesTab = 'favorite';
+let userTrips = [];
+let currentTripsTab = 'upcoming';
+// Trip plan wizard state
+let tripWizard = { wb: null, forecast: null, traffic: null, selectedSpecies: [] };
 
 // ===== DOM refs =====
 const $ = (sel) => document.querySelector(sel);
@@ -27,6 +32,9 @@ const detailPanel = $('#detail-panel');
 const detailContent = $('#detail-content');
 const infoModal = $('#info-modal');
 const authModal = $('#auth-modal');
+const tripModal = $('#trip-modal');
+const tripsPanel = $('#trips-panel');
+const tripsList = $('#trips-list');
 const placesPanel = $('#places-panel');
 const placesList = $('#places-list');
 const toastContainer = $('#toast-container');
@@ -72,9 +80,11 @@ function setupAuth() {
     updateAuthUI(user);
     if (user && (event === 'SIGNED_IN' || event === 'INITIAL')) {
       loadUserPlaces();
+      loadUserTrips();
     }
     if (event === 'SIGNED_OUT') {
       userPlaces = [];
+      userTrips = [];
     }
   });
 }
@@ -315,6 +325,14 @@ async function showWaterDetail(wb, dist) {
 
   // Place actions (favorite / visited / avoid)
   html += getPlaceStatusHtml(wb);
+
+  // Plan a Trip button
+  html += `
+    <button class="btn-plan-trip" onclick="window._openTripPlan('${escapeAttr(JSON.stringify({ name: wb.name, type: wb.type, lat: wb.lat, lon: wb.lon, id: wb.id }))}')">
+      <svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z" fill="currentColor"/></svg>
+      Plan a Day on the Water
+    </button>
+  `;
 
   // Species selector — clickable chips that load tackle recs
   html += `
@@ -605,6 +623,248 @@ window._removeListPlace = async function(placeId) {
   }
 };
 
+// ===== Trip Planner =====
+
+window._openTripPlan = function(wbJson) {
+  const user = getUser();
+  if (!user) { authModal.classList.remove('hidden'); return; }
+
+  const wb = JSON.parse(wbJson);
+  tripWizard = { wb, forecast: null, traffic: null, selectedSpecies: [] };
+
+  // Set up step 1
+  $('#trip-place-preview').innerHTML = `
+    <div class="trip-place-name">${escapeHtml(wb.name)}</div>
+    <div class="trip-place-type">${wb.type}</div>
+  `;
+
+  // Set date min/max (today to +6 days for forecast)
+  const today = new Date();
+  const maxDate = new Date(today);
+  maxDate.setDate(maxDate.getDate() + 6);
+  const dateInput = $('#trip-date');
+  dateInput.min = today.toISOString().split('T')[0];
+  dateInput.max = maxDate.toISOString().split('T')[0];
+  dateInput.value = today.toISOString().split('T')[0];
+
+  // Reset steps
+  showTripStep(1);
+  tripModal.classList.remove('hidden');
+  detailPanel.classList.add('hidden');
+};
+
+function showTripStep(n) {
+  [1, 2, 3].forEach(s => {
+    const el = $(`#trip-step-${s}`);
+    if (el) el.classList.toggle('hidden', s !== n);
+  });
+}
+
+async function handleGetForecast() {
+  const wb = tripWizard.wb;
+  if (!wb) return;
+
+  const dateVal = $('#trip-date').value;
+  if (!dateVal) { toast('Pick a date', true); return; }
+
+  const timeWindow = document.querySelector('input[name="trip-time"]:checked')?.value || 'morning';
+  const btn = $('#btn-trip-forecast');
+  btn.disabled = true;
+  btn.textContent = 'Loading forecast...';
+
+  try {
+    const forecast = await fetchForecast(wb.lat, wb.lon, dateVal, timeWindow);
+    const traffic = estimateTraffic(dateVal, timeWindow);
+    tripWizard.forecast = forecast;
+    tripWizard.traffic = traffic;
+
+    $('#trip-forecast-area').innerHTML = getForecastCardHtml(forecast);
+    $('#trip-traffic-area').innerHTML = getTrafficBadgeHtml(traffic);
+
+    // Populate species selector
+    const species = getCommonSpecies(wb.type, wb.lat, wb.lon);
+    const selectorEl = $('#trip-species-selector');
+    selectorEl.innerHTML = species.map(s =>
+      `<button class="species-chip" data-species="${escapeAttr(s)}" onclick="window._toggleTripSpecies(this)">${escapeHtml(s)}</button>`
+    ).join('');
+    tripWizard.selectedSpecies = [];
+
+    showTripStep(2);
+  } catch (e) {
+    console.error('Forecast error:', e);
+    toast(`Forecast error: ${e.message}`, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Get Forecast';
+  }
+}
+
+window._toggleTripSpecies = function(btn) {
+  const species = btn.dataset.species;
+  const idx = tripWizard.selectedSpecies.indexOf(species);
+  if (idx >= 0) {
+    tripWizard.selectedSpecies.splice(idx, 1);
+    btn.classList.remove('species-active');
+  } else {
+    if (tripWizard.selectedSpecies.length >= 3) {
+      toast('Max 3 species', true);
+      return;
+    }
+    tripWizard.selectedSpecies.push(species);
+    btn.classList.add('species-active');
+  }
+};
+
+function handleGeneratePlan() {
+  const { wb, forecast, traffic, selectedSpecies } = tripWizard;
+  if (!forecast) return;
+  if (selectedSpecies.length === 0) {
+    toast('Select at least one species', true);
+    return;
+  }
+
+  const clarity = getWaterClarity(forecast);
+  const gear = generateGearChecklist(selectedSpecies, forecast, wb.type);
+  tripWizard.gearChecklist = gear;
+  tripWizard.clarity = clarity;
+
+  // Summary
+  $('#trip-plan-summary').innerHTML = `
+    <div class="forecast-card" style="margin-bottom:10px;">
+      <div class="forecast-header">
+        <span class="forecast-date">${escapeHtml(wb.name)}</span>
+        <span class="forecast-window">${forecast.timeWindowLabel}</span>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:0.85rem;margin-top:6px;">
+        <span class="trip-meta-item temp">${forecast.temp}°F ${forecast.conditions}</span>
+        <span class="trip-meta-item" style="color:${traffic.level === 'low' ? '#2ecc71' : traffic.level === 'moderate' ? '#f39c12' : '#e74c3c'}">${traffic.level} traffic</span>
+        <span class="trip-meta-item">Activity: ${forecast.fishActivity}/100</span>
+      </div>
+      <div style="margin-top:8px;">${selectedSpecies.map(s => `<span class="species-chip-small">${escapeHtml(s)}</span>`).join(' ')}</div>
+    </div>
+  `;
+
+  // Gear checklist
+  $('#trip-gear-area').innerHTML = getGearChecklistHtml(gear, clarity);
+  $('#trip-notes').value = '';
+
+  showTripStep(3);
+}
+
+async function handleSaveTrip() {
+  const { wb, forecast, traffic, selectedSpecies, gearChecklist } = tripWizard;
+  const btn = $('#btn-trip-save');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  try {
+    await saveTripPlan({
+      placeName: wb.name,
+      placeType: wb.type,
+      lat: wb.lat,
+      lon: wb.lon,
+      osmId: wb.id,
+      tripDate: forecast.date,
+      timeWindow: forecast.timeWindow,
+      forecast,
+      trafficEstimate: traffic.level,
+      trafficDescription: traffic.description,
+      species: selectedSpecies,
+      gearChecklist,
+      notes: $('#trip-notes').value.trim(),
+    });
+    toast('Trip saved!');
+    tripModal.classList.add('hidden');
+    loadUserTrips();
+  } catch (e) {
+    toast(`Error saving: ${e.message}`, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Trip';
+  }
+}
+
+// ===== My Trips Panel =====
+
+async function loadUserTrips() {
+  const user = getUser();
+  if (!user) return;
+  try {
+    userTrips = await getUserTripPlans(currentTripsTab === 'past');
+  } catch (e) {
+    console.warn('Failed to load trips:', e);
+  }
+}
+
+function renderTripsList() {
+  const user = getUser();
+  if (!user) {
+    tripsList.innerHTML = '<p class="places-empty">Sign in to plan trips</p>';
+    return;
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  let filtered;
+  if (currentTripsTab === 'upcoming') {
+    filtered = userTrips.filter(t => t.trip_date >= today && t.status === 'planned');
+  } else {
+    filtered = userTrips.filter(t => t.trip_date < today || t.status !== 'planned');
+  }
+
+  if (filtered.length === 0) {
+    tripsList.innerHTML = `<p class="places-empty">No ${currentTripsTab} trips</p>`;
+    return;
+  }
+
+  tripsList.innerHTML = filtered.map(t => `
+    ${getTripSummaryCardHtml(t)}
+    <div class="trip-actions" data-trip-id="${t.id}">
+      ${t.status === 'planned' ? `
+        <button class="trip-action-btn complete-btn" onclick="window._completeTripAction('${t.id}')">Complete</button>
+        <button class="trip-action-btn" onclick="window._viewTripGear('${t.id}')">View Gear</button>
+      ` : ''}
+      <button class="trip-action-btn delete-btn" onclick="window._deleteTripAction('${t.id}')">Delete</button>
+    </div>
+  `).join('');
+}
+
+window._completeTripAction = async function(id) {
+  try {
+    await updateTripPlan(id, { status: 'completed' });
+    const trip = userTrips.find(t => t.id === id);
+    if (trip) trip.status = 'completed';
+    renderTripsList();
+    toast('Trip marked complete');
+  } catch (e) { toast(`Error: ${e.message}`, true); }
+};
+
+window._deleteTripAction = async function(id) {
+  if (!confirm('Delete this trip?')) return;
+  try {
+    await deleteTripPlan(id);
+    userTrips = userTrips.filter(t => t.id !== id);
+    renderTripsList();
+    toast('Trip deleted');
+  } catch (e) { toast(`Error: ${e.message}`, true); }
+};
+
+window._viewTripGear = function(id) {
+  const trip = userTrips.find(t => t.id === id);
+  if (!trip || !trip.gear_checklist) { toast('No gear data'); return; }
+
+  // Open a detail-like view
+  const clarity = trip.forecast ? getWaterClarity(trip.forecast) : 'clear';
+  detailContent.innerHTML = `
+    <h2>${escapeHtml(trip.place_name)}</h2>
+    <span class="detail-type-badge badge-${trip.place_type}">${trip.place_type}</span>
+    <span style="color:var(--text-muted);font-size:0.85rem;margin-left:8px;">${friendlyDate(trip.trip_date)}</span>
+    ${trip.forecast ? getForecastCardHtml(trip.forecast) : ''}
+    ${getGearChecklistHtml(trip.gear_checklist, clarity)}
+  `;
+  detailPanel.classList.remove('hidden');
+  tripsPanel.classList.add('hidden');
+};
+
 // ===== Event Listeners =====
 
 function setupEventListeners() {
@@ -738,6 +998,7 @@ function setupEventListeners() {
     }
     placesPanel.classList.toggle('hidden');
     filterPanel.classList.add('hidden');
+    tripsPanel.classList.add('hidden');
     renderPlacesList();
   });
   $('#btn-close-places').addEventListener('click', () => {
@@ -751,6 +1012,42 @@ function setupEventListeners() {
       tab.classList.add('active');
       currentPlacesTab = tab.dataset.tab;
       renderPlacesList();
+    });
+  });
+
+  // === Trip Plan Modal ===
+  $('#btn-close-trip').addEventListener('click', () => tripModal.classList.add('hidden'));
+  tripModal.addEventListener('click', (e) => { if (e.target === tripModal) tripModal.classList.add('hidden'); });
+  $('#btn-trip-forecast').addEventListener('click', handleGetForecast);
+  $('#btn-trip-back-1').addEventListener('click', () => showTripStep(1));
+  $('#btn-trip-generate').addEventListener('click', handleGeneratePlan);
+  $('#btn-trip-back-2').addEventListener('click', () => showTripStep(2));
+  $('#btn-trip-save').addEventListener('click', handleSaveTrip);
+
+  // Lure card delegation in trip modal too
+  tripModal.addEventListener('click', (e) => {
+    const card = e.target.closest('.lure-card');
+    if (card) { if (!e.target.closest('a')) card.classList.toggle('lure-expanded'); }
+  });
+
+  // === My Trips Panel ===
+  $('#btn-my-trips').addEventListener('click', async () => {
+    const user = getUser();
+    if (!user) { authModal.classList.remove('hidden'); return; }
+    tripsPanel.classList.toggle('hidden');
+    filterPanel.classList.add('hidden');
+    placesPanel.classList.add('hidden');
+    await loadUserTrips();
+    renderTripsList();
+  });
+  $('#btn-close-trips').addEventListener('click', () => tripsPanel.classList.add('hidden'));
+  document.querySelectorAll('.trips-tab').forEach(tab => {
+    tab.addEventListener('click', async () => {
+      document.querySelectorAll('.trips-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentTripsTab = tab.dataset.tab;
+      await loadUserTrips();
+      renderTripsList();
     });
   });
 

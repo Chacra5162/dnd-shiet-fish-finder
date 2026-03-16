@@ -77,6 +77,9 @@
       <button id="btn-my-places" class="icon-btn" title="My saved places">
         <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor"/></svg>
       </button>
+      <button id="btn-my-trips" class="icon-btn" title="My trip plans">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z" fill="currentColor"/></svg>
+      </button>
       <button id="btn-account" class="icon-btn" title="Account">
         <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="currentColor"/></svg>
       </button>
@@ -152,6 +155,77 @@
     <button id="btn-close-detail" class="close-btn detail-close">&times;</button>
     <div id="detail-content" class="detail-content">
       <!-- Populated dynamically -->
+    </div>
+  </div>
+
+  <!-- Trip Plan Modal -->
+  <div id="trip-modal" class="modal hidden">
+    <div class="modal-content trip-modal-content">
+      <button id="btn-close-trip" class="close-btn">&times;</button>
+
+      <!-- Step 1: Select Date/Time -->
+      <div id="trip-step-1" class="trip-step">
+        <h2>Plan a Day on the Water</h2>
+        <div class="trip-place-preview" id="trip-place-preview"></div>
+        <div class="form-field">
+          <label for="trip-date">Date</label>
+          <input type="date" id="trip-date" required>
+        </div>
+        <div class="form-field">
+          <label>Time Window</label>
+          <div class="time-window-group">
+            <label class="time-window-opt"><input type="radio" name="trip-time" value="morning" checked><span>Morning<br><small>5–10 AM</small></span></label>
+            <label class="time-window-opt"><input type="radio" name="trip-time" value="midday"><span>Midday<br><small>10 AM–3 PM</small></span></label>
+            <label class="time-window-opt"><input type="radio" name="trip-time" value="evening"><span>Evening<br><small>3–9 PM</small></span></label>
+          </div>
+        </div>
+        <button id="btn-trip-forecast" class="btn-primary">Get Forecast</button>
+      </div>
+
+      <!-- Step 2: Forecast + Species -->
+      <div id="trip-step-2" class="trip-step hidden">
+        <h2>Forecast &amp; Conditions</h2>
+        <div id="trip-forecast-area"></div>
+        <div id="trip-traffic-area"></div>
+        <div class="form-field" style="margin-top:12px;">
+          <label>Target Species (select 1-3)</label>
+          <div id="trip-species-selector" class="species-selector"></div>
+        </div>
+        <div class="trip-step-nav">
+          <button id="btn-trip-back-1" class="btn-secondary">Back</button>
+          <button id="btn-trip-generate" class="btn-primary">Generate Plan</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Full Plan + Save -->
+      <div id="trip-step-3" class="trip-step hidden">
+        <h2>Your Trip Plan</h2>
+        <div id="trip-plan-summary"></div>
+        <div id="trip-gear-area"></div>
+        <div class="form-field" style="margin-top:12px;">
+          <label for="trip-notes">Notes</label>
+          <textarea id="trip-notes" class="place-notes-input" placeholder="Anything to remember..."></textarea>
+        </div>
+        <div class="trip-step-nav">
+          <button id="btn-trip-back-2" class="btn-secondary">Back</button>
+          <button id="btn-trip-save" class="btn-primary">Save Trip</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- My Trips Panel -->
+  <div id="trips-panel" class="places-panel hidden">
+    <div class="filter-header">
+      <h3>My Trips</h3>
+      <button id="btn-close-trips" class="close-btn">&times;</button>
+    </div>
+    <div class="places-tabs">
+      <button class="trips-tab active" data-tab="upcoming">Upcoming</button>
+      <button class="trips-tab" data-tab="past">Past</button>
+    </div>
+    <div id="trips-list" class="places-list">
+      <p class="places-empty">No trips planned yet</p>
     </div>
   </div>
 

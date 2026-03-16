@@ -1,4 +1,4 @@
-const CACHE_NAME = 'waterway-finder-v4';
+const CACHE_NAME = 'waterway-finder-v5';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const STATIC_ASSETS = [
   './js/map.js',
   './js/supabase.js',
   './js/fishing.js',
+  './js/tripPlan.js',
   './manifest.json',
   './icons/favicon.svg',
 ];

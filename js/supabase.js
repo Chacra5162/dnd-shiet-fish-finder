@@ -167,6 +167,77 @@ async function getPlaceStatuses(placeName, lat, lon) {
   return data || [];
 }
 
+// ===== Trip Plans =====
+
+async function saveTripPlan(plan) {
+  if (!currentUser) throw new Error('Not signed in');
+  const client = getClient();
+  const { data, error } = await client
+    .from('trip_plans')
+    .insert({
+      user_id: currentUser.id,
+      place_name: plan.placeName,
+      place_type: plan.placeType,
+      lat: plan.lat,
+      lon: plan.lon,
+      osm_id: plan.osmId || null,
+      trip_date: plan.tripDate,
+      time_window: plan.timeWindow,
+      forecast: plan.forecast || null,
+      traffic_estimate: plan.trafficEstimate || null,
+      traffic_description: plan.trafficDescription || null,
+      species: plan.species || [],
+      gear_checklist: plan.gearChecklist || null,
+      notes: plan.notes || '',
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function getUserTripPlans(includeOld = false) {
+  if (!currentUser) return [];
+  const client = getClient();
+  let query = client
+    .from('trip_plans')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .order('trip_date', { ascending: true });
+  if (!includeOld) {
+    const today = new Date().toISOString().split('T')[0];
+    query = query.gte('trip_date', today);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+async function updateTripPlan(id, updates) {
+  if (!currentUser) throw new Error('Not signed in');
+  const client = getClient();
+  const { data, error } = await client
+    .from('trip_plans')
+    .update(updates)
+    .eq('id', id)
+    .eq('user_id', currentUser.id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteTripPlan(id) {
+  if (!currentUser) throw new Error('Not signed in');
+  const client = getClient();
+  const { error } = await client
+    .from('trip_plans')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', currentUser.id);
+  if (error) throw error;
+}
+
 export {
   initAuth,
   signUp,
@@ -179,4 +250,8 @@ export {
   removePlace,
   updatePlaceNotes,
   getPlaceStatuses,
+  saveTripPlan,
+  getUserTripPlans,
+  updateTripPlan,
+  deleteTripPlan,
 };

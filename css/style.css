@@ -653,6 +653,28 @@ a { color: var(--accent); }
   color: #e74c3c;
 }
 
+/* Plan a Trip button in detail panel */
+.btn-plan-trip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(52,152,219,0.3);
+  background: rgba(52,152,219,0.08);
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-plan-trip:hover {
+  background: rgba(52,152,219,0.18);
+  border-color: var(--accent);
+}
+
 /* Notes input in detail panel */
 .place-notes-section {
   margin-top: 12px;
@@ -804,6 +826,239 @@ a { color: var(--accent); }
 .marker-badge-favorite { background: #f1c40f; }
 .marker-badge-visited { background: #2ecc71; }
 .marker-badge-avoid { background: #e74c3c; }
+
+/* ===== Trip Plan Modal ===== */
+.trip-modal-content {
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.trip-place-preview {
+  background: var(--bg-surface);
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+.trip-place-preview .trip-place-name {
+  font-weight: 600;
+  color: var(--accent);
+}
+.trip-place-preview .trip-place-type {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.time-window-group {
+  display: flex;
+  gap: 8px;
+}
+.time-window-opt {
+  flex: 1;
+  display: flex;
+  cursor: pointer;
+}
+.time-window-opt input { display: none; }
+.time-window-opt span {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 10px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(52,152,219,0.2);
+  background: var(--bg-surface);
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+.time-window-opt span small {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.time-window-opt input:checked + span {
+  background: rgba(52,152,219,0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.trip-step { }
+.trip-step.hidden { display: none; }
+.trip-step-nav {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.btn-secondary {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: var(--bg-surface);
+  color: var(--text);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.btn-secondary:hover { border-color: var(--accent); }
+.trip-step-nav .btn-primary { flex: 2; }
+
+/* Forecast card in trip modal */
+.forecast-card {
+  background: var(--bg-surface);
+  border-radius: var(--radius);
+  padding: 14px;
+  border: 1px solid rgba(52,152,219,0.15);
+}
+.forecast-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.forecast-date {
+  font-weight: 600;
+  color: var(--accent);
+}
+.forecast-window {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: var(--bg);
+  padding: 3px 10px;
+  border-radius: 10px;
+}
+
+/* Traffic badge */
+.traffic-badge {
+  background: var(--bg-surface);
+  border-left: 3px solid;
+  border-radius: 0 8px 8px 0;
+  padding: 10px 14px;
+  margin-top: 10px;
+}
+.traffic-level {
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: block;
+}
+.traffic-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Gear section in trip plan */
+.gear-section {
+  margin-top: 14px;
+}
+.gear-section h4 {
+  font-size: 0.78rem;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 8px;
+}
+
+/* Essentials checklist */
+.essentials-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.essential-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg-surface);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.essential-item input {
+  accent-color: var(--accent);
+}
+.essential-item input:checked + span {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+/* Trip summary card (in trips panel) */
+.trip-summary-card {
+  background: var(--bg-surface);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.trip-summary-card:hover { background: rgba(52,152,219,0.1); }
+.trip-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.trip-summary-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.trip-summary-date {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.trip-status-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.trip-status-planned { background: rgba(52,152,219,0.15); color: var(--accent); }
+.trip-status-completed { background: rgba(46,204,113,0.15); color: #2ecc71; }
+.trip-status-cancelled { background: rgba(149,165,166,0.15); color: var(--text-muted); }
+.trip-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.78rem;
+}
+.trip-meta-item {
+  color: var(--text-muted);
+}
+.trip-species-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.species-chip-small {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  background: rgba(52,152,219,0.1);
+  color: var(--accent);
+}
+.trip-notes-preview {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 4px;
+}
+.trip-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.trip-action-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.trip-action-btn:hover { border-color: var(--accent); color: var(--text); }
+.trip-action-btn.complete-btn:hover { border-color: #2ecc71; color: #2ecc71; }
+.trip-action-btn.delete-btn:hover { border-color: #e74c3c; color: #e74c3c; }
 
 /* ===== Species Selector & Tackle Recs ===== */
 .species-selector {
