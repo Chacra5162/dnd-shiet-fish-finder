@@ -2112,6 +2112,216 @@ input, select, textarea {
   }
 }
 
+/* ===== Community Board ===== */
+.community-posts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.community-post-card {
+  background: var(--bg-surface);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.community-post-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.community-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.community-post-name {
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+.community-post-time {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+.community-post-body {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin-bottom: 6px;
+  word-wrap: break-word;
+}
+.community-post-photo {
+  width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  object-fit: cover;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+.community-catch-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(46,204,113,0.12);
+  color: #2ecc71;
+  margin-bottom: 6px;
+}
+.community-post-delete {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  float: right;
+}
+.community-post-delete:hover { color: #e74c3c; }
+
+.community-empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 16px 0;
+}
+
+/* Community post form */
+.community-form {
+  margin-top: 10px;
+  background: var(--bg-surface);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.community-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 8px;
+}
+.community-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 8px 4px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  touch-action: manipulation;
+}
+.community-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.community-form textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid rgba(52,152,219,0.2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 16px !important;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 50px;
+  outline: none;
+}
+.community-form textarea:focus { border-color: var(--accent); }
+.community-catch-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  margin-top: 6px;
+}
+.community-catch-fields input,
+.community-catch-fields select {
+  background: var(--bg);
+  border: 1px solid rgba(52,152,219,0.2);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--text);
+  font-size: 16px !important;
+  outline: none;
+}
+.community-form-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  align-items: center;
+}
+.community-photo-btn {
+  background: var(--bg);
+  border: 1px solid rgba(52,152,219,0.2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--accent);
+  font-size: 0.78rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.community-photo-btn:hover { border-color: var(--accent); }
+.community-photo-preview {
+  font-size: 0.72rem;
+  color: var(--stream);
+}
+.community-submit-btn {
+  margin-left: auto;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.community-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.community-load-more {
+  background: none;
+  border: 1px solid rgba(52,152,219,0.2);
+  border-radius: 8px;
+  padding: 8px;
+  color: var(--accent);
+  font-size: 0.82rem;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 6px;
+}
+.community-load-more:hover { border-color: var(--accent); }
+
+/* Photo viewer */
+.photo-viewer-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+.photo-viewer-content img {
+  max-width: 95vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
 /* ===== PWA / Safe Area Fixes ===== */
 @supports (padding: env(safe-area-inset-bottom)) {
   .detail-panel {

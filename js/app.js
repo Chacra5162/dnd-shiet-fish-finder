@@ -10,6 +10,7 @@ import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlac
 import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml } from './fishing.js';
 import { TIME_WINDOWS, fetchForecast, estimateTraffic, generateGearChecklist, getForecastCardHtml, getTrafficBadgeHtml, getGearChecklistHtml, getTripSummaryCardHtml, friendlyDate } from './tripPlan.js';
 import { CATEGORIES, getArsenalItems, addArsenalItem, updateArsenalItem, deleteArsenalItem, getPhotoUrl, filterItems, getUniqueColors, getUniqueWeights } from './arsenal.js';
+import { generateWaterBodyKey, getCommunityPosts, addCommunityPost, deleteCommunityPost, getCommunityPhotoUrl } from './community.js';
 
 // ===== State =====
 let userLat = 37.54; // Default: Richmond, VA
@@ -684,6 +685,17 @@ async function showWaterDetail(wb, dist) {
     </div>
   `;
 
+  // Community board section
+  html += `
+    <div class="detail-section" id="community-section">
+      <h3>Community Board</h3>
+      <div id="community-posts" class="community-posts">
+        <div class="loading-inline">Loading posts...</div>
+      </div>
+      <div id="community-form-area"></div>
+    </div>
+  `;
+
   html += `
     <div style="margin-top:16px; font-size:0.75rem; color:var(--text-muted);">
       ${wb.lat.toFixed(5)}, ${wb.lon.toFixed(5)}
@@ -696,6 +708,9 @@ async function showWaterDetail(wb, dist) {
 
   // Async: fetch weather, best times, and tides
   loadWeatherForDetail(wb.lat, wb.lon, wb.type);
+
+  // Async: load community posts
+  loadCommunityBoard(wb);
 }
 
 // Fetch weather, best times, and tides for the detail panel
@@ -741,6 +756,200 @@ async function loadTidesForDetail(lat, lon, waterType) {
     console.warn('Tide fetch failed:', e);
     tideArea.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">Tide data unavailable</p>';
   }
+}
+
+// ===== Community Board =====
+
+let communityCurrentWb = null;
+let communityPostType = 'comment';
+let communityPhotoFile = null;
+
+async function loadCommunityBoard(wb) {
+  communityCurrentWb = wb;
+  const postsEl = document.getElementById('community-posts');
+  const formEl = document.getElementById('community-form-area');
+  if (!postsEl) return;
+
+  const key = generateWaterBodyKey(wb.name, wb.lat, wb.lon);
+
+  try {
+    const posts = await getCommunityPosts(key);
+    renderCommunityPosts(posts, postsEl);
+  } catch (e) {
+    console.warn('Community load failed:', e);
+    postsEl.innerHTML = '<p class="community-empty">Could not load posts</p>';
+  }
+
+  // Render form (sign-in gated)
+  if (formEl) {
+    const user = getUser();
+    if (user) {
+      formEl.innerHTML = getCommunityFormHtml(wb);
+    } else {
+      formEl.innerHTML = `
+        <div style="text-align:center;padding:10px 0;">
+          <button class="btn-link" onclick="document.dispatchEvent(new CustomEvent('require-auth'))">Sign in to post</button>
+        </div>
+      `;
+    }
+  }
+}
+
+function renderCommunityPosts(posts, container) {
+  if (!posts.length) {
+    container.innerHTML = '<p class="community-empty">No posts yet — be the first to share!</p>';
+    return;
+  }
+
+  const user = getUser();
+  const userId = user?.id;
+
+  container.innerHTML = posts.map(post => {
+    const initials = (post.display_name || 'A').slice(0, 2).toUpperCase();
+    const time = timeAgo(new Date(post.created_at));
+    const photoUrl = post.photo_path ? getCommunityPhotoUrl(post.photo_path) : null;
+    const isOwn = userId === post.user_id;
+
+    let catchBadge = '';
+    if (post.post_type === 'catch' && post.species) {
+      const parts = [post.species];
+      if (post.weight_lbs) parts.push(`${post.weight_lbs} lbs`);
+      if (post.length_in) parts.push(`${post.length_in}"`);
+      catchBadge = `<div class="community-catch-badge">${escapeHtml(parts.join(' · '))}</div>`;
+    }
+
+    return `
+      <div class="community-post-card">
+        <div class="community-post-header">
+          <div class="community-avatar">${escapeHtml(initials)}</div>
+          <span class="community-post-name">${escapeHtml(post.display_name)}</span>
+          <span class="community-post-time">${time}</span>
+          ${isOwn ? `<button class="community-post-delete" onclick="window._deleteCommunityPost('${post.id}','${escapeAttr(post.photo_path || '')}')">delete</button>` : ''}
+        </div>
+        ${catchBadge}
+        ${photoUrl ? `<img class="community-post-photo" src="${photoUrl}" alt="Photo" onclick="window._viewPhoto('${photoUrl}')">` : ''}
+        ${post.body ? `<div class="community-post-body">${escapeHtml(post.body)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function getCommunityFormHtml(wb) {
+  const species = getCommonSpecies(wb.type, wb.lat, wb.lon);
+  return `
+    <div class="community-form">
+      <div class="community-tab-bar">
+        <button class="community-tab active" data-type="comment" onclick="window._setCommunityTab(this)">Comment</button>
+        <button class="community-tab" data-type="catch" onclick="window._setCommunityTab(this)">Catch Report</button>
+        <button class="community-tab" data-type="photo" onclick="window._setCommunityTab(this)">Photo</button>
+      </div>
+      <textarea id="community-body" placeholder="Share something about this spot..."></textarea>
+      <div id="community-catch-fields" class="community-catch-fields" style="display:none;">
+        <select id="community-species">
+          <option value="">Species</option>
+          ${species.map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('')}
+        </select>
+        <input type="number" id="community-weight" placeholder="lbs" step="0.01" min="0">
+        <input type="number" id="community-length" placeholder="inches" step="0.25" min="0">
+      </div>
+      <div class="community-form-actions">
+        <button class="community-photo-btn" onclick="document.getElementById('community-photo-input').click()">
+          <svg viewBox="0 0 24 24" width="14" height="14"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" fill="currentColor"/></svg>
+          Photo
+        </button>
+        <span class="community-photo-preview" id="community-photo-preview"></span>
+        <input type="file" id="community-photo-input" accept="image/*" capture="environment" style="display:none;" onchange="window._communityPhotoSelected(this)">
+        <button class="community-submit-btn" id="community-submit-btn" onclick="window._submitCommunityPost()">Post</button>
+      </div>
+    </div>
+  `;
+}
+
+window._setCommunityTab = function(btn) {
+  document.querySelectorAll('.community-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  communityPostType = btn.dataset.type;
+  const catchFields = document.getElementById('community-catch-fields');
+  if (catchFields) catchFields.style.display = communityPostType === 'catch' ? 'grid' : 'none';
+};
+
+window._communityPhotoSelected = function(input) {
+  communityPhotoFile = input.files[0] || null;
+  const preview = document.getElementById('community-photo-preview');
+  if (preview) preview.textContent = communityPhotoFile ? communityPhotoFile.name.slice(0, 20) : '';
+};
+
+window._submitCommunityPost = async function() {
+  const user = getUser();
+  if (!user) { document.dispatchEvent(new CustomEvent('require-auth')); return; }
+  if (!communityCurrentWb) return;
+
+  const body = document.getElementById('community-body')?.value?.trim() || '';
+  const species = document.getElementById('community-species')?.value || '';
+  const weight = parseFloat(document.getElementById('community-weight')?.value) || null;
+  const length = parseFloat(document.getElementById('community-length')?.value) || null;
+
+  if (!body && !communityPhotoFile) {
+    toast('Write something or add a photo', true);
+    return;
+  }
+
+  const btn = document.getElementById('community-submit-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Posting...'; }
+
+  try {
+    const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Angler';
+    await addCommunityPost(user.id, displayName, communityCurrentWb, {
+      type: communityPostType,
+      body,
+      species: communityPostType === 'catch' ? species : null,
+      weight: communityPostType === 'catch' ? weight : null,
+      length: communityPostType === 'catch' ? length : null,
+    }, communityPhotoFile);
+
+    communityPhotoFile = null;
+    toast('Posted!');
+    // Reload board
+    loadCommunityBoard(communityCurrentWb);
+  } catch (e) {
+    console.error('Post error:', e);
+    toast(`Error: ${e.message}`, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Post'; }
+  }
+};
+
+window._deleteCommunityPost = async function(postId, photoPath) {
+  const user = getUser();
+  if (!user) return;
+  try {
+    await deleteCommunityPost(user.id, postId, photoPath || null);
+    toast('Post deleted');
+    if (communityCurrentWb) loadCommunityBoard(communityCurrentWb);
+  } catch (e) {
+    toast(`Error: ${e.message}`, true);
+  }
+};
+
+window._viewPhoto = function(url) {
+  const viewer = document.getElementById('photo-viewer');
+  const img = document.getElementById('photo-viewer-img');
+  if (viewer && img) {
+    img.src = url;
+    viewer.classList.remove('hidden');
+  }
+};
+
+function timeAgo(date) {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return date.toLocaleDateString();
 }
 
 // Species chip click handler

@@ -435,6 +435,14 @@
     </div>
   </div>
 
+  <!-- Community Photo Viewer -->
+  <div id="photo-viewer" class="modal hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+    <div class="photo-viewer-content">
+      <button class="close-btn" style="position:absolute;top:12px;right:12px;z-index:1;font-size:2rem;" onclick="document.getElementById('photo-viewer').classList.add('hidden')">&times;</button>
+      <img id="photo-viewer-img" src="" alt="Photo">
+    </div>
+  </div>
+
   <!-- Toast Notifications -->
   <div id="toast-container" class="toast-container"></div>
 
