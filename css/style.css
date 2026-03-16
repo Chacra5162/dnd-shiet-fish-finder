@@ -725,6 +725,44 @@ a { color: var(--accent); }
   color: #e74c3c;
 }
 
+/* ===== Access / Private Property Warnings ===== */
+.access-warning {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin: 10px 0 6px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.access-warning strong {
+  display: block;
+  margin-bottom: 1px;
+}
+.access-warning svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.access-warn-high {
+  background: rgba(231,76,60,0.12);
+  border: 1px solid rgba(231,76,60,0.3);
+  color: #e74c3c;
+}
+.access-warn-high span { color: #f5b7b1; }
+.access-warn-med {
+  background: rgba(243,156,18,0.10);
+  border: 1px solid rgba(243,156,18,0.25);
+  color: #f39c12;
+}
+.access-warn-med span { color: #fad7a0; }
+.access-info {
+  background: rgba(46,204,113,0.08);
+  border: 1px solid rgba(46,204,113,0.2);
+  color: #2ecc71;
+}
+.access-info span { color: #a9dfbf; }
+
 /* Plan a Trip button in detail panel */
 .btn-plan-trip {
   display: flex;

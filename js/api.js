@@ -51,6 +51,92 @@ function classifyWaterBody(tags) {
   return 'stream'; // default fallback
 }
 
+// Assess whether a water body is likely on private property
+// Returns { likely: bool, confidence: 'high'|'medium'|'low', reason: string }
+function assessPrivateProperty(wb) {
+  const tags = wb.tags || {};
+  const name = (wb.name || '').toLowerCase();
+
+  // === Definite signals from OSM tags ===
+
+  // Explicitly tagged private
+  if (tags.access === 'private' || tags.access === 'no') {
+    return { likely: true, confidence: 'high', reason: 'Tagged as private access in OpenStreetMap' };
+  }
+
+  // Explicitly public
+  if (tags.access === 'yes' || tags.access === 'public' || tags.access === 'permissive') {
+    return { likely: false, confidence: 'high', reason: 'Public access' };
+  }
+
+  // Part of a public park, wildlife area, or managed land
+  if (tags.leisure === 'park' || tags.leisure === 'nature_reserve' ||
+      tags.boundary === 'national_park' || tags.boundary === 'protected_area' ||
+      tags.ownership === 'public' || tags.ownership === 'national' ||
+      tags.ownership === 'state' || tags.ownership === 'municipal' ||
+      tags.operator?.toLowerCase().includes('wildlife') ||
+      tags.operator?.toLowerCase().includes('park') ||
+      tags.operator?.toLowerCase().includes('corps of engineers') ||
+      tags.operator?.toLowerCase().includes('forest service')) {
+    return { likely: false, confidence: 'high', reason: 'Public land / managed area' };
+  }
+
+  // Tagged with fishing access
+  if (tags.fishing === 'yes' || tags.sport === 'fishing' || tags.leisure === 'fishing') {
+    return { likely: false, confidence: 'medium', reason: 'Fishing access indicated' };
+  }
+
+  // On a golf course or private club
+  if (tags.leisure === 'golf_course' || tags.club || tags.access === 'members') {
+    return { likely: true, confidence: 'high', reason: 'Golf course or private club' };
+  }
+
+  // Part of residential/commercial landuse
+  if (tags.landuse === 'residential' || tags.landuse === 'commercial' ||
+      tags.landuse === 'farmland' || tags.landuse === 'farmyard') {
+    return { likely: true, confidence: 'medium', reason: `Located on ${tags.landuse} land` };
+  }
+
+  // === Heuristic signals ===
+
+  // Unnamed ponds are very likely private farm/residential ponds
+  if (wb.type === 'pond' && name.startsWith('pond #')) {
+    return { likely: true, confidence: 'medium', reason: 'Unnamed pond — likely private property' };
+  }
+
+  // Names suggesting private ownership
+  const privateNames = ['farm', 'estate', 'ranch', 'private', 'country club',
+    'golf', 'subdivision', 'HOA', 'homeowner', 'community pond'];
+  if (privateNames.some(p => name.includes(p))) {
+    return { likely: true, confidence: 'medium', reason: 'Name suggests private property' };
+  }
+
+  // Names suggesting public access
+  const publicNames = ['state park', 'national', 'wildlife', 'management area',
+    'public', 'county park', 'city park', 'memorial', 'recreation',
+    'reservoir', 'army corps', 'national forest'];
+  if (publicNames.some(p => name.includes(p))) {
+    return { likely: false, confidence: 'medium', reason: 'Name suggests public land' };
+  }
+
+  // Large well-known rivers are almost always public waterways
+  if (wb.type === 'river') {
+    return { likely: false, confidence: 'low', reason: 'Rivers are generally public waterways (verify bank access)' };
+  }
+
+  // Small unnamed water bodies — could be either
+  if (name.startsWith('lake #') || name.startsWith('creek #')) {
+    return { likely: true, confidence: 'low', reason: 'Unnamed water body — access uncertain, may be private' };
+  }
+
+  // Default: unknown — show caution for ponds, less so for others
+  if (wb.type === 'pond') {
+    return { likely: true, confidence: 'low', reason: 'Small ponds are often on private land' };
+  }
+
+  return { likely: false, confidence: 'low', reason: '' };
+}
+
 // Fetch from Overpass with fallback servers and retry
 async function fetchOverpass(query) {
   let lastError = null;
@@ -476,4 +562,5 @@ export {
   getCommonSpecies,
   getBBox,
   distanceMiles,
+  assessPrivateProperty,
 };

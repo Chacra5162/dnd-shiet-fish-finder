@@ -4,7 +4,7 @@
  * Focused on Virginia & North Carolina. Supabase auth + user places.
  */
 
-import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles } from './api.js';
+import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty } from './api.js';
 import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS } from './map.js';
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, getPlaceStatuses, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan } from './supabase.js';
 import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml } from './fishing.js';
@@ -372,6 +372,31 @@ async function showWaterDetail(wb, dist) {
     <span class="detail-type-badge badge-${wb.type}">${typeLabel[wb.type] || wb.type}</span>
     <span style="color:var(--text-muted); font-size:0.85rem; margin-left:8px;">${dist.toFixed(1)} mi away</span>
   `;
+
+  // Private property warning
+  const access = assessPrivateProperty(wb);
+  if (access.likely) {
+    const icon = access.confidence === 'high'
+      ? '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" fill="currentColor"/></svg>'
+      : '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/></svg>';
+    const cls = access.confidence === 'high' ? 'access-warn-high' : 'access-warn-med';
+    html += `
+      <div class="access-warning ${cls}">
+        ${icon}
+        <div>
+          <strong>${access.confidence === 'high' ? 'Private Property' : 'Access Uncertain'}</strong>
+          <span>${escapeHtml(access.reason)}. Always verify you have permission before accessing.</span>
+        </div>
+      </div>
+    `;
+  } else if (access.reason && access.confidence !== 'low') {
+    html += `
+      <div class="access-warning access-info">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/></svg>
+        <div><span>${escapeHtml(access.reason)}</span></div>
+      </div>
+    `;
+  }
 
   // Place actions (favorite / visited / avoid)
   html += getPlaceStatusHtml(wb);
