@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = 'waterway-finder';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // bumped to clear stale caches after dedupe improvements
 const STORES = {
   waterBodies: 'water_bodies',
   usgs: 'usgs_sites',

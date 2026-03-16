@@ -275,12 +275,125 @@ async function fetchWaterBodies(south, west, north, east) {
 }
 
 function dedupeWaterBodies(items) {
+  // First pass: exact coordinate dedupe
   const seen = new Set();
-  return items.filter(wb => {
-    const key = `${wb.name}_${wb.lat.toFixed(3)}_${wb.lon.toFixed(3)}`;
+  const unique = items.filter(wb => {
+    const key = `${wb.name}_${wb.lat.toFixed(4)}_${wb.lon.toFixed(4)}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
+  });
+
+  // Second pass: collapse same-named water bodies into a single representative point.
+  // A creek named "Big Creek" may appear as 20+ OSM segments along its length —
+  // keep only the most central point per name per cluster.
+  return collapseByName(unique);
+}
+
+// For named entries: group by exact name + type, then cluster spatially.
+// Within each cluster, keep the point closest to the cluster centroid.
+// For unnamed entries (generated names), use tighter proximity dedupe.
+function collapseByName(items) {
+  const named = [];    // has a real OSM name
+  const unnamed = [];  // generated name like "Creek #12345"
+
+  for (const wb of items) {
+    if (/^(Lake|Pond|River|Creek|Boat Landing|Fishing Pier) #\d+$/.test(wb.name)) {
+      unnamed.push(wb);
+    } else {
+      named.push(wb);
+    }
+  }
+
+  // --- Named: group by (name + type), then spatial clustering ---
+  const groups = new Map();
+  for (const wb of named) {
+    const key = `${wb.name}|||${wb.type}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(wb);
+  }
+
+  const result = [];
+
+  for (const [, group] of groups) {
+    if (group.length === 1) {
+      result.push(group[0]);
+      continue;
+    }
+
+    // Spatial clustering: merge points within ~2 miles of each other
+    const clusters = spatialCluster(group, 0.03); // ~2 miles in degrees
+    for (const cluster of clusters) {
+      result.push(pickRepresentative(cluster));
+    }
+  }
+
+  // --- Unnamed: proximity dedupe at ~0.5 mile resolution ---
+  const unnamedSeen = new Set();
+  for (const wb of unnamed) {
+    // Round to ~0.5 mile grid
+    const key = `${wb.type}_${wb.lat.toFixed(2)}_${wb.lon.toFixed(2)}`;
+    if (unnamedSeen.has(key)) continue;
+    unnamedSeen.add(key);
+    result.push(wb);
+  }
+
+  return result;
+}
+
+// Simple single-linkage spatial clustering.
+// Groups points where any point in the cluster is within `threshold` degrees of another.
+function spatialCluster(points, threshold) {
+  const clusters = [];
+  const assigned = new Array(points.length).fill(false);
+
+  for (let i = 0; i < points.length; i++) {
+    if (assigned[i]) continue;
+    const cluster = [points[i]];
+    assigned[i] = true;
+
+    // Expand cluster: find all unassigned points near any point in cluster
+    let expanded = true;
+    while (expanded) {
+      expanded = false;
+      for (let j = 0; j < points.length; j++) {
+        if (assigned[j]) continue;
+        for (const cp of cluster) {
+          if (Math.abs(points[j].lat - cp.lat) < threshold &&
+              Math.abs(points[j].lon - cp.lon) < threshold) {
+            cluster.push(points[j]);
+            assigned[j] = true;
+            expanded = true;
+            break;
+          }
+        }
+      }
+    }
+    clusters.push(cluster);
+  }
+  return clusters;
+}
+
+// From a cluster of same-name water bodies, pick the best representative:
+// - Prefer entries with the most OSM tags (richer data)
+// - Among ties, pick the one closest to the cluster centroid
+function pickRepresentative(cluster) {
+  if (cluster.length === 1) return cluster[0];
+
+  // Centroid
+  const cLat = cluster.reduce((s, p) => s + p.lat, 0) / cluster.length;
+  const cLon = cluster.reduce((s, p) => s + p.lon, 0) / cluster.length;
+
+  // Score: tag count (more tags = richer data), then distance to centroid as tiebreaker
+  return cluster.reduce((best, wb) => {
+    const bestTags = Object.keys(best.tags || {}).length;
+    const wbTags = Object.keys(wb.tags || {}).length;
+    if (wbTags > bestTags) return wb;
+    if (wbTags < bestTags) return best;
+    // Tiebreak: closer to centroid
+    const bestDist = (best.lat - cLat) ** 2 + (best.lon - cLon) ** 2;
+    const wbDist = (wb.lat - cLat) ** 2 + (wb.lon - cLon) ** 2;
+    return wbDist < bestDist ? wb : best;
   });
 }
 
