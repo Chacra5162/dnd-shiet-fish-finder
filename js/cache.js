@@ -27,8 +27,11 @@ function gridKey(lat, lon) {
   return `${gLat}_${gLon}`;
 }
 
+let _dbPromise = null;
+
 function openDB() {
-  return new Promise((resolve, reject) => {
+  if (_dbPromise) return _dbPromise;
+  _dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
@@ -45,8 +48,12 @@ function openDB() {
       }
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => {
+      _dbPromise = null; // allow retry on failure
+      reject(req.error);
+    };
   });
+  return _dbPromise;
 }
 
 async function getCached(storeName, lat, lon) {
@@ -85,8 +92,10 @@ async function setCache(storeName, lat, lon, data) {
 // Get all grid cells that cover a bounding box
 function getGridCells(south, west, north, east) {
   const cells = [];
-  for (let lat = south; lat <= north; lat += GRID_SIZE) {
-    for (let lon = west; lon <= east; lon += GRID_SIZE) {
+  for (let i = 0; (south + i * GRID_SIZE) <= north; i++) {
+    const lat = south + i * GRID_SIZE;
+    for (let j = 0; (west + j * GRID_SIZE) <= east; j++) {
+      const lon = west + j * GRID_SIZE;
       cells.push({ lat, lon, key: gridKey(lat, lon) });
     }
   }

@@ -3,9 +3,7 @@
  * Uses the shared Supabase client from supabase.js.
  */
 
-import { getClient } from './supabase.js';
-
-const SUPABASE_URL = 'https://emgyewsetldhzxzskyji.supabase.co';
+import { getClient, getSupabaseUrl } from './supabase.js';
 const BUCKET = 'community-photos';
 
 function client() {
@@ -22,7 +20,7 @@ function generateWaterBodyKey(name, lat, lon) {
 async function getCommunityPosts(waterBodyKey, limit = 50, offset = 0) {
   const { data, error } = await client()
     .from('community_posts')
-    .select('*')
+    .select('id,user_id,display_name,water_body_key,water_body_name,water_body_lat,water_body_lon,post_type,body,photo_path,species,weight_lbs,length_in,created_at')
     .eq('water_body_key', waterBodyKey)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
@@ -87,7 +85,7 @@ async function deleteCommunityPost(userId, postId, photoPath) {
 
 function getCommunityPhotoUrl(photoPath) {
   if (!photoPath) return null;
-  return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${photoPath}`;
+  return `${getSupabaseUrl()}/storage/v1/object/public/${BUCKET}/${photoPath}`;
 }
 
 // ===== Image Resize =====
@@ -97,6 +95,7 @@ function resizeImage(file, maxWidth) {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
+      img.onerror = () => resolve(file); // fallback: upload original file without resize
       img.onload = () => {
         const scale = img.width > maxWidth ? maxWidth / img.width : 1;
         const canvas = document.createElement('canvas');
@@ -116,7 +115,7 @@ function resizeImage(file, maxWidth) {
 async function getRecentPosts(limit = 30, offset = 0) {
   const { data, error } = await client()
     .from('community_posts')
-    .select('*')
+    .select('id,user_id,display_name,water_body_key,water_body_name,water_body_lat,water_body_lon,post_type,body,photo_path,species,weight_lbs,length_in,created_at')
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) throw error;

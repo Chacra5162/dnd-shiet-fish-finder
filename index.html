@@ -140,8 +140,8 @@
       <button id="btn-my-places" class="icon-btn" title="My saved places">
         <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor"/></svg>
       </button>
-      <button id="btn-arsenal" class="icon-btn" title="My Arsenal">
-        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M20 6h-2.18c.11-.31.18-.65.18-1a3 3 0 00-3-3c-1.05 0-1.95.56-2.47 1.38L12 4.26l-.53-.88A2.97 2.97 0 009 2a3 3 0 00-3 3c0 .35.07.69.18 1H4c-1.11 0-2 .89-2 2v3c0 .55.45 1 1 1h1v7c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-7h1c.55 0 1-.45 1-1V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm9 16H6v-7h12v7zm2-9H4V8h16v3z" fill="currentColor"/></svg>
+      <button id="btn-arsenal" class="icon-btn" title="My Tackle">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M22 2l-4.5 4.5L16 5l-1.5 1.5 2 2-9 9-4-4-1.5 1.5 4 4 1.5-1.5 9-9 2 2L21 9l-1.5-1.5L22 2zM5 19.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z" fill="currentColor"/></svg>
       </button>
       <button id="btn-licenses" class="icon-btn" title="My Licenses">
         <svg viewBox="0 0 24 24" width="20" height="20"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12zM6 10h2v2H6v-2zm0 4h8v2H6v-2zm10 0h2v2h-2v-2zm-6-4h8v2h-8v-2z" fill="currentColor"/></svg>
@@ -157,6 +157,14 @@
       </button>
     </div>
   </header>
+
+  <!-- Header Hint (first-run onboarding) -->
+  <div id="header-hint" class="header-hint hidden">
+    <div class="header-hint-inner">
+      <p>Tap buttons above to access: Filters, Social Feed, Saved Places, Tackle Box, Licenses, Trips, and Account</p>
+      <button class="btn-primary" style="width:100%;margin-top:8px;font-size:0.85rem;" onclick="document.getElementById('header-hint').classList.add('hidden');localStorage.setItem('wwf_header_hint_seen','1')">Got it!</button>
+    </div>
+  </div>
 
   <!-- Filter Panel -->
   <div id="filter-panel" class="filter-panel hidden">
@@ -248,7 +256,7 @@
   <div id="arsenal-panel" class="arsenal-overlay hidden">
     <div class="arsenal-container">
       <header class="arsenal-header">
-        <h2>My Arsenal</h2>
+        <h2>My Tackle</h2>
         <button id="btn-close-arsenal" class="close-btn">&times;</button>
       </header>
 
@@ -282,7 +290,7 @@
   <div id="arsenal-form-modal" class="modal hidden">
     <div class="modal-content" style="max-width:420px;">
       <button id="btn-close-arsenal-form" class="close-btn">&times;</button>
-      <h2 id="arsenal-form-title">Add to Arsenal</h2>
+      <h2 id="arsenal-form-title">Add to Tackle Box</h2>
       <form id="arsenal-form" class="auth-form">
         <div class="form-field">
           <label for="af-name">Name *</label>

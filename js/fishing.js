@@ -4,6 +4,8 @@
  * Includes detailed lure specs: weight, size, color, rigging.
  */
 
+import { distanceMiles } from './api.js';
+
 // ===== Weather via Open-Meteo =====
 
 let weatherCache = null;
@@ -311,11 +313,7 @@ function findNearestTideStation(lat, lon) {
   let best = null;
   let bestDist = Infinity;
   for (const s of TIDE_STATIONS) {
-    const R = 3959;
-    const dLat = (s.lat - lat) * Math.PI / 180;
-    const dLon = (s.lon - lon) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(s.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-    const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const dist = distanceMiles(lat, lon, s.lat, s.lon);
     if (dist < bestDist) { bestDist = dist; best = { ...s, dist }; }
   }
   return best;
@@ -379,7 +377,7 @@ function getTideHtml(tideData, stationName) {
 
   // Next high and low from now
   const now = new Date();
-  const upcoming = highsLows.filter(hl => new Date(hl.time) > now);
+  const upcoming = highsLows.filter(hl => new Date(hl.time.replace(' ', 'T')) > now);
   const nextHigh = upcoming.find(hl => hl.type === 'high');
   const nextLow = upcoming.find(hl => hl.type === 'low');
 
@@ -398,14 +396,14 @@ function getTideHtml(tideData, stationName) {
   }).join(' ');
 
   // Current time marker
-  const firstTime = new Date(predictions[0].time);
-  const lastTime = new Date(predictions[predictions.length - 1].time);
+  const firstTime = new Date(predictions[0].time.replace(' ', 'T'));
+  const lastTime = new Date(predictions[predictions.length - 1].time.replace(' ', 'T'));
   const nowPct = Math.max(0, Math.min(1, (now - firstTime) / (lastTime - firstTime)));
   const nowX = nowPct * chartW;
 
   // High/low markers on chart
   const markers = highsLows.map(hl => {
-    const t = new Date(hl.time);
+    const t = new Date(hl.time.replace(' ', 'T'));
     const pct = (t - firstTime) / (lastTime - firstTime);
     if (pct < 0 || pct > 1) return '';
     const x = pct * chartW;
@@ -416,7 +414,7 @@ function getTideHtml(tideData, stationName) {
   }).join('');
 
   const formatTideTime = (t) => {
-    const d = new Date(t);
+    const d = new Date(t.replace(' ', 'T'));
     return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   };
 
@@ -1615,14 +1613,37 @@ const SPECIES_DATA = {
     depthTips: { cold: 'Suspend near structure 15-25ft', mild: 'Brush piles & docks 5-12ft, spider rig effective', warm: 'Spawning flats 3-8ft, then transition to docks', hot: 'Deep brush piles 15-25ft, early morning shallower' },
   },
   'Walleye': {
+    tempBrackets: { cold: [35, 48], mild: [48, 60], warm: [60, 72], hot: [72, 85] },
     lures: {
-      cold: ['Blade Bait', 'Jigging Rap', 'Hair Jig'],
-      mild: ['Small Jig', 'Crankbait', 'Spinner Rig (Crawler Harness)'],
-      warm: ['Crankbait', 'Spinner Rig (Crawler Harness)', 'Swimbait', 'Small Jig'],
-      hot: ['Deep Crankbait', 'Bottom Bouncer', 'Live Bait Rig'],
+      cold: ['Blade Bait', 'Hair Jig', 'Jigging Spoon'],
+      mild: ['Crankbait', 'Jerkbait', 'Spinner Rig'],
+      warm: ['Deep Crankbait', 'Worm Harness', 'Swimbait'],
+      hot: ['Deep Crankbait', 'Live Bait Rig'],
     },
-    baits: ['Minnows', 'Nightcrawlers', 'Leeches'],
-    depthTips: { cold: 'Rocky points 10-20ft, jig very slowly', mild: 'Gravel flats & points 8-18ft, dawn/dusk best', warm: 'Current areas, dam tailwaters, trolling flats', hot: 'Deep structure 20-35ft, night fishing on flats' },
+    baits: ['Live minnows', 'Nightcrawlers', 'Leeches'],
+    depthTips: { cold: 'Deep structure 15-30ft, slow jigging presentations', mild: 'Transition banks 8-15ft, trolling crankbaits', warm: 'Points and humps 10-20ft, bottom bouncers', hot: 'Deepest structure 20-35ft, early morning or night fishing' },
+    tips: ['Best bite is low light — dawn, dusk, and overcast days', 'Claytor Lake (VA) is the primary VA walleye fishery', 'Slow presentations in cold water — barely move the bait', 'Trolling crankbaits along creek channels in spring is very effective'],
+  },
+  'Hickory Shad': {
+    tempBrackets: { cold: [45, 55], mild: [55, 65], warm: [65, 72], hot: [72, 85] },
+    lures: { cold: ['Small Shad Dart', 'Gold Spoon'], mild: ['Shad Dart', 'Small Jig', 'Gold Spoon'], warm: ['Shad Dart', 'Small Inline Spinner'], hot: ['Shad Dart'] },
+    baits: ['Small pieces of shad', 'Bloodworms'],
+    depthTips: { cold: 'Deep pools below dams 8-15ft', mild: 'Mid-depth runs 4-8ft below rapids', warm: 'Current seams near dam tailraces', hot: 'Deep holes near cold water inputs' },
+    tips: ['Fish below dams during spring run (March-May)', 'Use ultralight gear — 4-6lb test', 'Shad darts in white, chartreuse, or pink are standard', 'Cast upstream and let drift through current'],
+  },
+  'Spotted Bass': {
+    tempBrackets: { cold: [42, 55], mild: [55, 68], warm: [68, 80], hot: [80, 90] },
+    lures: { cold: ['Ned Rig', 'Small Jerkbait', 'Hair Jig'], mild: ['Grub', 'Small Crankbait', 'Drop Shot'], warm: ['Topwater', 'Crankbait', 'Swimbait'], hot: ['Deep Crankbait', 'Drop Shot', 'Ned Rig'] },
+    baits: ['Crawfish', 'Hellgrammites', 'Minnows'],
+    depthTips: { cold: 'Deep bluffs and ledges 12-25ft', mild: 'Rocky points and current breaks 6-15ft', warm: 'Current seams, rocky banks 3-10ft', hot: 'Deep ledges and shade 15-25ft' },
+    tips: ['Common in New River, upper James, and Roanoke River', 'Prefer more current than largemouth — fish the flow', 'Smaller profile baits — downsize everything vs largemouth', 'Often mixed with smallmouth in rocky river sections'],
+  },
+  'Carp': {
+    tempBrackets: { cold: [40, 55], mild: [55, 68], warm: [68, 80], hot: [80, 95] },
+    lures: { cold: ['Small Hair Jig'], mild: ['Bread Fly', 'Corn Fly'], warm: ['Surface Bread', 'Corn Fly'], hot: ['Surface Bread'] },
+    baits: ['Sweet corn (canned)', 'Bread', 'Boilies', 'Dough balls', 'Nightcrawlers'],
+    depthTips: { cold: 'Deep slow pools 6-12ft, bottom rigs', mild: 'Shallow flats 2-6ft, bottom feeding', warm: 'Visible cruising fish in shallows 1-4ft', hot: 'Shaded banks, deeper pools, early morning flats' },
+    tips: ['Pack bait (ground corn mix) to attract fish', 'Hair rig for best hookup ratio', 'Strong gear needed — 15-20lb line for big James River carp', 'Sight fishing with bread on surface is exciting in warm months'],
   },
   'Muskie': {
     lures: {
@@ -1664,7 +1685,7 @@ const SPECIES_DATA = {
     baits: ['Small Worms', 'Wax Worms', 'Single Salmon Egg'],
     depthTips: { cold: 'Plunge pools, behind rocks 2-5ft', mild: 'Pocket water, small pools, headwater streams', warm: 'Spring-fed areas, shaded headwaters only', hot: 'Find cold tributary inputs — brook trout are very heat-sensitive' },
   },
-  'Shad': {
+  'American Shad': {
     lures: {
       cold: ['Shad Dart (1/4oz)', 'Small Spoon', 'Shad Rig'],
       mild: ['Shad Dart', 'Small Jig', 'Flutter Spoon', 'Fly (Clouser Minnow)'],
@@ -1760,6 +1781,42 @@ const SPECIES_DATA = {
     },
     baits: ['Live Mud Minnows', 'Live Finger Mullet', 'Strip Bait (Bluefish belly)', 'Gulp Swimming Mullet'],
     depthTips: { cold: 'Offshore — flounder migrate out in winter', mild: 'Inlets & channel edges 5-15ft as fish migrate in', warm: 'Sandy bottom near structure 3-10ft, work the tide changes', hot: 'Inlets, bridges, dock pilings 5-15ft, incoming tide best' },
+  },
+  'Hickory Shad': {
+    tempBrackets: { cold: [45, 55], mild: [55, 65], warm: [65, 72], hot: [72, 85] },
+    lures: {
+      cold: ['Small Shad Dart', 'Gold Spoon'],
+      mild: ['Shad Dart', 'Small Jig', 'Gold Spoon'],
+      warm: ['Shad Dart', 'Small Inline Spinner'],
+      hot: ['Shad Dart'],
+    },
+    baits: ['Small pieces of shad', 'Bloodworms'],
+    depthTips: { cold: 'Deep pools below dams 8-15ft', mild: 'Mid-depth runs 4-8ft below rapids', warm: 'Current seams near dam tailraces', hot: 'Deep holes near cold water inputs' },
+    tips: ['Fish below dams during spring run (March-May)', 'Use ultralight gear — 4-6lb test', 'Shad darts in white, chartreuse, or pink are standard', 'Cast upstream and let drift naturally through current'],
+  },
+  'Carp': {
+    tempBrackets: { cold: [40, 55], mild: [55, 68], warm: [68, 80], hot: [80, 95] },
+    lures: {
+      cold: ['Small Hair Jig'],
+      mild: ['Bread Fly', 'Corn Fly'],
+      warm: ['Surface Bread', 'Corn Fly'],
+      hot: ['Surface Bread'],
+    },
+    baits: ['Sweet corn (canned)', 'Bread', 'Boilies', 'Dough balls', 'Nightcrawlers'],
+    depthTips: { cold: 'Deep slow pools 6-12ft, bottom rigs', mild: 'Shallow flats 2-6ft where they feed on bottom', warm: 'Visible cruising fish in shallows 1-4ft', hot: 'Shaded banks, deeper pools, early morning flats' },
+    tips: ['Pack bait (ground corn mix) in the swim to attract fish', 'Use a hair rig for best hookup ratio', 'Strong gear needed — 15-20lb line minimum for big James River carp', 'Sight fishing with bread on the surface is exciting in warm months'],
+  },
+  'Spotted Bass': {
+    tempBrackets: { cold: [42, 55], mild: [55, 68], warm: [68, 80], hot: [80, 90] },
+    lures: {
+      cold: ['Ned Rig', 'Small Jerkbait', 'Hair Jig'],
+      mild: ['Grub', 'Small Crankbait', 'Drop Shot'],
+      warm: ['Topwater', 'Crankbait', 'Swimbait'],
+      hot: ['Deep Crankbait', 'Drop Shot', 'Ned Rig'],
+    },
+    baits: ['Crawfish', 'Hellgrammites', 'Minnows'],
+    depthTips: { cold: 'Deep bluffs and ledges 12-25ft', mild: 'Rocky points and current breaks 6-15ft', warm: 'Current seams, rocky banks 3-10ft', hot: 'Deep ledges and shade 15-25ft, early morning topwater on shoals' },
+    tips: ['Very common in New River, upper James, and Roanoke River', 'Prefer more current than largemouth — fish the flow', 'Smaller profile baits than largemouth — downsize everything', 'Often found mixed with smallmouth in rocky river sections'],
   },
 };
 

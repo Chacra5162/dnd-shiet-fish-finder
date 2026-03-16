@@ -4,7 +4,7 @@
  * Focused on Virginia & North Carolina. Supabase auth + user places.
  */
 
-import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchFloodStage, fetchRecentUSGSData, fetchNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml } from './api.js';
+import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml } from './api.js';
 import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers } from './map.js';
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, getPlaceStatuses, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan } from './supabase.js';
 import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml } from './fishing.js';
@@ -74,7 +74,7 @@ function loadPrefs() {
       }
       if (updated) localStorage.setItem(PREF_KEY, JSON.stringify(waterTypePrefs));
     }
-  } catch {}
+  } catch (e) { localStorage.removeItem(PREF_KEY); }
 }
 
 function savePrefs(types) {
@@ -388,7 +388,7 @@ window._saveNotes = async function(btn) {
     return;
   }
 
-  const textarea = btn.previousElementSibling;
+  const textarea = btn.closest('.place-notes-section').querySelector('textarea');
   const notes = textarea.value.trim();
   const wbName = textarea.dataset.wbName;
   const wbLat = parseFloat(textarea.dataset.wbLat);
@@ -719,7 +719,7 @@ async function showWaterDetail(wb, dist) {
 
   // Plan a Trip button
   html += `
-    <button class="btn-plan-trip" onclick="window._openTripPlan('${escapeAttr(JSON.stringify({ name: wb.name, type: wb.type, lat: wb.lat, lon: wb.lon, id: wb.id }))}')">
+    <button class="btn-plan-trip" data-wb='${escapeAttr(JSON.stringify({ name: wb.name, type: wb.type, lat: wb.lat, lon: wb.lon, id: wb.id }))}' onclick="window._openTripPlan(this.dataset.wb)">
       <svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z" fill="currentColor"/></svg>
       Plan a Day on the Water
     </button>
@@ -816,7 +816,7 @@ async function showWaterDetail(wb, dist) {
   loadWeatherForDetail(wb.lat, wb.lon, wb.type, gen);
 
   // Async: load community posts
-  loadCommunityBoard(wb);
+  loadCommunityBoard(wb, gen);
 }
 
 // Fetch weather, best times, and tides for the detail panel
@@ -874,7 +874,7 @@ let communityCurrentWb = null;
 let communityPostType = 'comment';
 let communityPhotoFile = null;
 
-async function loadCommunityBoard(wb) {
+async function loadCommunityBoard(wb, gen) {
   communityCurrentWb = wb;
   const postsEl = document.getElementById('community-posts');
   const formEl = document.getElementById('community-form-area');
@@ -884,6 +884,7 @@ async function loadCommunityBoard(wb) {
 
   try {
     const posts = await getCommunityPosts(key);
+    if (gen !== undefined && gen !== detailGeneration) return;
     renderCommunityPosts(posts, postsEl);
   } catch (e) {
     console.warn('Community load failed:', e);
@@ -891,6 +892,7 @@ async function loadCommunityBoard(wb) {
   }
 
   // Render form (sign-in gated)
+  if (gen !== undefined && gen !== detailGeneration) return;
   if (formEl) {
     const user = getUser();
     if (user) {
@@ -934,10 +936,10 @@ function renderCommunityPosts(posts, container) {
           <div class="community-avatar">${escapeHtml(initials)}</div>
           <span class="community-post-name">${escapeHtml(post.display_name)}</span>
           <span class="community-post-time">${time}</span>
-          ${isOwn ? `<button class="community-post-delete" onclick="window._deleteCommunityPost('${post.id}','${escapeAttr(post.photo_path || '')}')">delete</button>` : ''}
+          ${isOwn ? `<button class="community-post-delete" data-post-id="${post.id}" data-photo="${escapeAttr(post.photo_path || '')}" onclick="window._deleteCommunityPost(this)">delete</button>` : ''}
         </div>
         ${catchBadge}
-        ${photoUrl ? `<img class="community-post-photo" src="${photoUrl}" alt="Photo" onclick="window._viewPhoto('${photoUrl}')">` : ''}
+        ${photoUrl ? `<img class="community-post-photo" src="${photoUrl}" alt="Photo" data-url="${escapeAttr(photoUrl)}" onclick="window._viewPhoto(this.dataset.url)">` : ''}
         ${post.body ? `<div class="community-post-body">${escapeHtml(post.body)}</div>` : ''}
       </div>
     `;
@@ -1029,9 +1031,11 @@ window._submitCommunityPost = async function() {
   }
 };
 
-window._deleteCommunityPost = async function(postId, photoPath) {
+window._deleteCommunityPost = async function(el) {
   const user = getUser();
   if (!user) return;
+  const postId = el.dataset.postId;
+  const photoPath = el.dataset.photo;
   try {
     await deleteCommunityPost(user.id, postId, photoPath || null);
     toast('Post deleted');
@@ -1134,7 +1138,7 @@ function renderSocialFeed(container) {
           <span class="community-post-time">${time}</span>
         </div>
         ${catchBadge}
-        ${photoUrl ? `<img class="community-post-photo" src="${photoUrl}" alt="Photo" onclick="event.stopPropagation();window._viewPhoto('${photoUrl}')">` : ''}
+        ${photoUrl ? `<img class="community-post-photo" src="${photoUrl}" alt="Photo" data-url="${escapeAttr(photoUrl)}" onclick="event.stopPropagation();window._viewPhoto(this.dataset.url)">` : ''}
         ${post.body ? `<div class="community-post-body">${escapeHtml(post.body)}</div>` : ''}
         <div class="social-go-hint">Tap to view location</div>
       </div>
@@ -1313,19 +1317,20 @@ function showUSGSDetail(site, dist) {
 async function loadUSGSFloodAndOutlook(site, gen) {
   const gaugeHeight = site.data?.gauge?.value ?? null;
 
-  // Fetch all three in parallel
-  const [floodData, recentData, nwsForecast] = await Promise.allSettled([
-    fetchFloodStage(site.siteCode),
+  // Fetch NWS gauge data once (shared by flood stage + forecast)
+  const [gaugeResult, recentData] = await Promise.allSettled([
+    fetchNWSGaugeData(site.siteCode),
     fetchRecentUSGSData(site.siteCode),
-    fetchNWSForecast(site.siteCode),
   ]);
 
-  // Flood stage
   if (gen !== detailGeneration) return; // stale — user opened a different location
 
+  const gaugeObj = gaugeResult.status === 'fulfilled' ? gaugeResult.value : null;
+
+  // Extract flood stage from the shared gauge object (no extra HTTP call)
   const floodArea = document.getElementById('usgs-flood-stage');
   if (floodArea) {
-    const flood = floodData.status === 'fulfilled' ? floodData.value : null;
+    const flood = extractFloodStage(gaugeObj);
     if (flood) {
       floodArea.innerHTML = getFloodStageHtml(flood, gaugeHeight);
     } else {
@@ -1333,15 +1338,19 @@ async function loadUSGSFloodAndOutlook(site, gen) {
     }
   }
 
+  // Fetch NWS forecast using the shared gauge object (only the stageflow call is new)
+  const nwsForecast = await extractNWSForecast(gaugeObj);
+
+  if (gen !== detailGeneration) return;
+
   // 6-hour outlook (trend + NWS forecast)
   const outlookArea = document.getElementById('usgs-outlook');
   if (outlookArea) {
     const recent = recentData.status === 'fulfilled' ? recentData.value : null;
-    const forecast = nwsForecast.status === 'fulfilled' ? nwsForecast.value : null;
     const trend = analyzeTrend(recent);
 
-    if (trend || forecast) {
-      outlookArea.innerHTML = getTrendHtml(trend, forecast);
+    if (trend || nwsForecast) {
+      outlookArea.innerHTML = getTrendHtml(trend, nwsForecast);
     } else {
       outlookArea.innerHTML = '<p style="color:var(--text-muted);font-size:0.82rem;">Trend data not available for this station.</p>';
     }
@@ -1584,7 +1593,7 @@ window._openTripPlan = function(wbJson) {
   const user = getUser();
   if (!user) { authModal.classList.remove('hidden'); return; }
 
-  const wb = JSON.parse(wbJson);
+  const wb = typeof wbJson === 'string' ? JSON.parse(wbJson) : wbJson;
   tripWizard = { wb, forecast: null, traffic: null, selectedSpecies: [] };
 
   // Clear stale trout warning from previous trip
@@ -2100,7 +2109,8 @@ function setupEventListeners() {
     try {
       if (editId) {
         const oldItem = arsenalItems.find(i => i.id === editId);
-        const updated = await updateArsenalItem(user.id, editId, itemData, photoFile, oldItem?.photo_path);
+        const safeData = { name: itemData.name, category: itemData.category, color: itemData.color, weight: itemData.weight, brand: itemData.brand, size: itemData.size, notes: itemData.notes };
+        const updated = await updateArsenalItem(user.id, editId, safeData, photoFile, oldItem?.photo_path);
         const idx = arsenalItems.findIndex(i => i.id === editId);
         if (idx >= 0) arsenalItems[idx] = updated;
         toast('Item updated');
@@ -2213,7 +2223,8 @@ function setupEventListeners() {
 function isUnnamed(name) {
   if (!name) return true;
   const n = name.toLowerCase().trim();
-  return n === '' || n === 'unnamed' || n.startsWith('unnamed ') || n === 'unknown' || n === 'no name';
+  return n === '' || n === 'unnamed' || n.startsWith('unnamed ') || n === 'unknown' || n === 'no name'
+    || /^(Lake|Pond|River|Creek|Boat Landing|Fishing Pier) #\d+$/.test(name);
 }
 
 function showUnnamedSuggestion(count) {
@@ -2404,7 +2415,10 @@ window._changeLicensePhoto = function(idx) {
   input.type = 'file';
   input.accept = 'image/*';
   input.capture = 'environment';
+  input.style.display = 'none';
+  document.body.appendChild(input);
   input.onchange = (e) => {
+    input.remove();
     const file = e.target.files[0];
     if (!file) return;
 
@@ -2473,6 +2487,9 @@ function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(err => {
       console.warn('SW registration failed:', err);
+    });
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      toast('App updated — reload for the latest version');
     });
   }
 }

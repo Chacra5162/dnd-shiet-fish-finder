@@ -16,7 +16,7 @@ const OVERPASS_URLS = [
 function buildOverpassQuery(south, west, north, east) {
   const bbox = `${south},${west},${north},${east}`;
   return `
-[out:json][timeout:25];
+[out:json][timeout:25][maxsize:16777216];
 (
   way["natural"="water"](${bbox});
   relation["natural"="water"](${bbox});
@@ -29,8 +29,6 @@ function buildOverpassQuery(south, west, north, east) {
   way["water"="reservoir"](${bbox});
   way["water"="river"](${bbox});
   node["natural"="water"](${bbox});
-  node["waterway"="river"](${bbox});
-  node["waterway"="stream"](${bbox});
   node["leisure"="slipway"](${bbox});
   way["leisure"="slipway"](${bbox});
   node["seamark:type"="harbour"](${bbox});
@@ -411,8 +409,9 @@ const PARAMS = {
   '00045': { name: 'Precipitation', unit: 'in', key: 'precip' },
 };
 
-// USGS bbox limit is ~0.2 degrees wide. Split large areas into tiles.
-const USGS_TILE_SIZE = 0.18; // degrees per tile (under 0.2 limit)
+// USGS bbox limit is ~0.2° for unfiltered queries, but siteType-filtered
+// queries accept larger boxes. We use siteType='LK,ST,SP' so 0.5° is safe.
+const USGS_TILE_SIZE = 0.5; // degrees per tile
 
 function splitBBox(south, west, north, east) {
   const tiles = [];
@@ -448,17 +447,8 @@ async function fetchUSGSTile(south, west, north, east) {
   return parseUSGSResponse(json);
 }
 
-async function fetchUSGSSites(south, west, north, east) {
-  // Check cache
-  const { cached, missing } = await getMultiCached(STORES.usgs, south, west, north, east);
-
-  if (missing.length === 0 && cached.length > 0) {
-    // Still fetch current values (shorter cache)
-    const withData = await enrichUSGSData(cached, south, west, north, east);
-    return { data: withData, fromCache: true };
-  }
-
-  // Split into tiles that fit USGS bbox limit
+// Shared helper: fetch all USGS tiles for a bbox, deduped by siteCode
+async function fetchAllUSGSTiles(south, west, north, east) {
   const tiles = splitBBox(south, west, north, east);
   const allSites = [];
   const seen = new Set();
@@ -481,6 +471,20 @@ async function fetchUSGSSites(south, west, north, east) {
       }
     }
   }
+  return allSites;
+}
+
+async function fetchUSGSSites(south, west, north, east) {
+  // Check cache
+  const { cached, missing } = await getMultiCached(STORES.usgs, south, west, north, east);
+
+  if (missing.length === 0 && cached.length > 0) {
+    // Still fetch current values (shorter cache)
+    const withData = await enrichUSGSData(cached, south, west, north, east);
+    return { data: withData, fromCache: true };
+  }
+
+  const allSites = await fetchAllUSGSTiles(south, west, north, east);
 
   // Cache site locations per grid cell
   const gridMap = {};
@@ -507,27 +511,7 @@ async function enrichUSGSData(sites, south, west, north, east) {
   }
 
   try {
-    const tiles = splitBBox(south, west, north, east);
-    const allFresh = [];
-    const seen = new Set();
-
-    const batchSize = 4;
-    for (let i = 0; i < tiles.length; i += batchSize) {
-      const batch = tiles.slice(i, i + batchSize);
-      const results = await Promise.allSettled(
-        batch.map(t => fetchUSGSTile(t.south, t.west, t.north, t.east))
-      );
-      for (const r of results) {
-        if (r.status === 'fulfilled') {
-          for (const site of r.value) {
-            if (!seen.has(site.siteCode)) {
-              seen.add(site.siteCode);
-              allFresh.push(site);
-            }
-          }
-        }
-      }
-    }
+    const allFresh = await fetchAllUSGSTiles(south, west, north, east);
 
     await setCache(STORES.usgsCurrent, (south + north) / 2, (west + east) / 2, allFresh);
 
@@ -663,23 +647,23 @@ function getCommonSpecies(waterType, lat, lon) {
 
   const species = {
     lake: eastern
-      ? ['Largemouth Bass', 'Blue Catfish', 'Channel Catfish', 'Bluegill', 'Crappie', 'Striped Bass', 'White Perch']
+      ? ['Largemouth Bass', 'Blue Catfish', 'Channel Catfish', 'Bluegill', 'Crappie', 'Striped Bass', 'White Perch', 'Carp']
       : mountain
-        ? ['Smallmouth Bass', 'Largemouth Bass', 'Striped Bass', 'Muskie', 'Rainbow Trout', 'Brown Trout']
-        : ['Largemouth Bass', 'Striped Bass', 'Smallmouth Bass', 'Crappie', 'Bluegill', 'Channel Catfish'],
+        ? ['Smallmouth Bass', 'Largemouth Bass', 'Striped Bass', 'Muskie', 'Rainbow Trout', 'Brown Trout', 'Walleye']
+        : ['Largemouth Bass', 'Striped Bass', 'Smallmouth Bass', 'Crappie', 'Bluegill', 'Channel Catfish', 'Carp'],
     river: eastern
       ? (coastal
-        ? ['Striped Bass', 'Blue Catfish', 'Speckled Trout', 'Red Drum', 'Flounder', 'White Perch', 'Shad']
-        : ['Striped Bass', 'Blue Catfish', 'Shad', 'White Perch', 'Largemouth Bass', 'Channel Catfish', 'Herring'])
+        ? ['Striped Bass', 'Blue Catfish', 'Speckled Trout', 'Red Drum', 'Flounder', 'White Perch', 'American Shad', 'Hickory Shad', 'Spot', 'Croaker']
+        : ['Striped Bass', 'Blue Catfish', 'American Shad', 'Hickory Shad', 'White Perch', 'Largemouth Bass', 'Channel Catfish', 'Herring', 'Carp'])
       : mountain
-        ? ['Smallmouth Bass', 'Rainbow Trout', 'Brown Trout', 'Brook Trout', 'Muskie']
-        : ['Smallmouth Bass', 'Channel Catfish', 'Largemouth Bass', 'Striped Bass', 'Sunfish'],
+        ? ['Smallmouth Bass', 'Spotted Bass', 'Rainbow Trout', 'Brown Trout', 'Brook Trout', 'Muskie']
+        : ['Smallmouth Bass', 'Spotted Bass', 'Channel Catfish', 'Largemouth Bass', 'Striped Bass', 'Sunfish', 'Carp'],
     stream: mountain
       ? ['Brook Trout', 'Rainbow Trout', 'Brown Trout']
       : (coastal
         ? ['Speckled Trout', 'Red Drum', 'Flounder', 'White Perch']
         : ['Sunfish', 'Smallmouth Bass', 'Creek Chub', 'Bluegill', 'Rock Bass']),
-    pond: ['Largemouth Bass', 'Bluegill', 'Channel Catfish', 'Crappie'],
+    pond: ['Largemouth Bass', 'Bluegill', 'Channel Catfish', 'Crappie', 'Carp'],
     boat_landing: eastern
       ? (coastal
         ? ['Striped Bass', 'Blue Catfish', 'Speckled Trout', 'Red Drum', 'Flounder']
@@ -734,42 +718,44 @@ function fetchWithTimeout(url, ms = 8000) {
 
 // ===== USGS Flood Stage & Forecast =====
 
-// NWS flood stage categories for a USGS site
-// Uses the NWS API to get flood thresholds
-async function fetchFloodStage(siteCode) {
+// Shared: fetch the NWS gauge object for a USGS site (single HTTP call)
+async function fetchNWSGaugeData(siteCode) {
   try {
-    // NWS maps USGS site codes to their gauge IDs
     const url = `https://api.water.noaa.gov/nwps/v1/gauges?identifier=USGS-${siteCode}`;
     const resp = await fetchWithTimeout(url, 8000);
     if (!resp.ok) return null;
     const data = await resp.json();
-
-    const gauge = data?.gauges?.[0];
-    if (!gauge) return null;
-
-    const nwsId = gauge.lid || gauge.id;
-    const floodCats = gauge.flood?.categories || gauge.floodCategories;
-    const status = gauge.observed || gauge.status?.observed;
-
-    // Try to get thresholds from the gauge data
-    const thresholds = {};
-    if (floodCats) {
-      if (floodCats.action?.stage != null) thresholds.action = floodCats.action.stage;
-      if (floodCats.flood?.stage != null) thresholds.flood = floodCats.flood.stage;
-      if (floodCats.moderate?.stage != null) thresholds.moderate = floodCats.moderate.stage;
-      if (floodCats.major?.stage != null) thresholds.major = floodCats.major.stage;
-    }
-
-    return {
-      nwsId,
-      thresholds,
-      currentStage: status?.primary?.value ?? null,
-      currentCategory: status?.floodCategory?.toLowerCase() ?? null,
-    };
+    return data?.gauges?.[0] || null;
   } catch (e) {
-    console.warn('Flood stage fetch failed for', siteCode, e.message);
+    console.warn('NWS gauge fetch failed for', siteCode, e.message);
     return null;
   }
+}
+
+// NWS flood stage categories for a USGS site
+// Accepts a pre-fetched gauge object to avoid duplicate HTTP calls
+function extractFloodStage(gauge) {
+  if (!gauge) return null;
+
+  const nwsId = gauge.lid || gauge.id;
+  const floodCats = gauge.flood?.categories || gauge.floodCategories;
+  const status = gauge.observed || gauge.status?.observed;
+
+  // Try to get thresholds from the gauge data
+  const thresholds = {};
+  if (floodCats) {
+    if (floodCats.action?.stage != null) thresholds.action = floodCats.action.stage;
+    if (floodCats.flood?.stage != null) thresholds.flood = floodCats.flood.stage;
+    if (floodCats.moderate?.stage != null) thresholds.moderate = floodCats.moderate.stage;
+    if (floodCats.major?.stage != null) thresholds.major = floodCats.major.stage;
+  }
+
+  return {
+    nwsId,
+    thresholds,
+    currentStage: status?.primary?.value ?? null,
+    currentCategory: status?.floodCategory?.toLowerCase() ?? null,
+  };
 }
 
 // Determine flood category from gauge height and thresholds
@@ -823,15 +809,9 @@ async function fetchRecentUSGSData(siteCode) {
 }
 
 // NWS river forecast — predicted stages for the next 6+ hours
-async function fetchNWSForecast(siteCode) {
+// Accepts a pre-fetched gauge object to avoid duplicate HTTP calls
+async function extractNWSForecast(gauge) {
   try {
-    // First find the NWS gauge ID
-    const url = `https://api.water.noaa.gov/nwps/v1/gauges?identifier=USGS-${siteCode}`;
-    const resp = await fetchWithTimeout(url, 8000);
-    if (!resp.ok) return null;
-    const data = await resp.json();
-
-    const gauge = data?.gauges?.[0];
     if (!gauge) return null;
     const nwsId = gauge.lid || gauge.id;
     if (!nwsId) return null;
@@ -861,7 +841,7 @@ async function fetchNWSForecast(siteCode) {
 
     return upcoming.length > 0 ? upcoming : null;
   } catch (e) {
-    console.warn('NWS forecast fetch failed for', siteCode, e.message);
+    console.warn('NWS forecast fetch failed for gauge', gauge?.lid || gauge?.id, e.message);
     return null;
   }
 }
@@ -1065,10 +1045,12 @@ function getTrendHtml(trendData, nwsForecast) {
 function renderSparkline(points, projected, key) {
   if (points.length < 3) return '';
 
-  const values = points.map(p => p.value);
-  values.push(projected); // add projection
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const histValues = points.map(p => p.value);
+  const values = [...histValues, projected]; // history + projection
+  // Compute y-axis range from historical points only so the projected
+  // value doesn't distort the scale; the projected dot clips to bounds.
+  const min = Math.min(...histValues);
+  const max = Math.max(...histValues);
   const range = max - min || 1;
   const w = 280;
   const h = 40;
@@ -1077,7 +1059,9 @@ function renderSparkline(points, projected, key) {
   const totalPoints = values.length;
   const coords = values.map((v, i) => {
     const x = padding + (i / (totalPoints - 1)) * (w - 2 * padding);
-    const y = h - padding - ((v - min) / range) * (h - 2 * padding);
+    // Clamp y to chart bounds (projected value may exceed historical range)
+    const normalized = Math.max(0, Math.min(1, (v - min) / range));
+    const y = h - padding - normalized * (h - 2 * padding);
     return `${x},${y}`;
   });
 
@@ -1105,9 +1089,10 @@ export {
   getBBox,
   distanceMiles,
   assessPrivateProperty,
-  fetchFloodStage,
+  fetchNWSGaugeData,
+  extractFloodStage,
   fetchRecentUSGSData,
-  fetchNWSForecast,
+  extractNWSForecast,
   analyzeTrend,
   getFloodStageHtml,
   getTrendHtml,

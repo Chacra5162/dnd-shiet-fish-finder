@@ -226,8 +226,13 @@ async function deleteTripPlan(id) {
   if (error) throw error;
 }
 
+function getSupabaseUrl() {
+  return SUPABASE_URL;
+}
+
 export {
   getClient,
+  getSupabaseUrl,
   initAuth,
   signUp,
   signIn,

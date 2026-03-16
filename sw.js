@@ -1,4 +1,6 @@
-const CACHE_NAME = 'dnd-shiet-fish-finder-v6';
+const CACHE_NAME = 'dnd-shiet-fish-finder-v7';
+const TILE_CACHE = 'dnd-tiles-v1';
+const MAX_TILES = 500;
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -11,6 +13,7 @@ const STATIC_ASSETS = [
   './js/fishing.js',
   './js/tripPlan.js',
   './js/arsenal.js',
+  './js/community.js',
   './manifest.json',
   './icons/favicon.svg',
 ];
@@ -35,10 +38,13 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+      Promise.all(
+        keys
+          .filter((k) => k !== CACHE_NAME && k !== TILE_CACHE)
+          .map((k) => caches.delete(k))
+      )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 // Fetch: network-first for API calls, cache-first for static assets
@@ -63,13 +69,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Map tiles — cache with network fallback
+  // Map tiles — cache with network fallback, LRU eviction at 500 entries
   if (url.hostname.includes('basemaps.cartocdn.com')) {
     event.respondWith(
-      caches.open(CACHE_NAME).then((cache) =>
+      caches.open(TILE_CACHE).then((cache) =>
         cache.match(event.request).then((cached) => {
-          const fetched = fetch(event.request).then((response) => {
-            if (response.ok) cache.put(event.request, response.clone());
+          const fetched = fetch(event.request).then(async (response) => {
+            if (response.ok) {
+              cache.put(event.request, response.clone());
+              // LRU eviction: delete oldest entry when over limit
+              const keys = await cache.keys();
+              if (keys.length > MAX_TILES) {
+                await cache.delete(keys[0]);
+              }
+            }
             return response;
           }).catch(() => cached);
           return cached || fetched;
@@ -91,4 +104,11 @@ self.addEventListener('fetch', (event) => {
       });
     })
   );
+});
+
+// Allow the app to trigger skipWaiting for update prompts
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

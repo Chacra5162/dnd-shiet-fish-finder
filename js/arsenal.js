@@ -4,9 +4,7 @@
  * Uses the shared Supabase client from supabase.js (same auth session).
  */
 
-import { getClient } from './supabase.js';
-
-const SUPABASE_URL = 'https://emgyewsetldhzxzskyji.supabase.co';
+import { getClient, getSupabaseUrl } from './supabase.js';
 
 const CATEGORIES = {
   crankbait: 'Crankbait',
@@ -52,7 +50,7 @@ async function addArsenalItem(userId, item, photoFile) {
     const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const { error: uploadError } = await client()
       .storage.from('arsenal-photos')
-      .upload(fileName, photoFile, { contentType: photoFile.type, upsert: false });
+      .upload(fileName, photoFile, { contentType: 'image/jpeg', upsert: false });
     if (uploadError) throw uploadError;
     photoPath = fileName;
   }
@@ -88,7 +86,7 @@ async function updateArsenalItem(userId, itemId, updates, newPhotoFile, oldPhoto
     const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const { error: uploadError } = await client()
       .storage.from('arsenal-photos')
-      .upload(fileName, newPhotoFile, { contentType: newPhotoFile.type, upsert: false });
+      .upload(fileName, newPhotoFile, { contentType: 'image/jpeg', upsert: false });
     if (uploadError) throw uploadError;
     updates.photo_path = fileName;
   }
@@ -119,7 +117,7 @@ async function deleteArsenalItem(userId, itemId, photoPath) {
 
 function getPhotoUrl(photoPath) {
   if (!photoPath) return null;
-  return `${SUPABASE_URL}/storage/v1/object/public/arsenal-photos/${photoPath}`;
+  return `${getSupabaseUrl()}/storage/v1/object/public/arsenal-photos/${photoPath}`;
 }
 
 // ===== Filtering / Sorting =====
