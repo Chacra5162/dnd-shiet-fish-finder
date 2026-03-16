@@ -10,7 +10,7 @@ import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlac
 import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml } from './fishing.js';
 import { TIME_WINDOWS, fetchForecast, estimateTraffic, generateGearChecklist, getForecastCardHtml, getTrafficBadgeHtml, getGearChecklistHtml, getTripSummaryCardHtml, friendlyDate } from './tripPlan.js';
 import { CATEGORIES, getArsenalItems, addArsenalItem, updateArsenalItem, deleteArsenalItem, getPhotoUrl, filterItems, getUniqueColors, getUniqueWeights } from './arsenal.js';
-import { generateWaterBodyKey, getCommunityPosts, getRecentPosts, addCommunityPost, deleteCommunityPost, getCommunityPhotoUrl } from './community.js';
+import { generateWaterBodyKey, getCommunityPosts, getRecentPosts, addCommunityPost, deleteCommunityPost, getCommunityPhotoUrl, resizeImage } from './community.js';
 
 // ===== State =====
 let userLat = 37.54; // Default: Richmond, VA
@@ -30,6 +30,13 @@ let arsenalFilters = { category: 'all', color: '', weight: '', search: '' };
 let hideUnnamed = localStorage.getItem('wwf_hide_unnamed') === 'true';
 // Generation counter to prevent async race conditions when detail panel is reopened quickly
 let detailGeneration = 0;
+
+// ===== Place Lookup Helper =====
+function findWaterBody(name, lat, lon, tolerance = 0.002) {
+  return waterBodies.find(w =>
+    w.name === name && Math.abs(w.lat - lat) < tolerance && Math.abs(w.lon - lon) < tolerance
+  );
+}
 
 // ===== DOM refs =====
 const $ = (sel) => document.querySelector(sel);
@@ -188,9 +195,7 @@ async function loadUserPlaces() {
 function refreshUserPlaceMarkers() {
   setUserPlaceMarkers(userPlaces, (place) => {
     // Find matching water body and show detail, or just pan
-    const wb = waterBodies.find(w =>
-      w.name === place.place_name && Math.abs(w.lat - place.lat) < 0.002 && Math.abs(w.lon - place.lon) < 0.002
-    );
+    const wb = findWaterBody(place.place_name, place.lat, place.lon);
     if (wb) {
       const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
       showWaterDetail(wb, dist);
@@ -761,7 +766,7 @@ async function showWaterDetail(wb, dist) {
             if (s.data.gauge) dataSnippets.push(`${s.data.gauge.value} ${s.data.gauge.unit}`);
             const dataStr = dataSnippets.length > 0 ? ` — ${dataSnippets.join(', ')}` : '';
             return `
-              <div class="nearby-usgs-item" onclick="document.dispatchEvent(new CustomEvent('show-usgs', {detail:'${s.siteCode}'}))">
+              <div class="nearby-usgs-item" data-site-code="${escapeAttr(s.siteCode)}">
                 <div class="station-name">${escapeHtml(s.name)}</div>
                 <div class="station-dist">${s.dist.toFixed(1)} mi from ${escapeHtml(wb.name)}${dataStr}</div>
               </div>
@@ -907,6 +912,45 @@ async function loadCommunityBoard(wb, gen) {
   }
 }
 
+function renderPostCardHtml(post, options = {}) {
+  const { showDelete = false, showLocation = false, userId = null } = options;
+  const initials = (post.display_name || 'A').slice(0, 2).toUpperCase();
+  const time = timeAgo(new Date(post.created_at));
+  const photoUrl = post.photo_path ? getCommunityPhotoUrl(post.photo_path) : null;
+  const isOwn = showDelete && userId === post.user_id;
+
+  let catchBadge = '';
+  if (post.post_type === 'catch' && post.species) {
+    const parts = [post.species];
+    if (post.weight_lbs) parts.push(`${post.weight_lbs} lbs`);
+    if (post.length_in) parts.push(`${post.length_in}"`);
+    catchBadge = `<div class="community-catch-badge">${escapeHtml(parts.join(' · '))}</div>`;
+  }
+
+  const locationAttrs = showLocation
+    ? ` data-lat="${escapeAttr(String(post.water_body_lat))}" data-lon="${escapeAttr(String(post.water_body_lon))}" data-name="${escapeAttr(post.water_body_name)}" onclick="window._goToSocialPost(this)"`
+    : '';
+  const cardClass = showLocation ? 'social-feed-card' : 'community-post-card';
+
+  return `
+    <div class="${cardClass}"${locationAttrs}>
+      <div class="community-post-header">
+        <div class="community-avatar">${escapeHtml(initials)}</div>
+        ${showLocation ? `<div style="flex:1;min-width:0;">
+            <span class="community-post-name">${escapeHtml(post.display_name)}</span>
+            <div class="social-location-tag">${escapeHtml(post.water_body_name)}</div>
+          </div>` : `<span class="community-post-name">${escapeHtml(post.display_name)}</span>`}
+        <span class="community-post-time">${time}</span>
+        ${isOwn ? `<button class="community-post-delete" data-post-id="${post.id}" data-photo="${escapeAttr(post.photo_path || '')}" onclick="window._deleteCommunityPost(this)">delete</button>` : ''}
+      </div>
+      ${catchBadge}
+      ${photoUrl ? `<img class="community-post-photo" src="${photoUrl}" alt="Photo" data-url="${escapeAttr(photoUrl)}" onclick="${showLocation ? 'event.stopPropagation();' : ''}window._viewPhoto(this.dataset.url)">` : ''}
+      ${post.body ? `<div class="community-post-body">${escapeHtml(post.body)}</div>` : ''}
+      ${showLocation ? '<div class="social-go-hint">Tap to view location</div>' : ''}
+    </div>
+  `;
+}
+
 function renderCommunityPosts(posts, container) {
   if (!posts.length) {
     container.innerHTML = '<p class="community-empty">No posts yet — be the first to share!</p>';
@@ -916,34 +960,9 @@ function renderCommunityPosts(posts, container) {
   const user = getUser();
   const userId = user?.id;
 
-  container.innerHTML = posts.map(post => {
-    const initials = (post.display_name || 'A').slice(0, 2).toUpperCase();
-    const time = timeAgo(new Date(post.created_at));
-    const photoUrl = post.photo_path ? getCommunityPhotoUrl(post.photo_path) : null;
-    const isOwn = userId === post.user_id;
-
-    let catchBadge = '';
-    if (post.post_type === 'catch' && post.species) {
-      const parts = [post.species];
-      if (post.weight_lbs) parts.push(`${post.weight_lbs} lbs`);
-      if (post.length_in) parts.push(`${post.length_in}"`);
-      catchBadge = `<div class="community-catch-badge">${escapeHtml(parts.join(' · '))}</div>`;
-    }
-
-    return `
-      <div class="community-post-card">
-        <div class="community-post-header">
-          <div class="community-avatar">${escapeHtml(initials)}</div>
-          <span class="community-post-name">${escapeHtml(post.display_name)}</span>
-          <span class="community-post-time">${time}</span>
-          ${isOwn ? `<button class="community-post-delete" data-post-id="${post.id}" data-photo="${escapeAttr(post.photo_path || '')}" onclick="window._deleteCommunityPost(this)">delete</button>` : ''}
-        </div>
-        ${catchBadge}
-        ${photoUrl ? `<img class="community-post-photo" src="${photoUrl}" alt="Photo" data-url="${escapeAttr(photoUrl)}" onclick="window._viewPhoto(this.dataset.url)">` : ''}
-        ${post.body ? `<div class="community-post-body">${escapeHtml(post.body)}</div>` : ''}
-      </div>
-    `;
-  }).join('');
+  container.innerHTML = posts.map(post =>
+    renderPostCardHtml(post, { showDelete: true, showLocation: false, userId })
+  ).join('');
 }
 
 function getCommunityFormHtml(wb) {
@@ -1114,36 +1133,9 @@ function renderSocialFeed(container) {
     return;
   }
 
-  container.innerHTML = filtered.map(post => {
-    const initials = (post.display_name || 'A').slice(0, 2).toUpperCase();
-    const time = timeAgo(new Date(post.created_at));
-    const photoUrl = post.photo_path ? getCommunityPhotoUrl(post.photo_path) : null;
-
-    let catchBadge = '';
-    if (post.post_type === 'catch' && post.species) {
-      const parts = [post.species];
-      if (post.weight_lbs) parts.push(`${post.weight_lbs} lbs`);
-      if (post.length_in) parts.push(`${post.length_in}"`);
-      catchBadge = `<div class="community-catch-badge">${escapeHtml(parts.join(' · '))}</div>`;
-    }
-
-    return `
-      <div class="social-feed-card" data-lat="${escapeAttr(String(post.water_body_lat))}" data-lon="${escapeAttr(String(post.water_body_lon))}" data-name="${escapeAttr(post.water_body_name)}" onclick="window._goToSocialPost(this)">
-        <div class="community-post-header">
-          <div class="community-avatar">${escapeHtml(initials)}</div>
-          <div style="flex:1;min-width:0;">
-            <span class="community-post-name">${escapeHtml(post.display_name)}</span>
-            <div class="social-location-tag">${escapeHtml(post.water_body_name)}</div>
-          </div>
-          <span class="community-post-time">${time}</span>
-        </div>
-        ${catchBadge}
-        ${photoUrl ? `<img class="community-post-photo" src="${photoUrl}" alt="Photo" data-url="${escapeAttr(photoUrl)}" onclick="event.stopPropagation();window._viewPhoto(this.dataset.url)">` : ''}
-        ${post.body ? `<div class="community-post-body">${escapeHtml(post.body)}</div>` : ''}
-        <div class="social-go-hint">Tap to view location</div>
-      </div>
-    `;
-  }).join('');
+  container.innerHTML = filtered.map(post =>
+    renderPostCardHtml(post, { showDelete: false, showLocation: true, userId: null })
+  ).join('');
 }
 
 window._setSocialTab = function(btn) {
@@ -1171,9 +1163,7 @@ window._goToSocialPost = function(el) {
   panTo(lat, lon, 14);
 
   // Try to find the water body and open its detail
-  const wb = waterBodies.find(w =>
-    w.name === name && Math.abs(w.lat - lat) < 0.01 && Math.abs(w.lon - lon) < 0.01
-  );
+  const wb = findWaterBody(name, lat, lon, 0.01);
   if (wb) {
     const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
     showWaterDetail(wb, dist);
@@ -1397,9 +1387,7 @@ window._goToPlace = function(el) {
   placesPanel.classList.add('hidden');
 
   // Try to find and show the matching water body
-  const wb = waterBodies.find(w =>
-    w.name === name && Math.abs(w.lat - lat) < 0.002 && Math.abs(w.lon - lon) < 0.002
-  );
+  const wb = findWaterBody(name, lat, lon);
   if (wb) {
     const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
     showWaterDetail(wb, dist);
@@ -2209,8 +2197,15 @@ function setupEventListeners() {
     e.preventDefault(); // prevent scroll during drag
   }, { passive: false });
 
-  // Event delegation for lure card expand/collapse
+  // Event delegation for lure card expand/collapse and USGS item clicks
   detailPanel.addEventListener('click', (e) => {
+    // USGS nearby item click
+    const usgsItem = e.target.closest('.nearby-usgs-item');
+    if (usgsItem && usgsItem.dataset.siteCode) {
+      document.dispatchEvent(new CustomEvent('show-usgs', { detail: usgsItem.dataset.siteCode }));
+      return;
+    }
+    // Lure card expand/collapse
     const card = e.target.closest('.lure-card');
     if (card) {
       // Don't toggle if they clicked a link inside
@@ -2417,37 +2412,24 @@ window._changeLicensePhoto = function(idx) {
   input.capture = 'environment';
   input.style.display = 'none';
   document.body.appendChild(input);
-  input.onchange = (e) => {
+  input.onchange = async (e) => {
     input.remove();
     const file = e.target.files[0];
     if (!file) return;
 
-    // Resize to keep localStorage manageable (max ~800px wide)
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        const maxW = 600;
-        const scale = img.width > maxW ? maxW / img.width : 1;
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
-        canvas.width = 0; canvas.height = 0; // release GPU memory
-
-        const licenses = getLicenses();
-        if (licenses[idx]) {
-          licenses[idx].photo = dataUrl;
-          saveLicenses(licenses);
-          renderLicenseSlots();
-          toast('Photo saved');
-        }
-      };
-      img.src = ev.target.result;
+    // Resize to keep localStorage manageable (max 600px wide)
+    const blob = await resizeImage(file, 600);
+    const reader2 = new FileReader();
+    reader2.onload = (ev2) => {
+      const licenses = getLicenses();
+      if (licenses[idx]) {
+        licenses[idx].photo = ev2.target.result;
+        saveLicenses(licenses);
+        renderLicenseSlots();
+        toast('Photo saved');
+      }
     };
-    reader.readAsDataURL(file);
+    reader2.readAsDataURL(blob);
   };
   input.click();
 };

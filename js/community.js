@@ -33,6 +33,8 @@ async function addCommunityPost(userId, displayName, waterBody, postData, photoF
 
   if (photoFile) {
     if (photoFile.size > 10 * 1024 * 1024) throw new Error('Photo must be under 10 MB');
+    const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
+    if (photoFile.type && !ALLOWED_MIME.includes(photoFile.type)) throw new Error('Invalid file type — use JPG, PNG, GIF, or WebP');
     const ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
     const rawExt = photoFile.name.split('.').pop().toLowerCase();
     const ext = ALLOWED_EXTS.includes(rawExt) ? rawExt : 'jpg';
@@ -130,4 +132,5 @@ export {
   addCommunityPost,
   deleteCommunityPost,
   getCommunityPhotoUrl,
+  resizeImage,
 };

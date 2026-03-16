@@ -5,7 +5,7 @@
 
 import {
   getRecommendation, SPECIES_DATA, rateFishActivity, getPressureTrend,
-  getTempBracket, getWaterClarity, degToCompass, getMoonPhase,
+  getTempBracket, getWaterClarity, degToCompass, getMoonPhase, describeWeatherCode,
 } from './fishing.js';
 
 function escapeHtml(str) {
@@ -91,15 +91,10 @@ async function fetchForecast(lat, lon, date, timeWindow) {
 
   // Add derived fields — use shared pressure logic from fishing.js
   forecast.pressureTrend = getPressureTrend(forecast.pressureMsl);
-  forecast.conditions = describeCode(forecast.weatherCode);
+  forecast.conditions = describeWeatherCode(forecast.weatherCode);
   forecast.fishActivity = rateFishActivity(forecast);
 
   return forecast;
-}
-
-function describeCode(code) {
-  const c = { 0:'Clear',1:'Mostly Clear',2:'Partly Cloudy',3:'Overcast',45:'Fog',48:'Freezing Fog',51:'Light Drizzle',53:'Drizzle',55:'Heavy Drizzle',61:'Light Rain',63:'Rain',65:'Heavy Rain',71:'Light Snow',73:'Snow',75:'Heavy Snow',80:'Showers',81:'Mod. Showers',82:'Heavy Showers',95:'Thunderstorm',96:'T-Storm + Hail',99:'Severe T-Storm' };
-  return c[code] || 'Unknown';
 }
 
 function formatDate(d) {

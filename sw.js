@@ -18,18 +18,13 @@ const STATIC_ASSETS = [
   './icons/favicon.svg',
 ];
 
-// External assets to cache on first load
-const EXTERNAL_ASSETS = [
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
-];
-
 // Install: cache static assets, then activate
+// Note: CDN scripts are NOT cached here — SRI hashes on the HTML tags ensure
+// integrity on every load, and the browser's HTTP cache handles CDN assets.
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll([...STATIC_ASSETS, ...EXTERNAL_ASSETS]))
+      .then((cache) => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting())
   );
 });

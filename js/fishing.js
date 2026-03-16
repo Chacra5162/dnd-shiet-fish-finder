@@ -1993,4 +1993,5 @@ export {
   findNearestTideStation,
   fetchTidePredictions,
   getTideHtml,
+  describeWeatherCode,
 };
