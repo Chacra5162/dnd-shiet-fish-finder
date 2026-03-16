@@ -5,7 +5,7 @@
  */
 
 import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty } from './api.js';
-import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS } from './map.js';
+import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers } from './map.js';
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, getPlaceStatuses, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan } from './supabase.js';
 import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml } from './fishing.js';
 import { TIME_WINDOWS, fetchForecast, estimateTraffic, generateGearChecklist, getForecastCardHtml, getTrafficBadgeHtml, getGearChecklistHtml, getTripSummaryCardHtml, friendlyDate } from './tripPlan.js';
@@ -26,6 +26,7 @@ let tripWizard = { wb: null, forecast: null, traffic: null, selectedSpecies: [] 
 // Arsenal state
 let arsenalItems = [];
 let arsenalFilters = { category: 'all', color: '', weight: '', search: '' };
+let hideUnnamed = localStorage.getItem('wwf_hide_unnamed') === 'true';
 
 // ===== DOM refs =====
 const $ = (sel) => document.querySelector(sel);
@@ -94,6 +95,7 @@ function showWaterTypeChooser() {
 
 // ===== Init =====
 async function init() {
+  preventPageZoom();
   registerServiceWorker();
   setupEventListeners();
   setupAuth();
@@ -161,9 +163,26 @@ async function loadUserPlaces() {
   if (!user) return;
   try {
     userPlaces = await getUserPlacesNear(userLat, userLon, 0.5);
+    refreshUserPlaceMarkers();
   } catch (e) {
     console.warn('Failed to load user places:', e);
   }
+}
+
+function refreshUserPlaceMarkers() {
+  setUserPlaceMarkers(userPlaces, (place) => {
+    // Find matching water body and show detail, or just pan
+    const wb = waterBodies.find(w =>
+      w.name === place.place_name && Math.abs(w.lat - place.lat) < 0.002 && Math.abs(w.lon - place.lon) < 0.002
+    );
+    if (wb) {
+      const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
+      showWaterDetail(wb, dist);
+    } else {
+      panTo(place.lat, place.lon, 14);
+      toast(`${place.place_name} — ${place.status}`);
+    }
+  });
 }
 
 // ===== Geolocation =====
@@ -227,7 +246,21 @@ async function loadData() {
       distanceMiles(userLat, userLon, s.lat, s.lon) <= radiusMiles
     );
 
+    // Count unnamed before filtering so we can show the suggestion
+    const unnamedCount = waterBodies.filter(wb => isUnnamed(wb.name)).length;
+
+    // Apply unnamed filter
+    if (hideUnnamed) {
+      waterBodies = waterBodies.filter(wb => !isUnnamed(wb.name));
+    }
+
+    // If lots of unnamed entries, suggest filtering (one-time)
+    if (!hideUnnamed && unnamedCount > 20 && !localStorage.getItem('wwf_unnamed_dismissed')) {
+      setTimeout(() => showUnnamedSuggestion(unnamedCount), 1500);
+    }
+
     setMarkers(waterBodies, usgsSites, userLat, userLon, showWaterDetail, showUSGSDetail);
+    refreshUserPlaceMarkers();
 
     toast(`Found ${waterBodies.length} water bodies, ${usgsSites.length} USGS stations`);
 
@@ -325,6 +358,7 @@ window._placeAction = async function(btn) {
       btn.classList.add(`active-${action}`);
       toast(`Marked as ${action}`);
     }
+    refreshUserPlaceMarkers();
   } catch (e) {
     console.error('Place action error:', e);
     toast(`Error: ${e.message}`, true);
@@ -1176,6 +1210,17 @@ function setupEventListeners() {
     });
   });
 
+  // Unnamed filter checkbox
+  const unnamedCb = document.getElementById('filter-hide-unnamed');
+  if (unnamedCb) {
+    unnamedCb.checked = hideUnnamed;
+    unnamedCb.addEventListener('change', () => {
+      hideUnnamed = unnamedCb.checked;
+      localStorage.setItem('wwf_hide_unnamed', hideUnnamed ? 'true' : 'false');
+      loadData();
+    });
+  }
+
   // Radius slider
   radiusSlider.addEventListener('input', () => {
     radiusValue.textContent = radiusSlider.value;
@@ -1485,6 +1530,47 @@ function setupEventListeners() {
   });
 }
 
+// ===== Unnamed Water Body Filter =====
+
+function isUnnamed(name) {
+  if (!name) return true;
+  const n = name.toLowerCase().trim();
+  return n === '' || n === 'unnamed' || n.startsWith('unnamed ') || n === 'unknown' || n === 'no name';
+}
+
+function showUnnamedSuggestion(count) {
+  const el = document.createElement('div');
+  el.className = 'unnamed-suggestion';
+  el.innerHTML = `
+    <div class="unnamed-suggestion-inner">
+      <p><strong>${count} unnamed water bodies</strong> are cluttering your map and slowing load times.</p>
+      <div class="unnamed-suggestion-actions">
+        <button class="btn-primary" id="btn-hide-unnamed" style="font-size:0.85rem;padding:8px 14px;">Hide Unnamed</button>
+        <button class="btn-secondary" id="btn-dismiss-unnamed" style="font-size:0.85rem;padding:8px 14px;">Dismiss</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(el);
+
+  el.querySelector('#btn-hide-unnamed').addEventListener('click', () => {
+    hideUnnamed = true;
+    localStorage.setItem('wwf_hide_unnamed', 'true');
+    localStorage.setItem('wwf_unnamed_dismissed', '1');
+    // Update the filter panel checkbox
+    const cb = document.getElementById('filter-hide-unnamed');
+    if (cb) cb.checked = true;
+    el.remove();
+    loadData();
+  });
+  el.querySelector('#btn-dismiss-unnamed').addEventListener('click', () => {
+    localStorage.setItem('wwf_unnamed_dismissed', '1');
+    el.remove();
+  });
+
+  // Auto-dismiss after 10 seconds
+  setTimeout(() => { if (el.parentNode) el.remove(); }, 10000);
+}
+
 // ===== Utilities =====
 
 function escapeHtml(str) {
@@ -1532,6 +1618,42 @@ function toast(msg, isError = false) {
   el.textContent = msg;
   toastContainer.appendChild(el);
   setTimeout(() => el.remove(), 3000);
+}
+
+// ===== Prevent Page Zoom (allow map zoom only) =====
+
+function preventPageZoom() {
+  // Block pinch-to-zoom on everything except the map
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 1 && !e.target.closest('#map')) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  // Block ctrl+scroll / ctrl+plus/minus zoom
+  document.addEventListener('wheel', (e) => {
+    if (e.ctrlKey && !e.target.closest('#map')) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) {
+      if (!e.target.closest('#map')) {
+        e.preventDefault();
+      }
+    }
+  });
+
+  // Block double-tap zoom on non-map areas (iOS/Android)
+  let lastTap = 0;
+  document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTap < 300 && !e.target.closest('#map')) {
+      e.preventDefault();
+    }
+    lastTap = now;
+  }, { passive: false });
 }
 
 // ===== Service Worker =====

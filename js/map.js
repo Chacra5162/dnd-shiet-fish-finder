@@ -9,6 +9,7 @@ let userMarker = null;
 let radiusCircle = null;
 let waterLayer = null;
 let usgsLayer = null;
+let userPlacesLayer = null;
 let allWaterBodies = [];
 let allUSGSSites = [];
 let activeFilters = new Set(['lake', 'river', 'stream', 'pond', 'usgs']);
@@ -21,6 +22,22 @@ const MARKER_ICONS = {
   usgs: { emoji: '!', cls: 'marker-usgs' },
 };
 
+// SVG icons for user place statuses
+const USER_PLACE_ICONS = {
+  favorite: {
+    svg: '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="#1a1a2e" stroke="#1a1a2e" stroke-width="0.5"/></svg>',
+    cls: 'marker-user-favorite',
+  },
+  visited: {
+    svg: '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="#1a1a2e" stroke="#1a1a2e" stroke-width="0.5"/></svg>',
+    cls: 'marker-user-visited',
+  },
+  avoid: {
+    svg: '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z" fill="#1a1a2e" stroke="#1a1a2e" stroke-width="0.5"/></svg>',
+    cls: 'marker-user-avoid',
+  },
+};
+
 function createMarkerIcon(type) {
   const cfg = MARKER_ICONS[type] || MARKER_ICONS.stream;
   return L.divIcon({
@@ -28,6 +45,16 @@ function createMarkerIcon(type) {
     html: `<span class="marker-icon-inner">${cfg.emoji}</span>`,
     iconSize: type === 'lake' ? [28, 28] : type === 'usgs' ? [26, 26] : type === 'river' ? [24, 24] : type === 'pond' ? [22, 22] : [20, 20],
     iconAnchor: type === 'lake' ? [14, 14] : type === 'usgs' ? [13, 13] : type === 'river' ? [12, 12] : type === 'pond' ? [11, 11] : [10, 10],
+  });
+}
+
+function createUserPlaceIcon(status) {
+  const cfg = USER_PLACE_ICONS[status] || USER_PLACE_ICONS.favorite;
+  return L.divIcon({
+    className: `marker-user-place ${cfg.cls}`,
+    html: cfg.svg,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
   });
 }
 
@@ -67,6 +94,7 @@ function initMap(lat, lon, radiusMiles) {
   // Layer groups
   waterLayer = L.layerGroup().addTo(map);
   usgsLayer = L.layerGroup().addTo(map);
+  userPlacesLayer = L.layerGroup().addTo(map);
 
   // Legend
   addLegend();
@@ -85,6 +113,10 @@ function addLegend() {
       <div class="legend-item"><div class="legend-dot" style="background:var(--stream)"></div> Stream / Creek</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--pond)"></div> Pond</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--usgs)"></div> USGS Station</div>
+      <h4 style="margin-top:6px;">My Places</h4>
+      <div class="legend-item"><div class="legend-dot" style="background:#f1c40f"></div> Favorite</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#2ecc71"></div> Visited</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#e74c3c"></div> Avoid</div>
     `;
     return div;
   };
@@ -165,6 +197,34 @@ function panTo(lat, lon, zoom) {
   }
 }
 
+// Render user place markers (favorites, visited, avoid) on the map
+function setUserPlaceMarkers(places, onClickPlace) {
+  if (!userPlacesLayer) return;
+  userPlacesLayer.clearLayers();
+
+  for (const place of places) {
+    const icon = createUserPlaceIcon(place.status);
+    const marker = L.marker([place.lat, place.lon], {
+      icon,
+      title: `${place.place_name} (${place.status})`,
+      zIndexOffset: 500, // above regular markers
+    });
+
+    const statusLabel = place.status === 'favorite' ? 'Favorite' : place.status === 'visited' ? 'Visited' : 'Avoid';
+    marker.bindTooltip(`${statusLabel}: ${place.place_name}`, {
+      direction: 'top',
+      offset: [0, -14],
+      className: 'leaflet-tooltip',
+    });
+
+    if (onClickPlace) {
+      marker.on('click', () => onClickPlace(place));
+    }
+
+    userPlacesLayer.addLayer(marker);
+  }
+}
+
 // Find USGS sites near a given water body
 function findNearbyUSGS(lat, lon, maxMiles = 5) {
   return allUSGSSites
@@ -185,4 +245,5 @@ export {
   recenter,
   panTo,
   findNearbyUSGS,
+  setUserPlaceMarkers,
 };

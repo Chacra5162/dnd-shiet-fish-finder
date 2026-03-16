@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#1a5276">
   <meta name="description" content="Find nearby lakes, rivers, streams and creeks with real-time water data for Virginia and North Carolina">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -168,6 +168,12 @@
         USGS Monitoring Stations
       </label>
     </div>
+    <div class="filter-divider"></div>
+    <label class="filter-checkbox">
+      <input type="checkbox" id="filter-hide-unnamed">
+      <span class="filter-swatch" style="background:var(--text-muted)"></span>
+      Hide unnamed water bodies
+    </label>
     <div class="filter-radius">
       <label>Search Radius: <span id="radius-value">20</span> miles</label>
       <input type="range" id="radius-slider" min="5" max="30" value="20" step="5">
