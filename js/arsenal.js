@@ -1,7 +1,10 @@
 /**
  * My Arsenal — tackle inventory with photos.
  * CRUD against Supabase user_arsenal table + arsenal-photos storage bucket.
+ * Uses the shared Supabase client from supabase.js (same auth session).
  */
+
+import { getClient } from './supabase.js';
 
 const SUPABASE_URL = 'https://emgyewsetldhzxzskyji.supabase.co';
 
@@ -21,18 +24,8 @@ const CATEGORIES = {
   other: 'Other',
 };
 
-// Get the supabase client from the global (loaded by supabase.js)
-function getClient() {
-  return window.supabase.createClient(SUPABASE_URL,
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtZ3lld3NldGxkaHp4enNreWppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MjQxNzIsImV4cCI6MjA4OTIwMDE3Mn0.gh3SR5XH4L-1RDHuz9euvgDFOUi70W2sxK5yPAua7IU'
-  );
-}
-
-// Reuse the client singleton from supabase.js if possible
-let _client = null;
 function client() {
-  if (!_client) _client = getClient();
-  return _client;
+  return getClient();
 }
 
 // ===== CRUD =====

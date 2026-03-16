@@ -239,6 +239,7 @@ async function deleteTripPlan(id) {
 }
 
 export {
+  getClient,
   initAuth,
   signUp,
   signIn,
