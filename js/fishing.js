@@ -247,36 +247,63 @@ function getBestTimesHtml(times) {
 
 // VA/NC NOAA tide stations — hardcoded for the region
 const TIDE_STATIONS = [
+  // James River (tidal from Richmond to Hampton Roads)
   { id: '8638610', name: 'Sewells Point', lat: 36.9467, lon: -76.3300 },
+  { id: '8638511', name: 'Dominion Terminal', lat: 36.9600, lon: -76.4200 },
+  { id: '8638595', name: 'Newport News', lat: 36.9467, lon: -76.4267 },
+  { id: '8637611', name: 'Jamaica Island (James R)', lat: 37.2050, lon: -76.7717 },
+  { id: '8637689', name: 'Yorktown USCG', lat: 37.2267, lon: -76.4783 },
+  { id: '8638424', name: 'Kingsmill (James R)', lat: 37.2233, lon: -76.6617 },
+  { id: '8638489', name: 'Jamestown (James R)', lat: 37.2083, lon: -76.7750 },
+  { id: '8638614', name: 'Willoughby Bay', lat: 36.9583, lon: -76.3150 },
+  { id: '8637542', name: 'Hopewell (James R)', lat: 37.3067, lon: -77.2883 },
+  { id: '8638660', name: 'Richmond Locks (James R)', lat: 37.5233, lon: -77.4233 },
+  // Chesapeake Bay
   { id: '8638863', name: 'Chesapeake Bay Bridge Tunnel', lat: 36.9667, lon: -76.1133 },
   { id: '8632200', name: 'Kiptopeke', lat: 37.1667, lon: -75.9883 },
-  { id: '8637689', name: 'Yorktown USCG', lat: 37.2267, lon: -76.4783 },
   { id: '8635750', name: 'Lewisetta', lat: 37.9950, lon: -76.4633 },
   { id: '8636580', name: 'Windmill Point', lat: 37.6150, lon: -76.2900 },
+  { id: '8637624', name: 'Gloucester Point', lat: 37.2467, lon: -76.5000 },
+  // York River
+  { id: '8637610', name: 'West Point (York R)', lat: 37.5317, lon: -76.7950 },
+  // Rappahannock River
+  { id: '8635985', name: 'Tappahannock', lat: 37.9267, lon: -76.8567 },
+  // Hampton Roads / Norfolk area
   { id: '8639348', name: 'Money Point', lat: 36.7767, lon: -76.3017 },
+  // Eastern Shore
   { id: '8631044', name: 'Wachapreague', lat: 37.6078, lon: -75.6858 },
+  // NC Outer Banks & Coast
   { id: '8652587', name: 'Oregon Inlet', lat: 35.7956, lon: -75.5481 },
   { id: '8656483', name: 'Beaufort, NC', lat: 34.7200, lon: -76.6700 },
   { id: '8658120', name: 'Wilmington, NC', lat: 34.2267, lon: -77.9533 },
   { id: '8654467', name: 'Hatteras, NC', lat: 35.2094, lon: -75.6903 },
-  { id: '8637624', name: 'Gloucester Point', lat: 37.2467, lon: -76.5000 },
-  { id: '8638511', name: 'Dominion Terminal', lat: 36.9600, lon: -76.4200 },
+  // NC Rivers
+  { id: '8651370', name: 'Duck, NC', lat: 36.1833, lon: -75.7467 },
+  { id: '8653365', name: 'Manns Harbor, NC', lat: 35.9083, lon: -75.8950 },
 ];
 
 function isTidalWater(lat, lon, waterType) {
-  // Only rivers, streams, and some lakes near the coast can be tidal
+  // Ponds are never tidal
   if (waterType === 'pond') return false;
 
-  // East of the fall line — split by state
-  // VA fall line: Richmond (-77.44), Fredericksburg (-77.47), Petersburg (-77.40)
-  // NC fall line: Raleigh (-78.64), Fayetteville (-78.88)
+  // Out of VA/NC range
   if (lat < 33.5 || lat > 39) return false;
-  const fallLine = lat >= 36.54 ? -77.5 : -78.0; // VA vs NC
+
+  // East of the fall line = tidal influence zone
+  // VA fall line: Richmond area (~-77.5), but James River is tidal TO Richmond
+  // NC fall line: further west (~-78.9)
+  // Use the same geographic splits as brackish species detection:
+  // - Eastern VA/NC: lon > -78 (matches species logic)
+  // - Coastal/brackish: lon > -76.5
+  // The James River is tidal all the way to Richmond (~-77.44)
+  const inVA = lat >= 36.54;
+  const fallLine = inVA ? -77.5 : -79.0; // VA: James tidal to Richmond; NC: wider tidal zone
   if (lon < fallLine) return false;
 
-  // Must be within ~40 miles of a tide station
+  // Must be within reasonable distance of a tide station
+  // With stations now along the James, York, Rappahannock — 60 miles covers the tidal rivers
   const nearest = findNearestTideStation(lat, lon);
-  return nearest && nearest.dist < 40;
+  return nearest && nearest.dist < 60;
 }
 
 function findNearestTideStation(lat, lon) {
