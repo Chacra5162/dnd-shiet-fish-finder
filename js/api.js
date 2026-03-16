@@ -603,6 +603,371 @@ function distanceMiles(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// ===== USGS Flood Stage & Forecast =====
+
+// NWS flood stage categories for a USGS site
+// Uses the NWS API to get flood thresholds
+async function fetchFloodStage(siteCode) {
+  try {
+    // NWS maps USGS site codes to their gauge IDs
+    const url = `https://api.water.noaa.gov/nwps/v1/gauges?identifier=USGS-${siteCode}`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+
+    const gauge = data?.gauges?.[0];
+    if (!gauge) return null;
+
+    const nwsId = gauge.lid || gauge.id;
+    const floodCats = gauge.flood?.categories || gauge.floodCategories;
+    const status = gauge.status?.observed || gauge.observed;
+
+    // Try to get thresholds from the gauge data
+    const thresholds = {};
+    if (floodCats) {
+      if (floodCats.action?.stage != null) thresholds.action = floodCats.action.stage;
+      if (floodCats.flood?.stage != null) thresholds.flood = floodCats.flood.stage;
+      if (floodCats.moderate?.stage != null) thresholds.moderate = floodCats.moderate.stage;
+      if (floodCats.major?.stage != null) thresholds.major = floodCats.major.stage;
+    }
+
+    return {
+      nwsId,
+      thresholds,
+      currentStage: status?.primary?.value ?? null,
+      currentCategory: status?.floodCategory?.toLowerCase() ?? null,
+    };
+  } catch (e) {
+    console.warn('Flood stage fetch failed for', siteCode, e.message);
+    return null;
+  }
+}
+
+// Determine flood category from gauge height and thresholds
+function getFloodCategory(gaugeHeight, thresholds) {
+  if (!thresholds || gaugeHeight == null) return null;
+  if (thresholds.major != null && gaugeHeight >= thresholds.major) return 'major';
+  if (thresholds.moderate != null && gaugeHeight >= thresholds.moderate) return 'moderate';
+  if (thresholds.flood != null && gaugeHeight >= thresholds.flood) return 'flood';
+  if (thresholds.action != null && gaugeHeight >= thresholds.action) return 'action';
+  return 'normal';
+}
+
+// Fetch 6 hours of recent USGS data for trend analysis
+async function fetchRecentUSGSData(siteCode) {
+  try {
+    const params = new URLSearchParams({
+      format: 'json',
+      sites: siteCode,
+      parameterCd: '00060,00065', // flow + gauge height
+      period: 'PT8H', // 8 hours of history (gives us good trend data)
+    });
+
+    const resp = await fetch(`${USGS_BASE}?${params}`, { signal: AbortSignal.timeout(10000) });
+    if (!resp.ok) return null;
+    const json = await resp.json();
+
+    const timeSeries = json?.value?.timeSeries || [];
+    const result = { flow: [], gauge: [] };
+
+    for (const ts of timeSeries) {
+      const paramCode = ts.variable?.variableCode?.[0]?.value;
+      const key = paramCode === '00060' ? 'flow' : paramCode === '00065' ? 'gauge' : null;
+      if (!key) continue;
+
+      const values = ts.values?.[0]?.value || [];
+      for (const v of values) {
+        const val = parseFloat(v.value);
+        if (isNaN(val) || val < -900) continue;
+        result[key].push({
+          time: new Date(v.dateTime).getTime(),
+          value: val,
+        });
+      }
+    }
+
+    return result;
+  } catch (e) {
+    console.warn('Recent USGS data fetch failed for', siteCode, e.message);
+    return null;
+  }
+}
+
+// NWS river forecast — predicted stages for the next 6+ hours
+async function fetchNWSForecast(siteCode) {
+  try {
+    // First find the NWS gauge ID
+    const url = `https://api.water.noaa.gov/nwps/v1/gauges?identifier=USGS-${siteCode}`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+
+    const gauge = data?.gauges?.[0];
+    if (!gauge) return null;
+    const nwsId = gauge.lid || gauge.id;
+    if (!nwsId) return null;
+
+    // Fetch forecast from NWS
+    const fcstUrl = `https://api.water.noaa.gov/nwps/v1/gauges/${nwsId}/stageflow`;
+    const fcstResp = await fetch(fcstUrl, { signal: AbortSignal.timeout(8000) });
+    if (!fcstResp.ok) return null;
+    const fcstData = await fcstResp.json();
+
+    // Extract forecast points
+    const forecasts = fcstData?.forecast?.data || fcstData?.data || [];
+    if (!Array.isArray(forecasts) || forecasts.length === 0) return null;
+
+    const now = Date.now();
+    const sixHoursOut = now + 6 * 60 * 60 * 1000;
+
+    // Filter to next 6 hours
+    const upcoming = forecasts
+      .map(pt => ({
+        time: new Date(pt.validTime || pt.time).getTime(),
+        stage: pt.primary?.value ?? pt.stage ?? pt.value ?? null,
+        flow: pt.secondary?.value ?? pt.flow ?? null,
+      }))
+      .filter(pt => pt.time >= now && pt.time <= sixHoursOut && pt.stage != null)
+      .sort((a, b) => a.time - b.time);
+
+    return upcoming.length > 0 ? upcoming : null;
+  } catch (e) {
+    console.warn('NWS forecast fetch failed for', siteCode, e.message);
+    return null;
+  }
+}
+
+// Analyze recent data to compute trend and 6-hour projection
+function analyzeTrend(recentData) {
+  if (!recentData) return null;
+
+  const result = {};
+
+  for (const key of ['gauge', 'flow']) {
+    const points = recentData[key];
+    if (!points || points.length < 4) continue;
+
+    // Use last 6 hours of data points
+    const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
+    const recent = points.filter(p => p.time >= sixHoursAgo);
+    if (recent.length < 3) continue;
+
+    const first = recent[0];
+    const last = recent[recent.length - 1];
+    const totalChange = last.value - first.value;
+    const hoursSpan = (last.time - first.time) / (1000 * 60 * 60);
+    if (hoursSpan < 0.5) continue;
+
+    const ratePerHour = totalChange / hoursSpan;
+
+    // Simple linear projection 6 hours out
+    const projected = last.value + (ratePerHour * 6);
+
+    // Determine trend direction
+    let trend = 'stable';
+    const threshold = key === 'flow' ? 5 : 0.05; // ft³/s or ft
+    if (ratePerHour > threshold) trend = 'rising';
+    else if (ratePerHour < -threshold) trend = 'falling';
+
+    result[key] = {
+      current: last.value,
+      change6h: totalChange,
+      ratePerHour,
+      trend,
+      projected6h: Math.max(0, projected),
+      points: recent,
+      unit: key === 'flow' ? 'ft³/s' : 'ft',
+    };
+  }
+
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+// Format flood stage HTML for the detail panel
+function getFloodStageHtml(floodData, gaugeHeight) {
+  if (!floodData) return '';
+
+  const thresholds = floodData.thresholds || {};
+  const hasThresholds = Object.keys(thresholds).length > 0;
+  const category = floodData.currentCategory || getFloodCategory(gaugeHeight, thresholds);
+
+  const catColors = {
+    normal: { bg: 'rgba(46,204,113,0.12)', border: 'rgba(46,204,113,0.3)', color: '#2ecc71', label: 'Normal' },
+    action: { bg: 'rgba(241,196,15,0.12)', border: 'rgba(241,196,15,0.3)', color: '#f1c40f', label: 'Action Stage' },
+    flood:  { bg: 'rgba(243,156,18,0.15)', border: 'rgba(243,156,18,0.3)', color: '#f39c12', label: 'Flood Stage' },
+    moderate: { bg: 'rgba(231,76,60,0.15)', border: 'rgba(231,76,60,0.3)', color: '#e74c3c', label: 'Moderate Flood' },
+    major:  { bg: 'rgba(192,57,43,0.2)', border: 'rgba(192,57,43,0.4)', color: '#c0392b', label: 'Major Flood' },
+  };
+  const cat = catColors[category] || catColors.normal;
+
+  let html = `
+    <div class="detail-section">
+      <h3>Flood Status</h3>
+      <div class="flood-status-badge" style="background:${cat.bg};border:1px solid ${cat.border};color:${cat.color};padding:10px 14px;border-radius:8px;margin-bottom:8px;">
+        <strong style="font-size:0.95rem;">${cat.label}</strong>
+        ${gaugeHeight != null ? `<span style="float:right;font-size:0.85rem;">${gaugeHeight.toFixed(2)} ft</span>` : ''}
+      </div>
+  `;
+
+  if (hasThresholds) {
+    html += `<div class="flood-thresholds" style="display:flex;flex-wrap:wrap;gap:6px;">`;
+    const stages = [
+      { key: 'action', label: 'Action', color: '#f1c40f' },
+      { key: 'flood', label: 'Flood', color: '#f39c12' },
+      { key: 'moderate', label: 'Moderate', color: '#e74c3c' },
+      { key: 'major', label: 'Major', color: '#c0392b' },
+    ];
+    for (const s of stages) {
+      if (thresholds[s.key] != null) {
+        const active = gaugeHeight != null && gaugeHeight >= thresholds[s.key];
+        html += `<span style="padding:3px 10px;border-radius:10px;font-size:0.75rem;font-weight:600;
+          background:${active ? s.color : 'var(--bg-surface)'};
+          color:${active ? '#fff' : 'var(--text-muted)'};">
+          ${s.label}: ${thresholds[s.key]} ft
+        </span>`;
+      }
+    }
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+// Format trend + projection HTML
+function getTrendHtml(trendData, nwsForecast) {
+  if (!trendData && !nwsForecast) return '';
+
+  let html = `<div class="detail-section"><h3>6-Hour Outlook</h3>`;
+
+  // Trend analysis from USGS historical data
+  if (trendData) {
+    for (const key of ['gauge', 'flow']) {
+      const t = trendData[key];
+      if (!t) continue;
+
+      const label = key === 'gauge' ? 'Gauge Height' : 'Discharge';
+      const arrow = t.trend === 'rising' ? '&#9650;' : t.trend === 'falling' ? '&#9660;' : '&#9654;';
+      const tColor = t.trend === 'rising' ? '#e74c3c' : t.trend === 'falling' ? '#3498db' : '#2ecc71';
+      const changeSign = t.change6h >= 0 ? '+' : '';
+
+      html += `
+        <div style="background:var(--bg-surface);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-weight:600;font-size:0.85rem;">${label}</span>
+            <span style="color:${tColor};font-weight:700;font-size:0.85rem;">${arrow} ${t.trend.charAt(0).toUpperCase() + t.trend.slice(1)}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:0.8rem;">
+            <div>
+              <div style="color:var(--text-muted);font-size:0.68rem;text-transform:uppercase;">Now</div>
+              <div style="font-weight:600;">${t.current.toFixed(key === 'gauge' ? 2 : 0)} ${t.unit}</div>
+            </div>
+            <div>
+              <div style="color:var(--text-muted);font-size:0.68rem;text-transform:uppercase;">Change (6h)</div>
+              <div style="font-weight:600;color:${tColor};">${changeSign}${t.change6h.toFixed(key === 'gauge' ? 2 : 0)} ${t.unit}</div>
+            </div>
+            <div>
+              <div style="color:var(--text-muted);font-size:0.68rem;text-transform:uppercase;">Projected</div>
+              <div style="font-weight:600;">${t.projected6h.toFixed(key === 'gauge' ? 2 : 0)} ${t.unit}</div>
+            </div>
+          </div>
+      `;
+
+      // Mini sparkline using the historical points
+      if (t.points && t.points.length >= 3) {
+        html += renderSparkline(t.points, t.projected6h, key);
+      }
+
+      html += `</div>`;
+    }
+  }
+
+  // NWS official forecast
+  if (nwsForecast && nwsForecast.length > 0) {
+    html += `
+      <div style="background:var(--bg-surface);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-weight:600;font-size:0.85rem;margin-bottom:6px;color:var(--accent);">NWS River Forecast</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+    `;
+    for (const pt of nwsForecast.slice(0, 4)) {
+      const time = new Date(pt.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      html += `
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;">
+          <span style="color:var(--text-muted);">${time}</span>
+          <span style="font-weight:600;">${pt.stage != null ? pt.stage.toFixed(2) + ' ft' : ''}${pt.flow != null ? ' / ' + Math.round(pt.flow) + ' ft³/s' : ''}</span>
+        </div>
+      `;
+    }
+    html += `</div></div>`;
+  }
+
+  // Fishing guidance based on trend
+  if (trendData) {
+    const gaugeTrend = trendData.gauge?.trend;
+    const flowTrend = trendData.flow?.trend;
+    let guidance = '';
+
+    if (gaugeTrend === 'rising' || flowTrend === 'rising') {
+      const rate = trendData.gauge?.ratePerHour || 0;
+      if (rate > 0.5) {
+        guidance = 'Water is rising rapidly — dangerous wading conditions. Fish may move to banks and eddies. Consider postponing.';
+      } else {
+        guidance = 'Water is rising — fish often feed aggressively on rising water. Target current seams and newly flooded banks. Use heavier weights.';
+      }
+    } else if (gaugeTrend === 'falling' || flowTrend === 'falling') {
+      guidance = 'Water is falling — excellent fishing conditions. Fish concentrate in deeper pools and channel bends as water recedes. Great time to fish.';
+    } else {
+      guidance = 'Stable conditions — predictable fishing. Target structure and normal holding water. Standard presentations should work well.';
+    }
+
+    html += `
+      <div style="background:rgba(52,152,219,0.08);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:10px 14px;font-size:0.82rem;line-height:1.4;">
+        <strong style="color:var(--accent);display:block;margin-bottom:3px;">Fishing Guidance</strong>
+        ${guidance}
+      </div>
+    `;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+// Render a tiny sparkline from data points + projected value
+function renderSparkline(points, projected, key) {
+  if (points.length < 3) return '';
+
+  const values = points.map(p => p.value);
+  values.push(projected); // add projection
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const w = 280;
+  const h = 40;
+  const padding = 2;
+
+  const totalPoints = values.length;
+  const coords = values.map((v, i) => {
+    const x = padding + (i / (totalPoints - 1)) * (w - 2 * padding);
+    const y = h - padding - ((v - min) / range) * (h - 2 * padding);
+    return `${x},${y}`;
+  });
+
+  // Split into history and projection
+  const historyPath = coords.slice(0, -1).join(' ');
+  const lastHistX = padding + ((totalPoints - 2) / (totalPoints - 1)) * (w - 2 * padding);
+  const lastHistY = h - padding - ((values[totalPoints - 2] - min) / range) * (h - 2 * padding);
+  const projX = coords[coords.length - 1];
+
+  return `
+    <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px;margin-top:6px;display:block;" preserveAspectRatio="none">
+      <polyline points="${historyPath}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round"/>
+      <line x1="${lastHistX}" y1="${lastHistY}" x2="${projX.split(',')[0]}" y2="${projX.split(',')[1]}" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.6"/>
+      <circle cx="${projX.split(',')[0]}" cy="${projX.split(',')[1]}" r="3" fill="var(--accent)" opacity="0.6"/>
+      <text x="${w - padding}" y="${padding + 8}" text-anchor="end" fill="var(--text-muted)" font-size="8">projected</text>
+    </svg>
+  `;
+}
+
 export {
   fetchWaterBodies,
   fetchUSGSSites,
@@ -611,4 +976,10 @@ export {
   getBBox,
   distanceMiles,
   assessPrivateProperty,
+  fetchFloodStage,
+  fetchRecentUSGSData,
+  fetchNWSForecast,
+  analyzeTrend,
+  getFloodStageHtml,
+  getTrendHtml,
 };

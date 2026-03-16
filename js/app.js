@@ -4,7 +4,7 @@
  * Focused on Virginia & North Carolina. Supabase auth + user places.
  */
 
-import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty } from './api.js';
+import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchFloodStage, fetchRecentUSGSData, fetchNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml } from './api.js';
 import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers } from './map.js';
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, getPlaceStatuses, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan } from './supabase.js';
 import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml } from './fishing.js';
@@ -692,23 +692,30 @@ function showUSGSDetail(site, dist) {
     `;
   }
 
+  // Flood stage placeholder (loaded async)
+  html += `<div id="usgs-flood-stage"><div class="loading-inline">Checking flood stage...</div></div>`;
+
+  // 6-hour outlook placeholder (loaded async)
+  html += `<div id="usgs-outlook"><div class="loading-inline">Loading 6-hour outlook...</div></div>`;
+
   // Links
+  const linkIcon = `<svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" fill="currentColor"/></svg>`;
   html += `
     <div class="detail-section">
       <h3>Resources</h3>
       <div class="detail-links">
         <a href="https://waterdata.usgs.gov/nwis/uv?site_no=${site.siteCode}" target="_blank" rel="noopener" class="detail-link">
-          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" fill="currentColor"/></svg>
-          USGS Station Data Page
+          ${linkIcon} USGS Station Data Page
         </a>
         <a href="https://waterdata.usgs.gov/nwis/inventory/?site_no=${site.siteCode}" target="_blank" rel="noopener" class="detail-link">
-          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" fill="currentColor"/></svg>
-          Station Inventory &amp; History
+          ${linkIcon} Station Inventory &amp; History
+        </a>
+        <a href="https://water.weather.gov/ahps2/hydrograph.php?gage=USGS-${site.siteCode}" target="_blank" rel="noopener" class="detail-link">
+          ${linkIcon} NWS River Forecast Hydrograph
         </a>
         ${links.map(l => `
           <a href="${l.url}" target="_blank" rel="noopener" class="detail-link">
-            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" fill="currentColor"/></svg>
-            ${escapeHtml(l.label)}
+            ${linkIcon} ${escapeHtml(l.label)}
           </a>
         `).join('')}
       </div>
@@ -724,6 +731,45 @@ function showUSGSDetail(site, dist) {
   detailContent.innerHTML = html;
   detailPanel.classList.remove('hidden');
   panTo(site.lat, site.lon, 14);
+
+  // Async: load flood stage, trend data, and NWS forecast
+  loadUSGSFloodAndOutlook(site);
+}
+
+async function loadUSGSFloodAndOutlook(site) {
+  const gaugeHeight = site.data?.gauge?.value ?? null;
+
+  // Fetch all three in parallel
+  const [floodData, recentData, nwsForecast] = await Promise.allSettled([
+    fetchFloodStage(site.siteCode),
+    fetchRecentUSGSData(site.siteCode),
+    fetchNWSForecast(site.siteCode),
+  ]);
+
+  // Flood stage
+  const floodArea = document.getElementById('usgs-flood-stage');
+  if (floodArea) {
+    const flood = floodData.status === 'fulfilled' ? floodData.value : null;
+    if (flood) {
+      floodArea.innerHTML = getFloodStageHtml(flood, gaugeHeight);
+    } else {
+      floodArea.innerHTML = '';
+    }
+  }
+
+  // 6-hour outlook (trend + NWS forecast)
+  const outlookArea = document.getElementById('usgs-outlook');
+  if (outlookArea) {
+    const recent = recentData.status === 'fulfilled' ? recentData.value : null;
+    const forecast = nwsForecast.status === 'fulfilled' ? nwsForecast.value : null;
+    const trend = analyzeTrend(recent);
+
+    if (trend || forecast) {
+      outlookArea.innerHTML = getTrendHtml(trend, forecast);
+    } else {
+      outlookArea.innerHTML = '<p style="color:var(--text-muted);font-size:0.82rem;">Trend data not available for this station.</p>';
+    }
+  }
 }
 
 // ===== My Places Panel =====
