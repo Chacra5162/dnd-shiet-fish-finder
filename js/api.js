@@ -136,6 +136,43 @@ const PARAMS = {
   '00045': { name: 'Precipitation', unit: 'in', key: 'precip' },
 };
 
+// USGS bbox limit is ~0.2 degrees wide. Split large areas into tiles.
+const USGS_TILE_SIZE = 0.18; // degrees per tile (under 0.2 limit)
+
+function splitBBox(south, west, north, east) {
+  const tiles = [];
+  for (let s = south; s < north; s += USGS_TILE_SIZE) {
+    for (let w = west; w < east; w += USGS_TILE_SIZE) {
+      tiles.push({
+        south: s,
+        west: w,
+        north: Math.min(s + USGS_TILE_SIZE, north),
+        east: Math.min(w + USGS_TILE_SIZE, east),
+      });
+    }
+  }
+  return tiles;
+}
+
+async function fetchUSGSTile(south, west, north, east) {
+  const params = new URLSearchParams({
+    format: 'json',
+    bBox: `${west.toFixed(5)},${south.toFixed(5)},${east.toFixed(5)},${north.toFixed(5)}`,
+    parameterCd: Object.keys(PARAMS).join(','),
+    siteType: 'LK,ST,SP',
+    siteStatus: 'active',
+  });
+
+  const response = await fetch(`${USGS_BASE}?${params}`);
+  if (!response.ok) {
+    console.warn(`USGS tile error ${response.status} for bbox ${west},${south},${east},${north}`);
+    return [];
+  }
+
+  const json = await response.json();
+  return parseUSGSResponse(json);
+}
+
 async function fetchUSGSSites(south, west, north, east) {
   // Check cache
   const { cached, missing } = await getMultiCached(STORES.usgs, south, west, north, east);
@@ -146,24 +183,33 @@ async function fetchUSGSSites(south, west, north, east) {
     return { data: withData, fromCache: true };
   }
 
-  // Fetch site list with current values
-  const params = new URLSearchParams({
-    format: 'json',
-    bBox: `${west},${south},${east},${north}`,
-    parameterCd: Object.keys(PARAMS).join(','),
-    siteType: 'LK,ST,SP',
-    siteStatus: 'active',
-  });
+  // Split into tiles that fit USGS bbox limit
+  const tiles = splitBBox(south, west, north, east);
+  const allSites = [];
+  const seen = new Set();
 
-  const response = await fetch(`${USGS_BASE}?${params}`);
-  if (!response.ok) throw new Error(`USGS API error: ${response.status}`);
-
-  const json = await response.json();
-  const sites = parseUSGSResponse(json);
+  // Fetch tiles in parallel (max 4 concurrent to be polite)
+  const batchSize = 4;
+  for (let i = 0; i < tiles.length; i += batchSize) {
+    const batch = tiles.slice(i, i + batchSize);
+    const results = await Promise.allSettled(
+      batch.map(t => fetchUSGSTile(t.south, t.west, t.north, t.east))
+    );
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        for (const site of r.value) {
+          if (!seen.has(site.siteCode)) {
+            seen.add(site.siteCode);
+            allSites.push(site);
+          }
+        }
+      }
+    }
+  }
 
   // Cache site locations per grid cell
   const gridMap = {};
-  for (const site of sites) {
+  for (const site of allSites) {
     const { gridKey } = await import('./cache.js');
     const key = gridKey(site.lat, site.lon);
     if (!gridMap[key]) gridMap[key] = [];
@@ -175,7 +221,7 @@ async function fetchUSGSSites(south, west, north, east) {
     await setCache(STORES.usgs, lat, lon, items);
   }
 
-  return { data: sites, fromCache: false };
+  return { data: allSites, fromCache: false };
 }
 
 async function enrichUSGSData(sites, south, west, north, east) {
@@ -188,23 +234,31 @@ async function enrichUSGSData(sites, south, west, north, east) {
   }
 
   try {
-    const params = new URLSearchParams({
-      format: 'json',
-      bBox: `${west},${south},${east},${north}`,
-      parameterCd: Object.keys(PARAMS).join(','),
-      siteType: 'LK,ST,SP',
-      siteStatus: 'active',
-    });
+    const tiles = splitBBox(south, west, north, east);
+    const allFresh = [];
+    const seen = new Set();
 
-    const response = await fetch(`${USGS_BASE}?${params}`);
-    if (!response.ok) return sites;
+    const batchSize = 4;
+    for (let i = 0; i < tiles.length; i += batchSize) {
+      const batch = tiles.slice(i, i + batchSize);
+      const results = await Promise.allSettled(
+        batch.map(t => fetchUSGSTile(t.south, t.west, t.north, t.east))
+      );
+      for (const r of results) {
+        if (r.status === 'fulfilled') {
+          for (const site of r.value) {
+            if (!seen.has(site.siteCode)) {
+              seen.add(site.siteCode);
+              allFresh.push(site);
+            }
+          }
+        }
+      }
+    }
 
-    const json = await response.json();
-    const freshData = parseUSGSResponse(json);
+    await setCache(STORES.usgsCurrent, (south + north) / 2, (west + east) / 2, allFresh);
 
-    await setCache(STORES.usgsCurrent, (south + north) / 2, (west + east) / 2, freshData);
-
-    return freshData.length > 0 ? freshData : sites;
+    return allFresh.length > 0 ? allFresh : sites;
   } catch {
     return sites;
   }
