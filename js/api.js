@@ -580,6 +580,64 @@ function parseUSGSResponse(json) {
 
 // ===== Fishing Resources (VA/NC specific) =====
 
+function getSpecialRegulations(name, lat, lon) {
+  const n = (name || '').toLowerCase();
+  const inVA = lat >= 36.54 && lat <= 39.47 && lon >= -83.68 && lon <= -75.24;
+  const regs = [];
+
+  // VA special regulations
+  if (inVA) {
+    if (n.includes('new river') && lon < -80) {
+      regs.push({ rule: 'Smallmouth Bass: 20" minimum, 2 per day (Claytor Dam to Bluestone)', type: 'size' });
+      regs.push({ rule: 'Muskie: 42" minimum, 1 per day', type: 'size' });
+    }
+    if (n.includes('james river')) {
+      regs.push({ rule: 'Striped Bass: 20-28" slot limit (1 per day), or over 36" (1 per day)', type: 'slot' });
+      if (lon > -77.5) regs.push({ rule: 'Blue Catfish: No daily limit below the fall line', type: 'creel' });
+    }
+    if (n.includes('smith mountain')) {
+      regs.push({ rule: 'Striped Bass: 20" minimum, 2 per day', type: 'size' });
+      regs.push({ rule: 'Smallmouth Bass: 12" minimum', type: 'size' });
+    }
+    if (n.includes('claytor')) {
+      regs.push({ rule: 'Walleye: 18" minimum, 2 per day', type: 'size' });
+      regs.push({ rule: 'Striped Bass: 20" minimum, 2 per day', type: 'size' });
+    }
+    if (n.includes('kerr') || n.includes('buggs island')) {
+      regs.push({ rule: 'Striped Bass: 20" minimum, 4 per day', type: 'size' });
+      regs.push({ rule: 'Largemouth Bass: 14" minimum in tournaments', type: 'size' });
+    }
+    if (n.includes('lake anna')) {
+      regs.push({ rule: 'Striped Bass: 20" minimum, 2 per day', type: 'size' });
+    }
+    if (n.includes('philpott')) {
+      regs.push({ rule: 'Striped Bass: 20" minimum, 2 per day', type: 'size' });
+    }
+    if (n.includes('back bay') || n.includes('currituck')) {
+      regs.push({ rule: 'Special regulations — check VMRC saltwater limits', type: 'special' });
+    }
+    // Trout streams
+    if (n.includes('rapidan') || n.includes('staunton river') || n.includes('moorman') || n.includes('north fork moormans')) {
+      regs.push({ rule: 'Special trout regulations — catch and release only, single hook, artificial only', type: 'special' });
+    }
+  }
+
+  // NC special regulations
+  if (!inVA) {
+    if (n.includes('jordan lake') || n.includes('falls lake')) {
+      regs.push({ rule: 'Striped Bass: 20" minimum in some zones', type: 'size' });
+    }
+    if (n.includes('lake norman')) {
+      regs.push({ rule: 'Striped Bass: must immediately release all fish 20-26"', type: 'slot' });
+    }
+    if (n.includes('nantahala') || n.includes('tuckasegee')) {
+      regs.push({ rule: 'Delayed harvest trout water — catch and release Oct 1 - Jun 1', type: 'special' });
+    }
+  }
+
+  return regs;
+}
+
 function getFishingLinks(lat, lon, waterType, waterName) {
   const inVA = lat >= 36.54 && lat <= 39.47 && lon >= -83.68 && lon <= -75.24;
   const inNC = lat >= 33.84 && lat <= 36.59 && lon >= -84.32 && lon <= -75.46;
@@ -587,14 +645,21 @@ function getFishingLinks(lat, lon, waterType, waterName) {
   const links = [];
 
   if (inVA) {
-    links.push({
-      label: 'VA DWR Fishing Reports',
-      url: 'https://dwr.virginia.gov/fishing/fishing-reports/',
-    });
-    links.push({
-      label: 'VA Trout Stocking Schedule',
-      url: 'https://dwr.virginia.gov/fishing/trout-stocking-schedule/',
-    });
+    // Regional fishing reports
+    if (lon < -80) {
+      links.push({ label: 'VA DWR Southwest Region Fishing Report', url: 'https://dwr.virginia.gov/fishing/fishing-reports/' });
+    } else if (lon < -78) {
+      links.push({ label: 'VA DWR Central/Piedmont Fishing Report', url: 'https://dwr.virginia.gov/fishing/fishing-reports/' });
+    } else {
+      links.push({ label: 'VA DWR Tidewater/Eastern Fishing Report', url: 'https://dwr.virginia.gov/fishing/fishing-reports/' });
+    }
+    // Trout stocking schedule — only for mountain/trout areas
+    if (lon < -78.5 || waterName.toLowerCase().includes('trout') || waterName.toLowerCase().includes('stocked')) {
+      links.push({
+        label: 'VA Trout Stocking Schedule — Check Recent Stockings',
+        url: 'https://dwr.virginia.gov/fishing/trout-stocking-schedule/',
+      });
+    }
     links.push({
       label: 'VA Fishing Regulations',
       url: 'https://dwr.virginia.gov/fishing/regulations/',
@@ -1081,10 +1146,92 @@ function renderSparkline(points, projected, key) {
   `;
 }
 
+async function fetchWaterTempHistory(siteCode) {
+  try {
+    const params = new URLSearchParams({
+      format: 'json',
+      sites: siteCode,
+      parameterCd: '00010,00011', // both C and F
+      period: 'P7D',
+    });
+    const resp = await fetchWithTimeout(`${USGS_BASE}?${params}`, 15000);
+    if (!resp.ok) return null;
+    const json = await resp.json();
+
+    const timeSeries = json?.value?.timeSeries || [];
+    const temps = [];
+
+    for (const ts of timeSeries) {
+      const paramCode = ts.variable?.variableCode?.[0]?.value;
+      const isCelsius = paramCode === '00010';
+      const values = ts.values?.[0]?.value || [];
+
+      for (const v of values) {
+        let val = parseFloat(v.value);
+        if (isNaN(val) || val < -900) continue;
+        if (isCelsius) val = Math.round((val * 9 / 5 + 32) * 10) / 10;
+        temps.push({ time: new Date(v.dateTime).getTime(), temp: val });
+      }
+      if (temps.length > 0) break; // prefer first matching series
+    }
+
+    return temps.length > 0 ? temps : null;
+  } catch (e) {
+    console.warn('Water temp history fetch failed:', e.message);
+    return null;
+  }
+}
+
+function getWaterTempChartHtml(temps) {
+  if (!temps || temps.length < 10) return '';
+
+  // Downsample to ~48 points (one per 3-4 hours over 7 days)
+  const step = Math.max(1, Math.floor(temps.length / 48));
+  const sampled = temps.filter((_, i) => i % step === 0);
+
+  const values = sampled.map(t => t.temp);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const w = 300, h = 60, pad = 2;
+
+  const points = sampled.map((t, i) => {
+    const x = pad + (i / (sampled.length - 1)) * (w - 2 * pad);
+    const y = pad + (h - 2 * pad) * (1 - (t.temp - min) / range);
+    return `${x},${y}`;
+  }).join(' ');
+
+  const latest = values[values.length - 1];
+  const oldest = values[0];
+  const trend = latest > oldest + 1 ? 'rising' : latest < oldest - 1 ? 'falling' : 'stable';
+  const trendColor = trend === 'rising' ? '#e74c3c' : trend === 'falling' ? '#3498db' : '#2ecc71';
+  const trendArrow = trend === 'rising' ? '&#9650;' : trend === 'falling' ? '&#9660;' : '&#9654;';
+
+  return `
+    <div class="detail-section">
+      <h3>Water Temperature — 7 Day Trend</h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span style="font-size:1.1rem;font-weight:700;color:#e67e22;">${latest.toFixed(1)}°F</span>
+        <span style="font-size:0.82rem;color:${trendColor};font-weight:600;">${trendArrow} ${trend.charAt(0).toUpperCase() + trend.slice(1)} (${min.toFixed(1)}–${max.toFixed(1)}°F range)</span>
+      </div>
+      <div style="background:var(--bg-surface);border-radius:8px;padding:8px 10px 4px;">
+        <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px;display:block;" preserveAspectRatio="none">
+          <polyline points="${points}" fill="none" stroke="#e67e22" stroke-width="2" stroke-linejoin="round"/>
+          <polygon points="${pad},${h} ${points} ${w - pad},${h}" fill="rgba(230,126,34,0.1)"/>
+        </svg>
+        <div style="display:flex;justify-content:space-between;font-size:0.6rem;color:var(--text-muted);margin-top:2px;">
+          <span>7 days ago</span><span>Now</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 export {
   fetchWaterBodies,
   fetchUSGSSites,
   getFishingLinks,
+  getSpecialRegulations,
   getCommonSpecies,
   getBBox,
   distanceMiles,
@@ -1096,4 +1243,6 @@ export {
   analyzeTrend,
   getFloodStageHtml,
   getTrendHtml,
+  fetchWaterTempHistory,
+  getWaterTempChartHtml,
 };

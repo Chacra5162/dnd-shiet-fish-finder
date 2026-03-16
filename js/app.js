@@ -4,10 +4,10 @@
  * Focused on Virginia & North Carolina. Supabase auth + user places.
  */
 
-import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml } from './api.js';
+import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getSpecialRegulations, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml, fetchWaterTempHistory, getWaterTempChartHtml } from './api.js';
 import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers } from './map.js';
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan } from './supabase.js';
-import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml } from './fishing.js';
+import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, calculateSolunarPeriods, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml } from './fishing.js';
 import { TIME_WINDOWS, fetchForecast, estimateTraffic, generateGearChecklist, getForecastCardHtml, getTrafficBadgeHtml, getGearChecklistHtml, getTripSummaryCardHtml, friendlyDate } from './tripPlan.js';
 import { CATEGORIES, getArsenalItems, addArsenalItem, updateArsenalItem, deleteArsenalItem, getPhotoUrl, filterItems, getUniqueColors, getUniqueWeights } from './arsenal.js';
 import { generateWaterBodyKey, getCommunityPosts, getRecentPosts, addCommunityPost, deleteCommunityPost, getCommunityPhotoUrl, resizeImage } from './community.js';
@@ -474,6 +474,45 @@ window._dismissTroutWarning = function(btn, key) {
   if (el) el.remove();
 };
 
+// ===== Shad Run Calendar =====
+
+function getShadRunHtml(wb) {
+  // Shad runs happen March through May on eastern VA/NC rivers
+  const month = new Date().getMonth() + 1; // 1-12
+  if (month < 3 || month > 5) return '';
+
+  // Only eastern rivers (east of the fall line)
+  if (wb.type !== 'river') return '';
+  const inVA = wb.lat >= 36.54;
+  const fallLine = inVA ? -77.5 : -79.0;
+  if (wb.lon < fallLine) return '';
+
+  // Known shad rivers
+  const name = (wb.name || '').toLowerCase();
+  const shadRivers = ['james', 'rappahannock', 'roanoke', 'potomac', 'york', 'mattaponi', 'pamunkey', 'appomattox', 'neuse', 'tar', 'cape fear', 'roanoke'];
+  const isKnownShadRiver = shadRivers.some(r => name.includes(r));
+
+  if (!isKnownShadRiver) return '';
+
+  const monthNames = { 3: 'March', 4: 'April', 5: 'May' };
+  const peakText = month === 3 ? 'Early run — Hickory Shad starting, American Shad arriving'
+    : month === 4 ? 'Peak run — both Hickory and American Shad active'
+    : 'Late run — American Shad finishing, best below dams';
+
+  return `
+    <div class="detail-section">
+      <div style="background:rgba(52,152,219,0.1);border:1px solid rgba(52,152,219,0.3);border-radius:8px;padding:12px 14px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <span style="font-size:1.2rem;">🐟</span>
+          <strong style="color:var(--accent);font-size:0.9rem;">Shad Run Active — ${monthNames[month]}</strong>
+        </div>
+        <p style="font-size:0.82rem;color:var(--text);margin:0;line-height:1.4;">${peakText}</p>
+        <p style="font-size:0.75rem;color:var(--text-muted);margin:4px 0 0;">Use shad darts (white/chartreuse/pink) on ultralight gear below dams and rapids. VA trout license NOT required for shad.</p>
+      </div>
+    </div>
+  `;
+}
+
 // ===== Access Info (Fishing / Bank-Pier / Boat) =====
 
 // Determine access for fishing, bank/pier, and boat with deep heuristics.
@@ -679,6 +718,42 @@ function getAccessInfoHtml(wb) {
 
 // ===== Detail Panels =====
 
+function getRegulationsHtml(wb) {
+  const regs = getSpecialRegulations(wb.name, wb.lat, wb.lon);
+  const inVA = wb.lat >= 36.54 && wb.lat <= 39.47 && wb.lon >= -83.68 && wb.lon <= -75.24;
+
+  let html = '<div class="detail-section"><h3>Regulations</h3>';
+
+  if (regs.length > 0) {
+    html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">';
+    for (const reg of regs) {
+      const icon = reg.type === 'size' ? '\u{1F4CF}' : reg.type === 'slot' ? '\u{1F504}' : reg.type === 'creel' ? '\u{1FAA3}' : '\u26A0\uFE0F';
+      html += `<div style="background:var(--bg-surface);padding:8px 12px;border-radius:8px;font-size:0.82rem;display:flex;gap:8px;align-items:flex-start;">
+        <span style="flex-shrink:0;">${icon}</span>
+        <span>${escapeHtml(reg.rule)}</span>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  // Always show link to full regulations
+  const regUrl = inVA ? 'https://dwr.virginia.gov/fishing/regulations/' : 'https://www.ncwildlife.org/licensing/regulations';
+  const regLabel = inVA ? 'VA DWR Full Fishing Regulations' : 'NC Wildlife Fishing Regulations';
+  html += `<a href="${escapeAttr(regUrl)}" target="_blank" rel="noopener" class="detail-link" style="margin-top:4px;">
+    <svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" fill="currentColor"/></svg>
+    ${escapeHtml(regLabel)}
+  </a>`;
+
+  if (regs.length === 0) {
+    html += '<p style="font-size:0.78rem;color:var(--text-muted);margin-top:4px;">General statewide limits apply. Check the link above for current regulations.</p>';
+  } else {
+    html += '<p style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">Regulations may change. Always verify with the latest official regulations before keeping fish.</p>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
 async function showWaterDetail(wb, dist) {
   const nearbyUSGS = findNearbyUSGS(wb.lat, wb.lon, 10);
   const links = getFishingLinks(wb.lat, wb.lon, wb.type, wb.name);
@@ -719,6 +794,9 @@ async function showWaterDetail(wb, dist) {
   // Trout license warning
   html += getTroutWarningHtml(wb, 'detail');
 
+  // Shad run indicator
+  html += getShadRunHtml(wb);
+
   // Place actions (favorite / visited / avoid)
   html += getPlaceStatusHtml(wb);
 
@@ -752,6 +830,9 @@ async function showWaterDetail(wb, dist) {
 
   // Access info — always show fishing, bank/pier, and boat access
   html += getAccessInfoHtml(wb);
+
+  // Regulations
+  html += getRegulationsHtml(wb);
 
   // Nearby USGS
   if (nearbyUSGS.length > 0) {
@@ -842,7 +923,7 @@ async function loadWeatherForDetail(lat, lon, waterType, gen) {
     // Best fishing times
     const timesArea = document.getElementById('best-times-area');
     if (timesArea) {
-      const times = getBestFishingTimes(weather);
+      const times = getBestFishingTimes(weather, lat, lon);
       timesArea.innerHTML = getBestTimesHtml(times);
     }
   } catch (e) {
@@ -1261,6 +1342,9 @@ function showUSGSDetail(site, dist) {
     `;
   }
 
+  // Water temperature trend chart placeholder (loaded async)
+  html += `<div id="usgs-water-temp"></div>`;
+
   // Flood stage placeholder (loaded async)
   html += `<div id="usgs-flood-stage"><div class="loading-inline">Checking flood stage...</div></div>`;
 
@@ -1346,6 +1430,15 @@ async function loadUSGSFloodAndOutlook(site, gen) {
     } else {
       outlookArea.innerHTML = '<p style="color:var(--text-muted);font-size:0.82rem;">Trend data not available for this station.</p>';
     }
+  }
+
+  // Water temperature trend (independent)
+  if (site.data?.temp) {
+    fetchWaterTempHistory(site.siteCode).then(temps => {
+      if (gen !== detailGeneration) return;
+      const el = document.getElementById('usgs-water-temp');
+      if (el && temps) el.innerHTML = getWaterTempChartHtml(temps);
+    });
   }
 }
 

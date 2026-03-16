@@ -167,39 +167,169 @@ function getMoonPhase(date) {
 }
 
 
+// ===== Solunar Calculations =====
+
+// Trig helpers in degrees
+function sinD(d) { return Math.sin(d * Math.PI / 180); }
+function cosD(d) { return Math.cos(d * Math.PI / 180); }
+function tanD(d) { return Math.tan(d * Math.PI / 180); }
+function asinD(x) { return Math.asin(x) * 180 / Math.PI; }
+function acosD(x) { return Math.acos(Math.max(-1, Math.min(1, x))) * 180 / Math.PI; }
+function atan2D(y, x) { return Math.atan2(y, x) * 180 / Math.PI; }
+
+function getJulianDate(date) {
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  const A = Math.floor((14 - m) / 12);
+  const Y = y + 4800 - A;
+  const M = m + 12 * A - 3;
+  return d + Math.floor((153 * M + 2) / 5) + 365 * Y + Math.floor(Y / 4) - Math.floor(Y / 100) + Math.floor(Y / 400) - 32045 - 0.5;
+}
+
+/**
+ * Calculate solunar periods (moon rise/set/transit) for a given location and date.
+ * Uses simplified lunar position algorithms accurate to ~1 degree.
+ */
+function calculateSolunarPeriods(lat, lon, date) {
+  const d = new Date(date || new Date());
+  d.setHours(0, 0, 0, 0);
+
+  // Julian date at midnight local time
+  const JD = getJulianDate(d);
+
+  // Centuries from J2000 epoch (noon at midnight + 0.5 for noon)
+  const T = (JD + 0.5 - 2451545.0) / 36525;
+
+  // Simplified moon ecliptic longitude (accuracy ~1 degree)
+  const L0 = 218.3164477 + 481267.88123421 * T; // mean longitude
+  const M = 134.9633964 + 477198.8675055 * T;    // mean anomaly
+  const F = 93.2720950 + 483202.0175233 * T;     // argument of latitude
+  const D = 297.8501921 + 445267.1114034 * T;    // mean elongation
+  const Ms = 357.5291092 + 35999.0502909 * T;    // sun mean anomaly
+
+  const Lmoon = L0 + 6.289 * sinD(M) + 1.274 * sinD(2 * D - M) + 0.658 * sinD(2 * D)
+    + 0.214 * sinD(2 * M) - 0.186 * sinD(Ms) - 0.114 * sinD(2 * F);
+  const Bmoon = 5.128 * sinD(F) + 0.281 * sinD(M + F) + 0.278 * sinD(M - F);
+
+  // Ecliptic to equatorial coordinates
+  const obliquity = 23.4393 - 0.0130 * T;
+  const ra = atan2D(sinD(Lmoon) * cosD(obliquity) - tanD(Bmoon) * sinD(obliquity), cosD(Lmoon));
+  const dec = asinD(sinD(Bmoon) * cosD(obliquity) + cosD(Bmoon) * sinD(obliquity) * sinD(Lmoon));
+
+  // Greenwich Mean Sidereal Time at midnight
+  const GMST0 = 280.46061837 + 360.98564736629 * (JD - 2451545.0);
+  const LST0 = ((GMST0 + lon) % 360 + 360) % 360; // local sidereal time at midnight
+
+  // Hour angle at midnight — normalize RA to positive
+  const raPos = ((ra % 360) + 360) % 360;
+  let HA0 = raPos - LST0;
+  if (HA0 > 180) HA0 -= 360;
+  if (HA0 < -180) HA0 += 360;
+
+  // Transit: when hour angle = 0. Moon moves ~14.49 deg/hour (sidereal + lunar motion)
+  const transitHours = -HA0 / 14.49;
+
+  // Rise/set: hour angle when moon is at -0.833 degrees altitude (standard refraction)
+  const h0 = -0.833;
+  const cosH = (sinD(h0) - sinD(lat) * sinD(dec)) / (cosD(lat) * cosD(dec));
+
+  let riseHours = null;
+  let setHours = null;
+  if (Math.abs(cosH) <= 1) {
+    const H = acosD(cosH) / 14.49;
+    riseHours = transitHours - H;
+    setHours = transitHours + H;
+  }
+
+  // Underfoot is ~12.2 hours from transit (half a lunar day)
+  const underfootHours = transitHours + 12.2;
+
+  // Convert fractional hours from midnight to Date objects
+  const hoursToDate = (h) => {
+    if (h == null) return null;
+    const result = new Date(d);
+    result.setHours(0, 0, 0, 0);
+    result.setMinutes(Math.round(h * 60));
+    return result;
+  };
+
+  const transit = hoursToDate(transitHours);
+  const underfoot = hoursToDate(underfootHours);
+  const rise = riseHours != null ? hoursToDate(riseHours) : null;
+  const set = setHours != null ? hoursToDate(setHours) : null;
+
+  // Major periods: 1 hour before to 1 hour after transit and underfoot (~2h each)
+  const majorPeriods = [];
+  if (transit) majorPeriods.push({ start: new Date(transit.getTime() - 60 * 60000), end: new Date(transit.getTime() + 60 * 60000), label: 'Major', center: transit });
+  if (underfoot) majorPeriods.push({ start: new Date(underfoot.getTime() - 60 * 60000), end: new Date(underfoot.getTime() + 60 * 60000), label: 'Major', center: underfoot });
+
+  // Minor periods: 30 min before to 30 min after rise and set (~1h each)
+  const minorPeriods = [];
+  if (rise) minorPeriods.push({ start: new Date(rise.getTime() - 30 * 60000), end: new Date(rise.getTime() + 30 * 60000), label: 'Minor', center: rise });
+  if (set) minorPeriods.push({ start: new Date(set.getTime() - 30 * 60000), end: new Date(set.getTime() + 30 * 60000), label: 'Minor', center: set });
+
+  return { moonRise: rise, moonSet: set, moonOverhead: transit, moonUnderfoot: underfoot, majorPeriods, minorPeriods };
+}
+
 // ===== Best Fishing Times =====
 
-function getBestFishingTimes(weather, date) {
+function getBestFishingTimes(weather, lat, lon, date) {
   const moon = getMoonPhase(date);
   const isOvercast = weather.cloudCover > 65;
   const isRainy = weather.precipitation > 0.02;
   const isNewOrFull = moon.name === 'New Moon' || moon.name === 'Full Moon';
 
-  // Rate each hour 5AM - 9PM based on proven factors
+  // Calculate real solunar periods if lat/lon available
+  const solunar = (lat != null && lon != null) ? calculateSolunarPeriods(lat, lon, date || new Date()) : null;
+  const allPeriods = solunar ? [...solunar.majorPeriods, ...solunar.minorPeriods] : [];
+
+  // Rate each hour 0-23 (full day) based on proven factors + solunar
   const hours = [];
-  for (let h = 5; h <= 21; h++) {
-    let score = 30;
+  for (let h = 0; h <= 23; h++) {
+    let score = 25;
 
     // Dawn/dusk golden hours — the most reliable fishing pattern
-    if (h >= 5 && h <= 7) score += 25;       // prime dawn
-    else if (h >= 6 && h <= 9) score += 18;   // early morning
-    else if (h >= 17 && h <= 19) score += 22;  // prime dusk
-    else if (h >= 19 && h <= 21) score += 15;  // late evening
-    else if (h >= 11 && h <= 14) score -= 10;  // midday slump
+    if (h >= 5 && h <= 7) score += 20;         // prime dawn
+    else if (h >= 6 && h <= 9) score += 14;     // early morning
+    else if (h >= 17 && h <= 19) score += 18;    // prime dusk
+    else if (h >= 19 && h <= 21) score += 12;    // late evening
+    else if (h >= 11 && h <= 14) score -= 8;     // midday slump
+    else if (h >= 0 && h <= 4) score -= 5;       // overnight baseline
 
     // Overcast skies extend the bite window through midday
-    if (isOvercast && h >= 10 && h <= 15) score += 12;
+    if (isOvercast && h >= 10 && h <= 15) score += 10;
 
     // Light rain boosts action anytime
-    if (isRainy) score += 5;
+    if (isRainy) score += 4;
 
     // New/full moon = generally more active feeding overall
-    if (isNewOrFull) score += 4;
+    if (isNewOrFull) score += 3;
+
+    // Solunar boost: check if this hour falls within any major or minor period
+    const hourStart = new Date(solunar ? solunar.majorPeriods[0]?.start || new Date() : new Date());
+    if (solunar) {
+      const ref = new Date(solunar.moonOverhead || solunar.moonUnderfoot || new Date());
+      const dayBase = new Date(ref);
+      dayBase.setHours(0, 0, 0, 0);
+      const hStart = new Date(dayBase);
+      hStart.setHours(h, 0, 0, 0);
+      const hEnd = new Date(dayBase);
+      hEnd.setHours(h, 59, 59, 999);
+
+      for (const period of allPeriods) {
+        // Check if the hour overlaps with this period
+        if (period.start <= hEnd && period.end >= hStart) {
+          score += period.label === 'Major' ? 25 : 15;
+          break;
+        }
+      }
+    }
 
     hours.push({
       hour: h,
       label: formatHour(h),
-      score: Math.max(5, Math.min(95, score)),
+      score: Math.max(5, Math.min(99, score)),
     });
   }
 
@@ -213,6 +343,7 @@ function getBestFishingTimes(weather, date) {
     bestWindow,
     secondBest,
     moon,
+    solunar,
   };
 }
 
@@ -222,8 +353,47 @@ function formatHour(h) {
   return h > 12 ? `${h - 12} PM` : `${h} AM`;
 }
 
+function formatTimeShort(date) {
+  if (!date) return '??';
+  let h = date.getHours();
+  const m = date.getMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
 function getBestTimesHtml(times) {
   const maxScore = Math.max(...times.hours.map(h => h.score));
+  const sol = times.solunar;
+
+  // Build solunar period badges
+  let solunarBadges = '';
+  if (sol) {
+    const now = new Date();
+    const isNight = (d) => d && (d.getHours() < 5 || d.getHours() >= 22);
+    const allPeriods = [...sol.majorPeriods, ...sol.minorPeriods];
+    allPeriods.sort((a, b) => a.start - b.start);
+
+    solunarBadges = allPeriods.map(p => {
+      const color = p.label === 'Major' ? '#2ecc71' : '#f1c40f';
+      const dimmed = isNight(p.center) ? 'opacity:0.55;' : '';
+      return `<span class="solunar-period-badge" style="background:${color};color:#1a1a2e;${dimmed}">${p.label}: ${formatTimeShort(p.start)} &ndash; ${formatTimeShort(p.end)}</span>`;
+    }).join('');
+  }
+
+  // Moon event times
+  let moonEvents = '';
+  if (sol) {
+    const events = [];
+    if (sol.moonRise) events.push(`Moonrise ${formatTimeShort(sol.moonRise)}`);
+    if (sol.moonSet) events.push(`Moonset ${formatTimeShort(sol.moonSet)}`);
+    if (sol.moonOverhead) events.push(`Transit ${formatTimeShort(sol.moonOverhead)}`);
+    if (sol.moonUnderfoot) events.push(`Underfoot ${formatTimeShort(sol.moonUnderfoot)}`);
+    moonEvents = events.map(e => `<span class="solunar-event">${e}</span>`).join('');
+  }
+
+  // Show daytime hours (5AM-9PM) in the chart for readability
+  const dayHours = times.hours.filter(h => h.hour >= 5 && h.hour <= 21);
 
   return `
     <div class="detail-section">
@@ -232,8 +402,9 @@ function getBestTimesHtml(times) {
         <span class="best-time-badge best">Best: ${times.bestWindow.label}</span>
         ${times.secondBest ? `<span class="best-time-badge good">Also good: ${times.secondBest.label}</span>` : ''}
       </div>
+      ${solunarBadges ? `<div class="solunar-periods">${solunarBadges}</div>` : ''}
       <div class="times-chart">
-        ${times.hours.map(h => {
+        ${dayHours.map(h => {
           const pct = Math.round((h.score / maxScore) * 100);
           const color = h.score >= 65 ? '#2ecc71' : h.score >= 45 ? '#f39c12' : '#e74c3c';
           return `<div class="times-bar-col">
@@ -244,7 +415,7 @@ function getBestTimesHtml(times) {
       </div>
       <div class="solunar-info">
         <span class="solunar-badge">${times.moon.emoji} ${times.moon.name}</span>
-        <span class="solunar-item">Dawn &amp; dusk are peak feeding windows</span>
+        ${moonEvents ? `<div class="solunar-events">${moonEvents}</div>` : '<span class="solunar-item">Dawn &amp; dusk are peak feeding windows</span>'}
       </div>
     </div>
   `;
@@ -1987,6 +2158,7 @@ export {
   degToCompass,
   getMoonPhase,
   getPressureTrend,
+  calculateSolunarPeriods,
   getBestFishingTimes,
   getBestTimesHtml,
   isTidalWater,
