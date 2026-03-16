@@ -109,8 +109,12 @@ a { color: var(--accent); }
 }
 .header-right {
   display: flex;
-  gap: 4px;
+  gap: 2px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
 }
+.header-right::-webkit-scrollbar { display: none; }
 
 .icon-btn {
   background: none;
@@ -130,8 +134,14 @@ a { color: var(--accent); }
   color: var(--text-muted);
   font-size: 1.5rem;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 8px 12px;
   line-height: 1;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
 }
 
 /* ===== Map ===== */
@@ -2117,8 +2127,6 @@ input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 400px;
-  overflow-y: auto;
 }
 .community-post-card {
   background: var(--bg-surface);

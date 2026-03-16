@@ -28,6 +28,8 @@ let tripWizard = { wb: null, forecast: null, traffic: null, selectedSpecies: [] 
 let arsenalItems = [];
 let arsenalFilters = { category: 'all', color: '', weight: '', search: '' };
 let hideUnnamed = localStorage.getItem('wwf_hide_unnamed') === 'true';
+// Generation counter to prevent async race conditions when detail panel is reopened quickly
+let detailGeneration = 0;
 
 // ===== DOM refs =====
 const $ = (sel) => document.querySelector(sel);
@@ -423,15 +425,19 @@ function isTroutLocation(wb) {
   return species.some(s => TROUT_SPECIES.includes(s));
 }
 
-function isTroutStockedName(name) {
+function isTroutStockedName(name, lat, lon) {
   const n = (name || '').toLowerCase();
+  // Only apply name heuristics in non-coastal areas where freshwater trout actually live
+  // Coastal areas (lon > -76.5) use "trout" for Speckled Trout (saltwater, no license needed)
+  const coastal = lon > -76.5;
+  if (coastal) return false;
   return n.includes('trout') || n.includes('stocked') || n.includes('hatchery');
 }
 
 function getTroutWarningHtml(wb, context = 'detail') {
   const species = getCommonSpecies(wb.type, wb.lat, wb.lon);
   const troutFound = species.filter(s => TROUT_SPECIES.includes(s));
-  const nameHint = isTroutStockedName(wb.name);
+  const nameHint = isTroutStockedName(wb.name, wb.lat, wb.lon);
 
   if (troutFound.length === 0 && !nameHint) return '';
   if (troutWarningDismissed.has(context + '_' + wb.name)) return '';
@@ -448,7 +454,7 @@ function getTroutWarningHtml(wb, context = 'detail') {
           <strong>Trout License Required</strong>
           <p>This location has <strong>${escapeHtml(troutList)}</strong>. ${stateLabel} requires a separate <strong>trout fishing license</strong> in addition to your regular fishing license to target or keep trout.</p>
           <div style="display:flex;gap:8px;margin-top:8px;">
-            <button class="btn-secondary" style="flex:0;padding:6px 12px;font-size:0.78rem;" onclick="this.closest('.trout-license-warning').remove()">Dismiss</button>
+            <button class="btn-secondary" style="flex:0;padding:6px 12px;font-size:0.78rem;" onclick="window._dismissTroutWarning(this,'${escapeAttr(context + '_' + wb.name)}')">Dismiss</button>
             <button class="btn-secondary" style="flex:0;padding:6px 12px;font-size:0.78rem;color:var(--accent);border-color:var(--accent);" onclick="document.getElementById('btn-licenses')?.click()">My Licenses</button>
           </div>
         </div>
@@ -456,6 +462,12 @@ function getTroutWarningHtml(wb, context = 'detail') {
     </div>
   `;
 }
+
+window._dismissTroutWarning = function(btn, key) {
+  troutWarningDismissed.add(key);
+  const el = btn.closest('.trout-license-warning');
+  if (el) el.remove();
+};
 
 // ===== Access Info (Fishing / Bank-Pier / Boat) =====
 
@@ -491,10 +503,12 @@ function assessAccess(wb) {
     'municipal', 'town lake', 'city lake', 'county lake',
   ];
   const privateNames = [
-    'farm', 'estate', 'ranch', 'private', 'country club', 'golf',
+    'estate', 'ranch', 'private', 'country club', 'golf',
     'subdivision', 'hoa', 'homeowner', 'community pond', 'retention',
     'stormwater', 'sewage', 'treatment', 'cooling', 'industrial',
   ];
+  // "farm" checked separately with word-boundary to avoid matching "Farmville", "Farmer's Mill" etc.
+  const hasFarmWord = /\bfarm\b/.test(name) && !name.includes('farmville') && !name.includes('farmer');
   const boatNames = [
     'boat ramp', 'boat landing', 'boat launch', 'launch ramp', 'slipway',
     'marina', 'boat access', 'public landing', 'landing', 'ramp',
@@ -505,7 +519,7 @@ function assessAccess(wb) {
   ];
 
   const hasPublicName = publicNames.some(p => name.includes(p));
-  const hasPrivateName = privateNames.some(p => name.includes(p));
+  const hasPrivateName = privateNames.some(p => name.includes(p)) || hasFarmWord;
   const hasBoatName = boatNames.some(p => name.includes(p));
   const hasPierName = pierNames.some(p => name.includes(p));
 
@@ -795,20 +809,25 @@ async function showWaterDetail(wb, dist) {
   detailPanel.classList.remove('hidden');
   panTo(wb.lat, wb.lon, 13);
 
+  // Bump generation to invalidate any in-flight async from a previous panel
+  const gen = ++detailGeneration;
+
   // Async: fetch weather, best times, and tides
-  loadWeatherForDetail(wb.lat, wb.lon, wb.type);
+  loadWeatherForDetail(wb.lat, wb.lon, wb.type, gen);
 
   // Async: load community posts
   loadCommunityBoard(wb);
 }
 
 // Fetch weather, best times, and tides for the detail panel
-async function loadWeatherForDetail(lat, lon, waterType) {
+async function loadWeatherForDetail(lat, lon, waterType, gen) {
+  if (gen !== detailGeneration) return; // stale
   const area = document.getElementById('weather-rec-area');
   if (!area) return;
 
   try {
     const weather = await fetchWeather(lat, lon);
+    if (gen !== detailGeneration) return; // stale
     area.innerHTML = getWeatherCardHtml(weather);
     window._currentWeather = weather;
 
@@ -822,24 +841,26 @@ async function loadWeatherForDetail(lat, lon, waterType) {
       timesArea.innerHTML = getBestTimesHtml(times);
     }
   } catch (e) {
+    if (gen !== detailGeneration) return;
     console.warn('Weather fetch failed:', e);
     area.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">Weather data unavailable</p>';
     window._currentWeather = null;
   }
 
   // Load tides if applicable (independent of weather)
-  loadTidesForDetail(lat, lon, waterType);
+  loadTidesForDetail(lat, lon, waterType, gen);
 }
 
-async function loadTidesForDetail(lat, lon, waterType) {
+async function loadTidesForDetail(lat, lon, waterType, gen) {
   const tideArea = document.getElementById('tide-area');
   if (!tideArea) return;
 
   const station = findNearestTideStation(lat, lon);
-  if (!station) { tideArea.innerHTML = ''; return; }
+  if (!station || station.dist > 60) { if (tideArea) tideArea.innerHTML = ''; return; }
 
   try {
     const tideData = await fetchTidePredictions(station.id);
+    if (gen !== detailGeneration) return; // stale
     tideArea.innerHTML = getTideHtml(tideData, station.name);
   } catch (e) {
     console.warn('Tide fetch failed:', e);
@@ -1103,7 +1124,7 @@ function renderSocialFeed(container) {
     }
 
     return `
-      <div class="social-feed-card" onclick="window._goToSocialPost(${post.water_body_lat}, ${post.water_body_lon}, '${escapeAttr(post.water_body_name)}')">
+      <div class="social-feed-card" data-lat="${post.water_body_lat}" data-lon="${post.water_body_lon}" data-name="${escapeAttr(post.water_body_name)}" onclick="window._goToSocialPost(this)">
         <div class="community-post-header">
           <div class="community-avatar">${escapeHtml(initials)}</div>
           <div style="flex:1;min-width:0;">
@@ -1134,7 +1155,11 @@ window._loadMoreSocial = async function() {
   await loadSocialFeed(true);
 };
 
-window._goToSocialPost = function(lat, lon, name) {
+window._goToSocialPost = function(el) {
+  const lat = parseFloat(el.dataset.lat);
+  const lon = parseFloat(el.dataset.lon);
+  const name = el.dataset.name;
+
   // Close social panel
   document.getElementById('social-panel').classList.add('hidden');
 
@@ -1149,8 +1174,6 @@ window._goToSocialPost = function(lat, lon, name) {
     const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
     showWaterDetail(wb, dist);
   } else {
-    // Water body not in current data set (maybe filtered out or different radius)
-    // Still pan to location and show a toast
     toast(`${name} — tap a nearby marker for details`);
   }
 };
@@ -1283,10 +1306,11 @@ function showUSGSDetail(site, dist) {
   panTo(site.lat, site.lon, 14);
 
   // Async: load flood stage, trend data, and NWS forecast
-  loadUSGSFloodAndOutlook(site);
+  const gen = ++detailGeneration;
+  loadUSGSFloodAndOutlook(site, gen);
 }
 
-async function loadUSGSFloodAndOutlook(site) {
+async function loadUSGSFloodAndOutlook(site, gen) {
   const gaugeHeight = site.data?.gauge?.value ?? null;
 
   // Fetch all three in parallel
@@ -1297,6 +1321,8 @@ async function loadUSGSFloodAndOutlook(site) {
   ]);
 
   // Flood stage
+  if (gen !== detailGeneration) return; // stale — user opened a different location
+
   const floodArea = document.getElementById('usgs-flood-stage');
   if (floodArea) {
     const flood = floodData.status === 'fulfilled' ? floodData.value : null;
@@ -1560,6 +1586,10 @@ window._openTripPlan = function(wbJson) {
 
   const wb = JSON.parse(wbJson);
   tripWizard = { wb, forecast: null, traffic: null, selectedSpecies: [] };
+
+  // Clear stale trout warning from previous trip
+  const tripWarnEl = document.getElementById('trip-trout-warn');
+  if (tripWarnEl) tripWarnEl.innerHTML = '';
 
   // Set up step 1
   $('#trip-place-preview').innerHTML = `
@@ -1831,6 +1861,10 @@ function setupEventListeners() {
   $('#btn-apply-filters').addEventListener('click', () => {
     // Read filter checkboxes
     const active = [...filterPanel.querySelectorAll('.filter-options input:checked')].map(c => c.dataset.type).filter(Boolean);
+    if (active.length === 0) {
+      toast('Select at least one type to show', true);
+      return;
+    }
     const waterTypes = active.filter(t => t !== 'usgs');
     if (waterTypes.length > 0) savePrefs(waterTypes);
     updateFilters(active, userLat, userLon, showWaterDetail, showUSGSDetail);
@@ -2148,18 +2182,20 @@ function setupEventListeners() {
     }
   });
 
-  // Swipe down to close detail panel
+  // Swipe down to close detail panel — only from the handle bar
   let touchStartY = 0;
   const handle = $('#detail-handle');
   handle.addEventListener('touchstart', (e) => {
     touchStartY = e.touches[0].clientY;
-  });
+    e.preventDefault(); // prevent scroll from also triggering
+  }, { passive: false });
   handle.addEventListener('touchmove', (e) => {
     const dy = e.touches[0].clientY - touchStartY;
-    if (dy > 60) {
+    if (dy > 80) {
       detailPanel.classList.add('hidden');
     }
-  });
+    e.preventDefault(); // prevent scroll during drag
+  }, { passive: false });
 
   // Event delegation for lure card expand/collapse
   detailPanel.addEventListener('click', (e) => {
@@ -2274,7 +2310,12 @@ function getLicenses() {
 }
 
 function saveLicenses(licenses) {
-  localStorage.setItem(LICENSE_KEY, JSON.stringify(licenses));
+  try {
+    localStorage.setItem(LICENSE_KEY, JSON.stringify(licenses));
+  } catch (e) {
+    toast('Storage full — try removing a license or using a smaller photo', true);
+    console.warn('localStorage quota exceeded:', e);
+  }
 }
 
 function openLicensePanel() {
@@ -2372,14 +2413,15 @@ window._changeLicensePhoto = function(idx) {
     reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
-        const maxW = 800;
+        const maxW = 600;
         const scale = img.width > maxW ? maxW / img.width : 1;
         const canvas = document.createElement('canvas');
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
+        canvas.width = 0; canvas.height = 0; // release GPU memory
 
         const licenses = getLicenses();
         if (licenses[idx]) {
@@ -2421,15 +2463,8 @@ function preventPageZoom() {
     }
   });
 
-  // Block double-tap zoom on non-map areas (iOS/Android)
-  let lastTap = 0;
-  document.addEventListener('touchend', (e) => {
-    const now = Date.now();
-    if (now - lastTap < 300 && !e.target.closest('#map')) {
-      e.preventDefault();
-    }
-    lastTap = now;
-  }, { passive: false });
+  // Double-tap zoom is prevented via CSS touch-action: manipulation on interactive elements
+  // No JS handler needed — the CSS approach doesn't block legitimate clicks
 }
 
 // ===== Service Worker =====

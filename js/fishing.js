@@ -283,8 +283,9 @@ const TIDE_STATIONS = [
 ];
 
 function isTidalWater(lat, lon, waterType) {
-  // Ponds are never tidal
-  if (waterType === 'pond') return false;
+  // Only rivers, streams, boat landings, and fishing piers can be tidal
+  // Lakes and ponds in tidal areas are not themselves tidal
+  if (waterType === 'pond' || waterType === 'lake') return false;
 
   // Out of VA/NC range
   if (lat < 33.5 || lat > 39) return false;

@@ -16,7 +16,7 @@ const OVERPASS_URLS = [
 function buildOverpassQuery(south, west, north, east) {
   const bbox = `${south},${west},${north},${east}`;
   return `
-[out:json][timeout:45];
+[out:json][timeout:25];
 (
   way["natural"="water"](${bbox});
   relation["natural"="water"](${bbox});
@@ -42,8 +42,8 @@ function buildOverpassQuery(south, west, north, east) {
   way["man_made"="pier"]["fishing"="yes"](${bbox});
   node["man_made"="pier"]["leisure"="fishing"](${bbox});
   way["man_made"="pier"]["leisure"="fishing"](${bbox});
-  node["man_made"="pier"](${bbox});
-  way["man_made"="pier"](${bbox});
+  node["man_made"="pier"]["access"!="private"]["access"!="no"](${bbox});
+  way["man_made"="pier"]["access"!="private"]["access"!="no"](${bbox});
 );
 out center tags;
 `.trim();
@@ -404,7 +404,7 @@ const USGS_BASE = 'https://waterservices.usgs.gov/nwis/iv/';
 
 // Parameter codes
 const PARAMS = {
-  '00010': { name: 'Water Temperature', unit: '°F', key: 'temp' },
+  '00010': { name: 'Water Temperature', unit: '°C', key: 'tempC', convert: true },
   '00011': { name: 'Water Temperature', unit: '°F', key: 'temp' },
   '00060': { name: 'Discharge', unit: 'ft³/s', key: 'flow' },
   '00065': { name: 'Gauge Height', unit: 'ft', key: 'gauge' },
@@ -571,12 +571,20 @@ function parseUSGSResponse(json) {
     if (!values || values.length === 0) continue;
 
     const latest = values[values.length - 1];
-    const val = parseFloat(latest.value);
+    let val = parseFloat(latest.value);
     if (isNaN(val) || val < -900) continue; // USGS uses -999999 for no data
 
-    site.data[paramInfo.key] = {
+    // Convert °C to °F for consistent display
+    const displayUnit = paramInfo.convert ? '°F' : paramInfo.unit;
+    if (paramInfo.convert) val = Math.round((val * 9 / 5 + 32) * 10) / 10;
+
+    // Use 'temp' as the key for both C and F params; prefer °F if both exist
+    const storeKey = paramInfo.key === 'tempC' ? 'temp' : paramInfo.key;
+    if (storeKey === 'temp' && site.data.temp && paramInfo.key === 'tempC') continue; // prefer native °F
+
+    site.data[storeKey] = {
       value: val,
-      unit: paramInfo.unit,
+      unit: displayUnit,
       name: paramInfo.name,
       dateTime: latest.dateTime,
     };
@@ -716,6 +724,14 @@ function distanceMiles(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// ===== Timeout Helper (compat with iOS Safari <16) =====
+
+function fetchWithTimeout(url, ms = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 // ===== USGS Flood Stage & Forecast =====
 
 // NWS flood stage categories for a USGS site
@@ -724,7 +740,7 @@ async function fetchFloodStage(siteCode) {
   try {
     // NWS maps USGS site codes to their gauge IDs
     const url = `https://api.water.noaa.gov/nwps/v1/gauges?identifier=USGS-${siteCode}`;
-    const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const resp = await fetchWithTimeout(url, 8000);
     if (!resp.ok) return null;
     const data = await resp.json();
 
@@ -733,7 +749,7 @@ async function fetchFloodStage(siteCode) {
 
     const nwsId = gauge.lid || gauge.id;
     const floodCats = gauge.flood?.categories || gauge.floodCategories;
-    const status = gauge.status?.observed || gauge.observed;
+    const status = gauge.observed || gauge.status?.observed;
 
     // Try to get thresholds from the gauge data
     const thresholds = {};
@@ -776,7 +792,7 @@ async function fetchRecentUSGSData(siteCode) {
       period: 'PT8H', // 8 hours of history (gives us good trend data)
     });
 
-    const resp = await fetch(`${USGS_BASE}?${params}`, { signal: AbortSignal.timeout(10000) });
+    const resp = await fetchWithTimeout(`${USGS_BASE}?${params}`, 10000);
     if (!resp.ok) return null;
     const json = await resp.json();
 
@@ -811,7 +827,7 @@ async function fetchNWSForecast(siteCode) {
   try {
     // First find the NWS gauge ID
     const url = `https://api.water.noaa.gov/nwps/v1/gauges?identifier=USGS-${siteCode}`;
-    const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const resp = await fetchWithTimeout(url, 8000);
     if (!resp.ok) return null;
     const data = await resp.json();
 
@@ -822,7 +838,7 @@ async function fetchNWSForecast(siteCode) {
 
     // Fetch forecast from NWS
     const fcstUrl = `https://api.water.noaa.gov/nwps/v1/gauges/${nwsId}/stageflow`;
-    const fcstResp = await fetch(fcstUrl, { signal: AbortSignal.timeout(8000) });
+    const fcstResp = await fetchWithTimeout(fcstUrl, 8000);
     if (!fcstResp.ok) return null;
     const fcstData = await fcstResp.json();
 

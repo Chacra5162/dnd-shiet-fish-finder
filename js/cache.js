@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = 'waterway-finder';
-const DB_VERSION = 2; // bumped to clear stale caches after dedupe improvements
+const DB_VERSION = 3; // v3: upgrade handler now actually deletes old stores on version bump
 const STORES = {
   waterBodies: 'water_bodies',
   usgs: 'usgs_sites',
@@ -32,6 +32,12 @@ function openDB() {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
+      // On version upgrade, clear old stores to flush stale data
+      if (e.oldVersion > 0 && e.oldVersion < DB_VERSION) {
+        for (const store of Object.values(STORES)) {
+          if (db.objectStoreNames.contains(store)) db.deleteObjectStore(store);
+        }
+      }
       for (const store of Object.values(STORES)) {
         if (!db.objectStoreNames.contains(store)) {
           db.createObjectStore(store, { keyPath: 'gridKey' });
