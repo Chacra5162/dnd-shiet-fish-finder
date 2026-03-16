@@ -2145,6 +2145,98 @@ function degToCompass(deg) {
   return dirs[Math.round(deg / 22.5) % 16];
 }
 
+// ===== Hatch Calendar — VA/NC Mountain Trout Streams =====
+
+const HATCH_CALENDAR = {
+  // Keyed by month number (1-12), each entry has hatches active in that month
+  // Adjusted for VA/NC Blue Ridge / Allegheny timing
+  1: [
+    { name: 'Midges', timeOfDay: 'Midday', flies: ['Griffith\'s Gnat #18-22', 'Zebra Midge #18-22', 'WD-40 #20-24'], notes: 'Fish slow, deep nymphs in tailouts. Midges hatch midday when it warms slightly.' },
+  ],
+  2: [
+    { name: 'Midges', timeOfDay: 'Midday', flies: ['Griffith\'s Gnat #18-22', 'Zebra Midge #18-22'], notes: 'Same as January but activity picks up on warmer days above 45°F.' },
+    { name: 'Early Black Stoneflies', timeOfDay: 'Afternoon', flies: ['Black Stonefly Nymph #14-16', 'Black Elk Hair Caddis #14'], notes: 'Look for small dark stones on snow near the stream.' },
+  ],
+  3: [
+    { name: 'Blue-Winged Olives (BWO)', timeOfDay: 'Afternoon', flies: ['Parachute Adams #16-20', 'RS2 Emerger #18-20', 'Pheasant Tail Nymph #16-18'], notes: 'Best on overcast, drizzly days. Size 18-20 in VA mountains.' },
+    { name: 'Midges', timeOfDay: 'Midday', flies: ['Griffith\'s Gnat #18-22'], notes: 'Still active through March.' },
+    { name: 'Early Black Stoneflies', timeOfDay: 'Afternoon', flies: ['Black Stonefly Nymph #14-16'], notes: 'Wrapping up by late March.' },
+  ],
+  4: [
+    { name: 'Hendricksons', timeOfDay: 'Afternoon (2-5 PM)', flies: ['Hendrickson Dry #12-14', 'Hendrickson Nymph #12-14', 'Sparkle Dun #14'], notes: 'First major mayfly hatch of spring. Fish rising in pools and runs.' },
+    { name: 'Blue-Winged Olives', timeOfDay: 'Afternoon', flies: ['Parachute Adams #18-20', 'CDC BWO #18-20'], notes: 'Continues from March, smaller sizes.' },
+    { name: 'Quill Gordons', timeOfDay: 'Midday-Afternoon', flies: ['Quill Gordon Dry #12-14', 'Quill Gordon Nymph #12-14'], notes: 'VA Blue Ridge specialty. Watch for rises in fast riffles.' },
+    { name: 'Grannon Caddis', timeOfDay: 'Evening', flies: ['Elk Hair Caddis #14-16', 'Bead Head Caddis Pupa #14-16'], notes: 'First significant caddis of the year.' },
+  ],
+  5: [
+    { name: 'Sulphurs', timeOfDay: 'Evening (5-8 PM)', flies: ['Sulphur Dun #14-16', 'Sulphur Emerger #16', 'Pheasant Tail #14-16'], notes: 'THE hatch of the year on VA streams. Heavy evening spinner falls. Size 14-16 in Blue Ridge.' },
+    { name: 'March Browns', timeOfDay: 'Midday-Afternoon', flies: ['March Brown Dry #10-12', 'March Brown Nymph #10-12'], notes: 'Large mayflies — exciting dry fly fishing. VA mountains run 2-3 weeks behind PA.' },
+    { name: 'Caddis (multiple species)', timeOfDay: 'Evening', flies: ['Elk Hair Caddis #12-16', 'X-Caddis #14-16', 'Green Caddis Larva #14'], notes: 'Multiple species active. Skate dries for explosive strikes.' },
+    { name: 'Light Cahills', timeOfDay: 'Evening', flies: ['Light Cahill #12-14', 'Cahill Nymph #12-14'], notes: 'Begins late May, peaks in June.' },
+  ],
+  6: [
+    { name: 'Sulphurs (continuing)', timeOfDay: 'Evening', flies: ['Sulphur Spinner #16-18', 'Sulphur Dun #16-18'], notes: 'Smaller sizes than May. Spinner falls can be incredible.' },
+    { name: 'Light Cahills', timeOfDay: 'Evening', flies: ['Light Cahill #12-14'], notes: 'Peak month for Light Cahills on Blue Ridge streams.' },
+    { name: 'Green Drakes', timeOfDay: 'Evening', flies: ['Green Drake #8-10', 'Coffin Fly Spinner #8-10'], notes: 'Short but spectacular. Biggest mayfly in the East. 1-2 week window.' },
+    { name: 'Terrestrials begin', timeOfDay: 'All day', flies: ['Foam Ant #14-16', 'Beetle #14-16', 'Small Inchworm #12'], notes: 'Terrestrial season starts. Ants and beetles near streamside vegetation.' },
+  ],
+  7: [
+    { name: 'Terrestrials', timeOfDay: 'All day', flies: ['Foam Ant #12-16', 'Foam Beetle #12-14', 'Dave\'s Hopper #8-12', 'Inchworm #12'], notes: 'Prime terrestrial season. Fish tight to overhanging banks and trees.' },
+    { name: 'Tricos', timeOfDay: 'Early morning (6-9 AM)', flies: ['Trico Spinner #20-24', 'Trico Dun #22-24'], notes: 'Tiny mayflies but incredible spinner falls at dawn. Need fine tippet 6X-7X.' },
+    { name: 'Caddis', timeOfDay: 'Evening', flies: ['Elk Hair Caddis #14-18'], notes: 'Various species still active through summer.' },
+  ],
+  8: [
+    { name: 'Terrestrials', timeOfDay: 'All day', flies: ['Dave\'s Hopper #8-10', 'Foam Ant #14', 'Foam Beetle #12-14', 'Cricket #10-12'], notes: 'Hoppers peak in August. Fish mornings — water temps may stress trout by afternoon.' },
+    { name: 'Tricos', timeOfDay: 'Early morning', flies: ['Trico Spinner #22-24'], notes: 'Continues from July. Best in tailwater sections.' },
+  ],
+  9: [
+    { name: 'Terrestrials (winding down)', timeOfDay: 'Midday', flies: ['Foam Ant #14-16', 'Beetle #14-16'], notes: 'Last good terrestrial fishing. Ants especially productive.' },
+    { name: 'Blue-Winged Olives (fall)', timeOfDay: 'Afternoon', flies: ['Parachute Adams #18-22', 'CDC BWO #20-22'], notes: 'Fall BWO hatch begins. Often better than spring. Overcast days are prime.' },
+    { name: 'October Caddis (early)', timeOfDay: 'Evening', flies: ['Orange Stimulator #8-10', 'October Caddis #8-10'], notes: 'Large orange caddis start appearing on mountain streams.' },
+  ],
+  10: [
+    { name: 'Blue-Winged Olives', timeOfDay: 'Afternoon', flies: ['Parachute Adams #18-22', 'RS2 #20-22', 'Pheasant Tail #18-20'], notes: 'Peak fall BWO fishing. Overcast, drizzly days are the best.' },
+    { name: 'October Caddis', timeOfDay: 'Afternoon-Evening', flies: ['Orange Stimulator #8-10', 'October Caddis Pupa #10'], notes: 'Peak month. Large, easy-to-see dry flies. Exciting surface fishing.' },
+  ],
+  11: [
+    { name: 'Blue-Winged Olives (late)', timeOfDay: 'Midday-Afternoon', flies: ['Parachute Adams #20-22', 'Midge/BWO Combo #20-22'], notes: 'Last good mayfly fishing of the year. Midday warmth triggers hatches.' },
+    { name: 'Midges', timeOfDay: 'Midday', flies: ['Zebra Midge #20-24', 'Griffith\'s Gnat #18-22'], notes: 'Midges take over as water cools. Fish tiny nymphs deep.' },
+  ],
+  12: [
+    { name: 'Midges', timeOfDay: 'Midday', flies: ['Griffith\'s Gnat #18-22', 'Zebra Midge #20-24', 'Mercury Midge #22'], notes: 'Winter midge fishing. Focus on the warmest hours. Slow, deep presentations.' },
+  ],
+};
+
+function getHatchCalendarHtml(lat, lon, month) {
+  // Only for mountain/trout areas (west of -78.5 in VA, west of -80 in NC)
+  const inVA = lat >= 36.54;
+  const troutZone = inVA ? lon < -78.5 : lon < -80;
+  if (!troutZone) return '';
+
+  const hatches = HATCH_CALENDAR[month || (new Date().getMonth() + 1)];
+  if (!hatches || hatches.length === 0) return '';
+
+  let html = '<div class="detail-section"><h3>Hatch Calendar \u2014 This Month</h3>';
+
+  for (const h of hatches) {
+    html += `
+      <div style="background:var(--bg-surface);border-radius:8px;padding:10px 12px;margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <strong style="font-size:0.88rem;color:var(--accent);">${h.name}</strong>
+          <span style="font-size:0.72rem;color:var(--text-muted);background:var(--bg);padding:2px 8px;border-radius:8px;">${h.timeOfDay}</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">
+          ${h.flies.map(f => `<span style="padding:2px 8px;border-radius:6px;font-size:0.75rem;background:rgba(46,204,113,0.1);color:#2ecc71;border:1px solid rgba(46,204,113,0.2);">${f}</span>`).join('')}
+        </div>
+        <p style="font-size:0.78rem;color:var(--text-muted);margin:0;line-height:1.3;">${h.notes}</p>
+      </div>
+    `;
+  }
+
+  html += '</div>';
+  return html;
+}
+
 export {
   fetchWeather,
   getRecommendation,
@@ -2165,4 +2257,6 @@ export {
   fetchTidePredictions,
   getTideHtml,
   describeWeatherCode,
+  HATCH_CALENDAR,
+  getHatchCalendarHtml,
 };

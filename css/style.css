@@ -2376,3 +2376,33 @@ input, select, textarea {
     top: calc(56px + env(safe-area-inset-top));
   }
 }
+
+/* ===== Collapsible Sections ===== */
+.collapsible-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  padding: 2px 0;
+}
+.collapsible-header h3 {
+  margin: 0;
+}
+.collapsible-chevron {
+  transition: transform 0.2s;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.collapsible-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+.collapsible-body.expanded {
+  max-height: 2000px;
+}
+.collapsible-chevron.expanded {
+  transform: rotate(180deg);
+}

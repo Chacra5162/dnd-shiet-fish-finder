@@ -210,6 +210,63 @@ async function deleteTripPlan(id) {
   if (error) throw error;
 }
 
+// ===== Fishing Regulations =====
+
+let _regulationsCache = null;
+
+async function fetchAllRegulations() {
+  if (_regulationsCache) return _regulationsCache;
+  const client = getClient();
+  const { data, error } = await client
+    .from('fishing_regulations')
+    .select('water_body_pattern,rule_text,rule_type,species,source_url,updated_at')
+    .eq('active', true);
+  if (error) { console.warn('Regulations fetch error:', error); return []; }
+  _regulationsCache = data || [];
+  return _regulationsCache;
+}
+
+function getRegulationsForWater(allRegs, waterName) {
+  const n = (waterName || '').toLowerCase();
+  return allRegs.filter(r => n.includes(r.water_body_pattern));
+}
+
+// ===== Gauge Alerts =====
+
+async function getUserGaugeAlerts() {
+  if (!currentUser) return [];
+  const client = getClient();
+  const { data, error } = await client
+    .from('gauge_alerts')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function saveGaugeAlert(alert) {
+  if (!currentUser) throw new Error('Not signed in');
+  const client = getClient();
+  const { data, error } = await client
+    .from('gauge_alerts')
+    .insert({ user_id: currentUser.id, ...alert })
+    .select().single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteGaugeAlert(alertId) {
+  if (!currentUser) throw new Error('Not signed in');
+  const client = getClient();
+  const { error } = await client
+    .from('gauge_alerts')
+    .delete()
+    .eq('id', alertId)
+    .eq('user_id', currentUser.id);
+  if (error) throw error;
+}
+
 function getSupabaseUrl() {
   return SUPABASE_URL;
 }
@@ -230,4 +287,9 @@ export {
   getUserTripPlans,
   updateTripPlan,
   deleteTripPlan,
+  fetchAllRegulations,
+  getRegulationsForWater,
+  getUserGaugeAlerts,
+  saveGaugeAlert,
+  deleteGaugeAlert,
 };

@@ -4,10 +4,10 @@
  * Focused on Virginia & North Carolina. Supabase auth + user places.
  */
 
-import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getSpecialRegulations, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml, fetchWaterTempHistory, getWaterTempChartHtml } from './api.js';
+import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml, fetchWaterTempHistory, getWaterTempChartHtml } from './api.js';
 import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers } from './map.js';
-import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan } from './supabase.js';
-import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, calculateSolunarPeriods, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml } from './fishing.js';
+import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan, fetchAllRegulations, getRegulationsForWater, getUserGaugeAlerts, saveGaugeAlert, deleteGaugeAlert } from './supabase.js';
+import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, calculateSolunarPeriods, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml, getHatchCalendarHtml } from './fishing.js';
 import { TIME_WINDOWS, fetchForecast, estimateTraffic, generateGearChecklist, getForecastCardHtml, getTrafficBadgeHtml, getGearChecklistHtml, getTripSummaryCardHtml, friendlyDate } from './tripPlan.js';
 import { CATEGORIES, getArsenalItems, addArsenalItem, updateArsenalItem, deleteArsenalItem, getPhotoUrl, filterItems, getUniqueColors, getUniqueWeights } from './arsenal.js';
 import { generateWaterBodyKey, getCommunityPosts, getRecentPosts, addCommunityPost, deleteCommunityPost, getCommunityPhotoUrl, resizeImage } from './community.js';
@@ -697,6 +697,20 @@ function assessAccess(wb) {
   return { fishing, bankPier, boat };
 }
 
+function collapsibleSection(title, content, startExpanded = false) {
+  return `
+    <div class="detail-section">
+      <div class="collapsible-header" onclick="this.nextElementSibling.classList.toggle('expanded');this.querySelector('.collapsible-chevron').classList.toggle('expanded')">
+        <h3>${title}</h3>
+        <span class="collapsible-chevron ${startExpanded ? 'expanded' : ''}">&#9660;</span>
+      </div>
+      <div class="collapsible-body ${startExpanded ? 'expanded' : ''}">
+        ${content}
+      </div>
+    </div>
+  `;
+}
+
 function getAccessInfoHtml(wb) {
   const { fishing, bankPier, boat } = assessAccess(wb);
 
@@ -721,40 +735,43 @@ function getAccessInfoHtml(wb) {
   `;
 
   return `
-    <div class="detail-section">
-      <h3>Access Info</h3>
-      <div class="access-info-grid">
-        ${cell(fishing, 'Fishing')}
-        ${cell(bankPier, 'Bank / Pier')}
-        ${cell(boat, 'Boat Access')}
-      </div>
+    <div class="access-info-grid">
+      ${cell(fishing, 'Fishing')}
+      ${cell(bankPier, 'Bank / Pier')}
+      ${cell(boat, 'Boat Access')}
     </div>
   `;
 }
 
 // ===== Detail Panels =====
 
-function getRegulationsHtml(wb) {
-  const regs = getSpecialRegulations(wb.name, wb.lat, wb.lon);
+function renderRegulationsHtml(regs, wb) {
   const inVA = wb.lat >= 36.54 && wb.lat <= 39.47 && wb.lon >= -83.68 && wb.lon <= -75.24;
 
-  let html = '<div class="detail-section"><h3>Regulations</h3>';
+  let html = '';
 
   if (regs.length > 0) {
     let slotExplained = false;
     html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">';
     for (const reg of regs) {
-      const icon = reg.type === 'size' ? '\u{1F4CF}' : reg.type === 'slot' ? '\u{1F504}' : reg.type === 'creel' ? '\u{1FAA3}' : '\u26A0\uFE0F';
+      const icon = reg.rule_type === 'size' ? '\u{1F4CF}' : reg.rule_type === 'slot' ? '\u{1F504}' : reg.rule_type === 'creel' ? '\u{1FAA3}' : '\u26A0\uFE0F';
       html += `<div style="background:var(--bg-surface);padding:8px 12px;border-radius:8px;font-size:0.82rem;display:flex;gap:8px;align-items:flex-start;">
         <span style="flex-shrink:0;">${icon}</span>
-        <span>${escapeHtml(reg.rule)}</span>
+        <span>${escapeHtml(reg.rule_text)}</span>
       </div>`;
-      if (reg.type === 'slot' && !slotExplained) {
+      if (reg.rule_type === 'slot' && !slotExplained) {
         html += '<div style="font-size:0.7rem;color:var(--text-muted);padding:0 12px;font-style:italic;">Slot limit = fish in this size range must be released</div>';
         slotExplained = true;
       }
     }
     html += '</div>';
+
+    // Last updated
+    const dates = regs.map(r => r.updated_at).filter(Boolean).sort();
+    if (dates.length > 0) {
+      const latest = new Date(dates[dates.length - 1]);
+      html += `<p style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">Last updated: ${latest.toLocaleDateString()}</p>`;
+    }
   }
 
   // Always show link to full regulations
@@ -771,8 +788,20 @@ function getRegulationsHtml(wb) {
     html += '<p style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">Regulations may change. Always verify with the latest official regulations before keeping fish.</p>';
   }
 
-  html += '</div>';
   return html;
+}
+
+async function loadRegulations(wb, gen) {
+  const el = document.getElementById('regulations-area');
+  if (!el) return;
+  try {
+    const allRegs = await fetchAllRegulations();
+    if (gen !== detailGeneration) return;
+    const regs = getRegulationsForWater(allRegs, wb.name);
+    el.innerHTML = renderRegulationsHtml(regs, wb);
+  } catch (e) {
+    console.warn('Regulations load failed:', e);
+  }
 }
 
 async function showWaterDetail(wb, dist) {
@@ -856,60 +885,69 @@ async function showWaterDetail(wb, dist) {
     html += `<div id="tide-area"><div class="loading-inline">Loading tide data...</div></div>`;
   }
 
-  // Access info — always show fishing, bank/pier, and boat access
-  html += getAccessInfoHtml(wb);
-
-  // Regulations
-  html += getRegulationsHtml(wb);
-
-  // Nearby USGS
-  if (nearbyUSGS.length > 0) {
-    html += `
-      <div class="detail-section">
-        <h3>Nearby USGS Monitoring</h3>
-        <div class="nearby-usgs-list">
-          ${nearbyUSGS.map(s => {
-            const dataSnippets = [];
-            if (s.data.temp) dataSnippets.push(`${s.data.temp.value}${s.data.temp.unit}`);
-            if (s.data.flow) dataSnippets.push(`${s.data.flow.value} ${s.data.flow.unit}`);
-            if (s.data.gauge) dataSnippets.push(`${s.data.gauge.value} ${s.data.gauge.unit}`);
-            const dataStr = dataSnippets.length > 0 ? ` — ${dataSnippets.join(', ')}` : '';
-            return `
-              <div class="nearby-usgs-item" data-site-code="${escapeAttr(s.siteCode)}">
-                <div class="station-name">${escapeHtml(s.name)}</div>
-                <div class="station-dist">${s.dist.toFixed(1)} mi from ${escapeHtml(wb.name)}${dataStr}</div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-    `;
+  // Hatch calendar (mountain trout streams)
+  if (wb.type === 'stream' || wb.type === 'river') {
+    html += getHatchCalendarHtml(wb.lat, wb.lon);
   }
 
-  // Links with separate Google & Apple Maps
-  const linkIcon = `<svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" fill="currentColor"/></svg>`;
-  html += `
-    <div class="detail-section">
-      <h3>Resources</h3>
-      <div class="detail-links">
-        ${links.map(l => `
-          <a href="${escapeAttr(l.url)}" target="_blank" rel="noopener" class="detail-link">
-            ${linkIcon}
-            ${escapeHtml(l.label)}
-          </a>
-        `).join('')}
+  // Access info — collapsible
+  html += collapsibleSection('Access Info', getAccessInfoHtml(wb));
+
+  // Regulations — collapsible (loaded async from Supabase)
+  html += collapsibleSection('Regulations', '<div id="regulations-area"><div class="loading-inline">Loading regulations...</div></div>');
+
+  // Nearby USGS — collapsible
+  if (nearbyUSGS.length > 0) {
+    const usgsContent = `
+      <div class="nearby-usgs-list">
+        ${nearbyUSGS.map(s => {
+          const dataSnippets = [];
+          if (s.data.temp) dataSnippets.push(`${s.data.temp.value}${s.data.temp.unit}`);
+          if (s.data.flow) dataSnippets.push(`${s.data.flow.value} ${s.data.flow.unit}`);
+          if (s.data.gauge) dataSnippets.push(`${s.data.gauge.value} ${s.data.gauge.unit}`);
+          const dataStr = dataSnippets.length > 0 ? ` — ${dataSnippets.join(', ')}` : '';
+          return `
+            <div class="nearby-usgs-item" data-site-code="${escapeAttr(s.siteCode)}">
+              <div class="station-name">${escapeHtml(s.name)}</div>
+              <div class="station-dist">${s.dist.toFixed(1)} mi from ${escapeHtml(wb.name)}${dataStr}</div>
+            </div>
+          `;
+        }).join('')}
       </div>
+    `;
+    html += collapsibleSection('Nearby USGS Monitoring', usgsContent);
+  }
+
+  // Links — collapsible
+  const linkIcon = `<svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" fill="currentColor"/></svg>`;
+  const linksContent = `
+    <div class="detail-links">
+      ${links.map(l => `
+        <a href="${escapeAttr(l.url)}" target="_blank" rel="noopener" class="detail-link">
+          ${linkIcon}
+          ${escapeHtml(l.label)}
+        </a>
+      `).join('')}
     </div>
   `;
+  html += collapsibleSection('Resources', linksContent);
 
-  // Community board section
+  // Community board — collapsible, starts expanded
+  const communityInner = `
+    <div id="community-posts" class="community-posts">
+      <div class="loading-inline">Loading posts...</div>
+    </div>
+    <div id="community-form-area"></div>
+  `;
   html += `
     <div class="detail-section" id="community-section">
-      <h3>Community Board</h3>
-      <div id="community-posts" class="community-posts">
-        <div class="loading-inline">Loading posts...</div>
+      <div class="collapsible-header" onclick="this.nextElementSibling.classList.toggle('expanded');this.querySelector('.collapsible-chevron').classList.toggle('expanded')">
+        <h3>Community Board</h3>
+        <span class="collapsible-chevron expanded">&#9660;</span>
       </div>
-      <div id="community-form-area"></div>
+      <div class="collapsible-body expanded">
+        ${communityInner}
+      </div>
     </div>
   `;
 
@@ -931,6 +969,9 @@ async function showWaterDetail(wb, dist) {
 
   // Async: load community posts
   loadCommunityBoard(wb, gen);
+
+  // Async: load regulations from Supabase
+  loadRegulations(wb, gen);
 }
 
 // Fetch weather, best times, and tides for the detail panel
@@ -1379,6 +1420,9 @@ function showUSGSDetail(site, dist) {
   // 6-hour outlook placeholder (loaded async)
   html += `<div id="usgs-outlook"><div class="loading-inline">Loading 6-hour outlook...</div></div>`;
 
+  // Gauge alert section (loaded async)
+  html += `<div id="gauge-alert-area"></div>`;
+
   // Links
   const linkIcon = `<svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" fill="currentColor"/></svg>`;
   html += `
@@ -1416,6 +1460,9 @@ function showUSGSDetail(site, dist) {
   // Async: load flood stage, trend data, and NWS forecast
   const gen = ++detailGeneration;
   loadUSGSFloodAndOutlook(site, gen);
+
+  // Async: load gauge alerts
+  renderGaugeAlertSection(site, gen);
 }
 
 async function loadUSGSFloodAndOutlook(site, gen) {
@@ -1469,6 +1516,151 @@ async function loadUSGSFloodAndOutlook(site, gen) {
     });
   }
 }
+
+// ===== Gauge Alerts =====
+
+async function renderGaugeAlertSection(site, gen) {
+  const area = document.getElementById('gauge-alert-area');
+  if (!area) return;
+  const user = getUser();
+  if (!user) {
+    area.innerHTML = `
+      <div class="detail-section">
+        <h3>Gauge Alerts</h3>
+        <p style="font-size:0.82rem;color:var(--text-muted);">Sign in to set gauge alerts for this station.</p>
+      </div>
+    `;
+    return;
+  }
+
+  area.innerHTML = `
+    <div class="detail-section">
+      <h3>Gauge Alerts</h3>
+      <div class="loading-inline">Loading alerts...</div>
+    </div>
+  `;
+
+  try {
+    const allAlerts = await getUserGaugeAlerts();
+    if (gen !== detailGeneration) return;
+    const siteAlerts = allAlerts.filter(a => a.site_code === site.siteCode);
+
+    // Build current values map for context
+    const currentValues = {};
+    if (site.data?.flow) currentValues.flow = { value: site.data.flow.value, unit: site.data.flow.unit };
+    if (site.data?.gauge) currentValues.gauge = { value: site.data.gauge.value, unit: site.data.gauge.unit };
+    if (site.data?.temp) currentValues.temp = { value: site.data.temp.value, unit: site.data.temp.unit };
+
+    const paramOptions = [];
+    if (site.data?.flow) paramOptions.push({ value: 'flow', label: 'Flow', unit: site.data.flow.unit });
+    if (site.data?.gauge) paramOptions.push({ value: 'gauge', label: 'Gauge Height', unit: site.data.gauge.unit });
+    if (site.data?.temp) paramOptions.push({ value: 'temp', label: 'Temperature', unit: site.data.temp.unit });
+
+    let html = '<div class="detail-section"><h3>Gauge Alerts</h3>';
+
+    // Existing alerts
+    if (siteAlerts.length > 0) {
+      html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">';
+      for (const a of siteAlerts) {
+        const paramLabel = a.parameter === 'flow' ? 'Flow' : a.parameter === 'gauge' ? 'Gauge Height' : 'Temperature';
+        const statusIcon = a.enabled ? '\u2705' : '\u274C';
+        html += `<div style="background:var(--bg-surface);padding:8px 12px;border-radius:8px;font-size:0.82rem;display:flex;justify-content:space-between;align-items:center;">
+          <span>${statusIcon} Alert: ${escapeHtml(paramLabel)} ${escapeHtml(a.condition)} ${a.threshold} ${escapeHtml(a.unit || '')}</span>
+          <button class="btn-icon" style="color:var(--danger);font-size:1.1rem;background:none;border:none;cursor:pointer;padding:2px 6px;" title="Delete alert" onclick="window._deleteGaugeAlert('${a.id}', '${site.siteCode}');">&times;</button>
+        </div>`;
+      }
+      html += '</div>';
+    }
+
+    // Add new alert form
+    if (paramOptions.length > 0) {
+      html += `
+        <div style="background:var(--bg-surface);padding:12px;border-radius:8px;">
+          <div style="font-size:0.82rem;font-weight:600;margin-bottom:8px;">Add Alert</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <select id="gauge-alert-param" style="padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:0.8rem;" onchange="window._updateAlertUnit()">
+              ${paramOptions.map(p => `<option value="${p.value}" data-unit="${escapeAttr(p.unit)}">${escapeHtml(p.label)}</option>`).join('')}
+            </select>
+            <select id="gauge-alert-condition" style="padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:0.8rem;">
+              <option value="above">Above</option>
+              <option value="below">Below</option>
+            </select>
+            <input id="gauge-alert-threshold" type="number" step="any" placeholder="Value" style="width:80px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:0.8rem;">
+            <span id="gauge-alert-unit" style="font-size:0.78rem;color:var(--text-muted);">${escapeHtml(paramOptions[0]?.unit || '')}</span>
+          </div>`;
+
+      // Show current value as context
+      const firstParam = paramOptions[0];
+      if (firstParam && currentValues[firstParam.value]) {
+        html += `<div id="gauge-alert-current" style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">Current: ${currentValues[firstParam.value].value} ${escapeHtml(currentValues[firstParam.value].unit)}</div>`;
+      }
+
+      html += `
+          <button class="btn-secondary" style="margin-top:8px;font-size:0.8rem;padding:6px 14px;" onclick="window._saveGaugeAlert('${escapeAttr(site.siteCode)}', '${escapeAttr(site.name)}')">Save Alert</button>
+        </div>
+        <p style="font-size:0.68rem;color:var(--text-muted);margin-top:6px;">Alerts are saved. Check back to see if conditions are met.</p>
+      `;
+    } else {
+      html += '<p style="font-size:0.82rem;color:var(--text-muted);">No parameter data available to set alerts on.</p>';
+    }
+
+    html += '</div>';
+    area.innerHTML = html;
+  } catch (e) {
+    if (gen !== detailGeneration) return;
+    console.warn('Gauge alerts load failed:', e);
+    area.innerHTML = '';
+  }
+}
+
+window._updateAlertUnit = function() {
+  const sel = document.getElementById('gauge-alert-param');
+  if (!sel) return;
+  const opt = sel.options[sel.selectedIndex];
+  const unitEl = document.getElementById('gauge-alert-unit');
+  if (unitEl) unitEl.textContent = opt.dataset.unit || '';
+};
+
+window._saveGaugeAlert = async function(siteCode, siteName) {
+  const param = document.getElementById('gauge-alert-param')?.value;
+  const condition = document.getElementById('gauge-alert-condition')?.value;
+  const threshold = parseFloat(document.getElementById('gauge-alert-threshold')?.value);
+  const unit = document.getElementById('gauge-alert-unit')?.textContent || '';
+
+  if (!param || !condition || isNaN(threshold)) {
+    toast('Fill in all alert fields', true);
+    return;
+  }
+
+  try {
+    await saveGaugeAlert({
+      site_code: siteCode,
+      site_name: siteName,
+      parameter: param,
+      condition,
+      threshold,
+      unit,
+      enabled: true,
+    });
+    toast('Alert saved!');
+    // Re-render the alert section
+    const site = usgsSites.find(s => s.siteCode === siteCode);
+    if (site) renderGaugeAlertSection(site, detailGeneration);
+  } catch (e) {
+    toast(`Error: ${e.message}`, true);
+  }
+};
+
+window._deleteGaugeAlert = async function(alertId, siteCode) {
+  try {
+    await deleteGaugeAlert(alertId);
+    toast('Alert deleted');
+    const site = usgsSites.find(s => s.siteCode === siteCode);
+    if (site) renderGaugeAlertSection(site, detailGeneration);
+  } catch (e) {
+    toast(`Error: ${e.message}`, true);
+  }
+};
 
 // ===== My Places Panel =====
 
@@ -1832,12 +2024,62 @@ function handleGeneratePlan() {
     </div>
   `;
 
+  // Share button
+  $('#trip-plan-summary').innerHTML += `
+    <button class="btn-secondary" style="margin-top:8px;width:100%;" onclick="window._shareTripBrief()">
+      <svg viewBox="0 0 24 24" width="16" height="16" style="vertical-align:middle;margin-right:4px;"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" fill="currentColor"/></svg>
+      Share Trip Brief
+    </button>
+  `;
+
   // Gear checklist
   $('#trip-gear-area').innerHTML = getGearChecklistHtml(gear, clarity);
   $('#trip-notes').value = '';
 
   showTripStep(3);
 }
+
+window._shareTripBrief = async function() {
+  const { wb, forecast, selectedSpecies } = tripWizard;
+  if (!wb || !forecast) return;
+
+  const lines = [
+    `\u{1F3A3} ${wb.name} \u2014 ${forecast.date}`,
+    `\u23F0 ${forecast.timeWindowLabel}`,
+    `\u{1F321}\uFE0F ${forecast.temp}\u00B0F, ${forecast.conditions}`,
+    `\u{1F4A8} Wind ${forecast.windSpeed} mph, Gusts ${forecast.windGusts} mph`,
+    `\u{1F4CA} Fish Activity: ${forecast.fishActivity}/100`,
+    `\u{1F41F} Target: ${selectedSpecies.join(', ')}`,
+    ``,
+    `\u{1F4CD} Directions: https://www.google.com/maps/dir/?api=1&destination=${wb.lat},${wb.lon}`,
+    ``,
+    `\u2014 via DND Shiet Fish Finder`,
+  ];
+
+  const text = lines.join('\n');
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: `Fishing Trip: ${wb.name}`, text });
+      toast('Shared!');
+    } catch (e) {
+      if (e.name !== 'AbortError') toast('Share failed', true);
+    }
+  } else {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Trip brief copied to clipboard!');
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      toast('Trip brief copied!');
+    }
+  }
+};
 
 async function handleSaveTrip() {
   const { wb, forecast, traffic, selectedSpecies, gearChecklist } = tripWizard;

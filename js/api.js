@@ -580,75 +580,7 @@ function parseUSGSResponse(json) {
 
 // ===== Fishing Resources (VA/NC specific) =====
 
-function getSpecialRegulations(name, lat, lon) {
-  const n = (name || '').toLowerCase();
-  const inVA = lat >= 36.54 && lat <= 39.47 && lon >= -83.68 && lon <= -75.24;
-  const regs = [];
-
-  // VA special regulations
-  if (inVA) {
-    if (n.includes('new river') && lon < -80) {
-      regs.push({ rule: 'Smallmouth Bass: 20" minimum, 2 per day (Claytor Dam to Bluestone)', type: 'size' });
-      regs.push({ rule: 'Muskie: 42" minimum, 1 per day', type: 'size' });
-    }
-    if (n.includes('james river')) {
-      regs.push({ rule: 'Striped Bass: 20-28" protected slot (must release), keep 1 over 28" or 1 over 36" per day', type: 'slot' });
-      if (lon > -77.5) regs.push({ rule: 'Blue Catfish: No daily limit below the fall line', type: 'creel' });
-    }
-    if (n.includes('smith mountain')) {
-      regs.push({ rule: 'Striped Bass: 20" minimum, 2 per day', type: 'size' });
-      regs.push({ rule: 'Smallmouth Bass: 12" minimum', type: 'size' });
-    }
-    if (n.includes('claytor')) {
-      regs.push({ rule: 'Walleye: 18" minimum, 2 per day', type: 'size' });
-      regs.push({ rule: 'Striped Bass: 20" minimum, 2 per day', type: 'size' });
-    }
-    if (n.includes('kerr') || n.includes('buggs island')) {
-      regs.push({ rule: 'Striped Bass: 20" minimum, 4 per day', type: 'size' });
-    }
-    if (n.includes('lake anna')) {
-      regs.push({ rule: 'Striped Bass: 20" minimum, 2 per day', type: 'size' });
-    }
-    if (n.includes('philpott')) {
-      regs.push({ rule: 'Striped Bass: 20" minimum, 2 per day', type: 'size' });
-    }
-    if (n.includes('back bay') || n.includes('currituck')) {
-      regs.push({ rule: 'Special regulations — check VMRC saltwater limits', type: 'special' });
-    }
-    // Trout streams
-    if (n.includes('rapidan') || n.includes('staunton river') || n.includes('moorman') || n.includes('north fork moormans')) {
-      regs.push({ rule: 'Special trout regulations — catch and release only, single hook, artificial only', type: 'special' });
-    }
-    if (n.includes('rappahannock')) {
-      regs.push({ rule: 'Striped Bass: check current season — moratorium or restricted harvest may apply', type: 'special' });
-    }
-    if (n.includes('potomac')) {
-      regs.push({ rule: 'Smallmouth Bass: 15" minimum (shared VA/MD waters)', type: 'size' });
-      regs.push({ rule: 'Striped Bass: check PRFC regulations — separate from VA DWR', type: 'special' });
-    }
-    if (n.includes('clinch')) {
-      regs.push({ rule: 'Smallmouth Bass: special regulations apply — check VA DWR', type: 'special' });
-    }
-  }
-
-  // NC special regulations
-  if (!inVA) {
-    if (n.includes('jordan lake') || n.includes('falls lake')) {
-      regs.push({ rule: 'Striped Bass: 20" minimum in some zones', type: 'size' });
-    }
-    if (n.includes('lake norman')) {
-      regs.push({ rule: 'Striped Bass: must immediately release all fish 20-26"', type: 'slot' });
-    }
-    if (n.includes('nantahala') || n.includes('tuckasegee')) {
-      regs.push({ rule: 'Delayed harvest trout water — catch and release Oct 1 through first Saturday in June', type: 'special' });
-    }
-    if (n.includes('wilson creek') || n.includes('watauga') || n.includes('south toe')) {
-      regs.push({ rule: 'Delayed harvest trout water — catch and release Oct 1 through first Saturday in June', type: 'special' });
-    }
-  }
-
-  return regs;
-}
+// getSpecialRegulations removed — now served from Supabase fishing_regulations table
 
 function getFishingLinks(lat, lon, waterType, waterName) {
   const inVA = lat >= 36.54 && lat <= 39.47 && lon >= -83.68 && lon <= -75.24;
@@ -1245,7 +1177,7 @@ export {
   fetchWaterBodies,
   fetchUSGSSites,
   getFishingLinks,
-  getSpecialRegulations,
+
   getCommonSpecies,
   getBBox,
   distanceMiles,
