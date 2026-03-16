@@ -1,6 +1,6 @@
 {
-  "name": "WaterWay Finder",
-  "short_name": "WaterWay",
+  "name": "DND Shiet Fish Finder",
+  "short_name": "DND Shiet",
   "description": "Find nearby lakes, rivers, streams and creeks with real-time water data for VA/NC",
   "start_url": "./index.html",
   "display": "standalone",
