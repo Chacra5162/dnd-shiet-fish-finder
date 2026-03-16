@@ -12,13 +12,15 @@ let usgsLayer = null;
 let userPlacesLayer = null;
 let allWaterBodies = [];
 let allUSGSSites = [];
-let activeFilters = new Set(['lake', 'river', 'stream', 'pond', 'usgs']);
+let activeFilters = new Set(['lake', 'river', 'stream', 'pond', 'boat_landing', 'fishing_pier', 'usgs']);
 
 const MARKER_ICONS = {
   lake: { emoji: '~', cls: 'marker-lake' },
   river: { emoji: '~', cls: 'marker-river' },
   stream: { emoji: '~', cls: 'marker-stream' },
   pond: { emoji: '~', cls: 'marker-pond' },
+  boat_landing: { emoji: '⚓', cls: 'marker-boat-landing' },
+  fishing_pier: { emoji: '🎣', cls: 'marker-fishing-pier' },
   usgs: { emoji: '!', cls: 'marker-usgs' },
 };
 
@@ -38,13 +40,25 @@ const USER_PLACE_ICONS = {
   },
 };
 
+const MARKER_SIZES = {
+  lake: [28, 28],
+  usgs: [26, 26],
+  boat_landing: [26, 26],
+  fishing_pier: [26, 26],
+  river: [24, 24],
+  pond: [22, 22],
+};
+const DEFAULT_MARKER_SIZE = [20, 20];
+
 function createMarkerIcon(type) {
   const cfg = MARKER_ICONS[type] || MARKER_ICONS.stream;
+  const size = MARKER_SIZES[type] || DEFAULT_MARKER_SIZE;
+  const anchor = [size[0] / 2, size[1] / 2];
   return L.divIcon({
     className: `marker-water ${cfg.cls}`,
     html: `<span class="marker-icon-inner">${cfg.emoji}</span>`,
-    iconSize: type === 'lake' ? [28, 28] : type === 'usgs' ? [26, 26] : type === 'river' ? [24, 24] : type === 'pond' ? [22, 22] : [20, 20],
-    iconAnchor: type === 'lake' ? [14, 14] : type === 'usgs' ? [13, 13] : type === 'river' ? [12, 12] : type === 'pond' ? [11, 11] : [10, 10],
+    iconSize: size,
+    iconAnchor: anchor,
   });
 }
 
@@ -112,6 +126,8 @@ function addLegend() {
       <div class="legend-item"><div class="legend-dot" style="background:var(--river)"></div> River</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--stream)"></div> Stream / Creek</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--pond)"></div> Pond</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--boat-landing)"></div> Boat Landing</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--fishing-pier)"></div> Fishing Pier</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--usgs)"></div> USGS Station</div>
       <h4 style="margin-top:6px;">My Places</h4>
       <div class="legend-item"><div class="legend-dot" style="background:#f1c40f"></div> Favorite</div>

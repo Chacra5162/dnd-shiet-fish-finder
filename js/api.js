@@ -31,6 +31,19 @@ function buildOverpassQuery(south, west, north, east) {
   node["natural"="water"](${bbox});
   node["waterway"="river"](${bbox});
   node["waterway"="stream"](${bbox});
+  node["leisure"="slipway"](${bbox});
+  way["leisure"="slipway"](${bbox});
+  node["seamark:type"="harbour"](${bbox});
+  node["waterway"="boat_ramp"](${bbox});
+  way["waterway"="boat_ramp"](${bbox});
+  node["leisure"="fishing"](${bbox});
+  way["leisure"="fishing"](${bbox});
+  node["man_made"="pier"]["fishing"="yes"](${bbox});
+  way["man_made"="pier"]["fishing"="yes"](${bbox});
+  node["man_made"="pier"]["leisure"="fishing"](${bbox});
+  way["man_made"="pier"]["leisure"="fishing"](${bbox});
+  node["man_made"="pier"](${bbox});
+  way["man_made"="pier"](${bbox});
 );
 out center tags;
 `.trim();
@@ -40,7 +53,33 @@ function classifyWaterBody(tags) {
   const water = tags.water || '';
   const waterway = tags.waterway || '';
   const natural = tags.natural || '';
+  const leisure = tags.leisure || '';
+  const manMade = tags.man_made || '';
   const name = (tags.name || '').toLowerCase();
+
+  // Boat landings / ramps / slipways
+  if (leisure === 'slipway' || waterway === 'boat_ramp' || tags['seamark:type'] === 'harbour' ||
+      name.includes('boat ramp') || name.includes('boat landing') || name.includes('launch ramp') || name.includes('slipway')) {
+    return 'boat_landing';
+  }
+
+  // Fishing piers
+  if ((manMade === 'pier' && (tags.fishing === 'yes' || leisure === 'fishing')) ||
+      (leisure === 'fishing' && manMade === 'pier') ||
+      name.includes('fishing pier') || name.includes('fish pier')) {
+    return 'fishing_pier';
+  }
+  // General piers (likely fishing-relevant)
+  if (manMade === 'pier') return 'fishing_pier';
+  // Leisure=fishing without pier is a fishing spot — classify by other tags or default
+  if (leisure === 'fishing' && manMade !== 'pier') {
+    // Try to further classify, otherwise mark as fishing pier
+    if (waterway || water || natural) {
+      // Fall through to normal classification
+    } else {
+      return 'fishing_pier';
+    }
+  }
 
   if (water === 'lake' || water === 'reservoir' || name.includes('lake') || name.includes('reservoir')) return 'lake';
   if (water === 'pond' || name.includes('pond')) return 'pond';
@@ -166,7 +205,7 @@ async function fetchOverpass(query) {
 
 // Generate a deterministic name for unnamed water bodies (same coords = same name always)
 function generateName(type, lat, lon) {
-  const typeLabels = { lake: 'Lake', pond: 'Pond', river: 'River', stream: 'Creek' };
+  const typeLabels = { lake: 'Lake', pond: 'Pond', river: 'River', stream: 'Creek', boat_landing: 'Boat Landing', fishing_pier: 'Fishing Pier' };
   const label = typeLabels[type] || 'Pond';
   // Deterministic hash from coordinates — no counter, stable across calls
   const hash = Math.abs(Math.round(lat * 10000) * 31 + Math.round(lon * 10000)) % 100000;
@@ -520,6 +559,16 @@ function getCommonSpecies(waterType, lat, lon) {
         ? ['Speckled Trout', 'Red Drum', 'Flounder', 'White Perch']
         : ['Sunfish', 'Smallmouth Bass', 'Creek Chub', 'Bluegill', 'Rock Bass']),
     pond: ['Largemouth Bass', 'Bluegill', 'Channel Catfish', 'Crappie'],
+    boat_landing: eastern
+      ? (coastal
+        ? ['Striped Bass', 'Blue Catfish', 'Speckled Trout', 'Red Drum', 'Flounder']
+        : ['Largemouth Bass', 'Blue Catfish', 'Striped Bass', 'Crappie', 'Channel Catfish'])
+      : ['Largemouth Bass', 'Smallmouth Bass', 'Striped Bass', 'Channel Catfish', 'Crappie'],
+    fishing_pier: coastal
+      ? ['Speckled Trout', 'Red Drum', 'Flounder', 'Spot', 'Croaker', 'Bluefish', 'Sheepshead']
+      : eastern
+        ? ['Striped Bass', 'Blue Catfish', 'White Perch', 'Channel Catfish', 'Crappie']
+        : ['Largemouth Bass', 'Channel Catfish', 'Bluegill', 'Crappie', 'Smallmouth Bass'],
   };
 
   return species[waterType] || species.pond;

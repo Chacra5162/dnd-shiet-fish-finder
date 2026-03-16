@@ -9,6 +9,8 @@
   --river: #1abc9c;
   --stream: #27ae60;
   --pond: #8e44ad;
+  --boat-landing: #e67e22;
+  --fishing-pier: #9b59b6;
   --usgs: #e74c3c;
   --bg: #0d1b2a;
   --bg-card: #1b2838;
@@ -186,6 +188,14 @@ a { color: var(--accent); }
 .marker-river { background: var(--river); width: 24px; height: 24px; }
 .marker-stream { background: var(--stream); width: 20px; height: 20px; }
 .marker-pond { background: var(--pond); width: 22px; height: 22px; }
+.marker-boat-landing {
+  background: var(--boat-landing);
+  width: 26px; height: 26px;
+}
+.marker-fishing-pier {
+  background: var(--fishing-pier);
+  width: 26px; height: 26px;
+}
 .marker-usgs {
   background: var(--usgs);
   width: 26px; height: 26px;
@@ -324,6 +334,8 @@ a { color: var(--accent); }
 .badge-river { background: var(--river); color: #fff; }
 .badge-stream { background: var(--stream); color: #fff; }
 .badge-pond { background: var(--pond); color: #fff; }
+.badge-boat_landing { background: var(--boat-landing); color: #fff; }
+.badge-fishing_pier { background: var(--fishing-pier); color: #fff; }
 .badge-usgs { background: var(--usgs); color: #fff; }
 
 .detail-section {

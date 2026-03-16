@@ -57,7 +57,19 @@ let waterTypePrefs = null; // null = not chosen yet, array = chosen types
 function loadPrefs() {
   try {
     const stored = localStorage.getItem(PREF_KEY);
-    if (stored) waterTypePrefs = JSON.parse(stored);
+    if (stored) {
+      waterTypePrefs = JSON.parse(stored);
+      // Add new types to existing prefs so returning users see them
+      const newTypes = ['boat_landing', 'fishing_pier'];
+      let updated = false;
+      for (const t of newTypes) {
+        if (!waterTypePrefs.includes(t)) {
+          waterTypePrefs.push(t);
+          updated = true;
+        }
+      }
+      if (updated) localStorage.setItem(PREF_KEY, JSON.stringify(waterTypePrefs));
+    }
   } catch {}
 }
 
@@ -404,7 +416,7 @@ async function showWaterDetail(wb, dist) {
   const nearbyUSGS = findNearbyUSGS(wb.lat, wb.lon, 10);
   const links = getFishingLinks(wb.lat, wb.lon, wb.type, wb.name);
   const species = getCommonSpecies(wb.type, wb.lat, wb.lon);
-  const typeLabel = { lake: 'Lake / Reservoir', river: 'River', stream: 'Stream / Creek', pond: 'Pond' };
+  const typeLabel = { lake: 'Lake / Reservoir', river: 'River', stream: 'Stream / Creek', pond: 'Pond', boat_landing: 'Boat Landing', fishing_pier: 'Fishing Pier' };
 
   let html = `
     <h2>${escapeHtml(wb.name)}</h2>
@@ -1202,7 +1214,7 @@ function setupEventListeners() {
   // Filter checkboxes
   filterPanel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
     cb.addEventListener('change', () => {
-      const active = [...filterPanel.querySelectorAll('input:checked')].map(c => c.dataset.type);
+      const active = [...filterPanel.querySelectorAll('input:checked')].map(c => c.dataset.type).filter(Boolean);
       // Save water type prefs (exclude usgs from pref, it's always available)
       const waterTypes = active.filter(t => t !== 'usgs');
       if (waterTypes.length > 0) savePrefs(waterTypes);
