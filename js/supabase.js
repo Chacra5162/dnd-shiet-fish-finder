@@ -139,23 +139,6 @@ async function updatePlaceNotes(placeId, notes) {
   return data;
 }
 
-// Get all statuses for a specific water body (by name + location)
-async function getPlaceStatuses(placeName, lat, lon) {
-  if (!currentUser) return [];
-  const client = getClient();
-  const { data, error } = await client
-    .from('user_places')
-    .select('*')
-    .eq('user_id', currentUser.id)
-    .eq('place_name', placeName)
-    .gte('lat', lat - 0.001)
-    .lte('lat', lat + 0.001)
-    .gte('lon', lon - 0.001)
-    .lte('lon', lon + 0.001);
-  if (error) throw error;
-  return data || [];
-}
-
 // ===== Trip Plans =====
 
 async function saveTripPlan(plan) {

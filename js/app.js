@@ -735,7 +735,7 @@ async function showWaterDetail(wb, dist) {
     <div class="detail-section">
       <h3>Species — Tap for What to Use</h3>
       <div class="species-selector" id="species-selector">
-        ${species.map((s, i) => `<button class="species-chip" data-species="${escapeAttr(s)}" onclick="window._selectSpecies(this, ${wb.lat}, ${wb.lon})" disabled>${escapeHtml(s)}</button>`).join('')}
+        ${species.map((s, i) => `<button class="species-chip" data-species="${escapeAttr(s)}" data-lat="${wb.lat}" data-lon="${wb.lon}" onclick="window._selectSpecies(this)" disabled>${escapeHtml(s)}</button>`).join('')}
       </div>
     </div>
   `;
@@ -1173,7 +1173,9 @@ window._goToSocialPost = function(el) {
 };
 
 // Species chip click handler
-window._selectSpecies = async function(btn, lat, lon) {
+window._selectSpecies = async function(btn) {
+  const lat = parseFloat(btn.dataset.lat);
+  const lon = parseFloat(btn.dataset.lon);
   // Toggle active state
   const wasActive = btn.classList.contains('species-active');
   document.querySelectorAll('.species-chip').forEach(c => c.classList.remove('species-active'));
