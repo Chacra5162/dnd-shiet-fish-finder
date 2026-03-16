@@ -1634,16 +1634,36 @@ a { color: var(--accent); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: rgba(52,152,219,0.2);
+  background: rgba(52,152,219,0.25);
   color: var(--accent);
   font-size: 0.6rem;
   font-weight: 700;
-  cursor: help;
+  cursor: pointer;
   vertical-align: middle;
   margin-left: 3px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.info-tip:active {
+  background: rgba(52,152,219,0.5);
+}
+.info-tip-popup {
+  display: block;
+  background: var(--bg);
+  border: 1px solid rgba(52,152,219,0.3);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-top: 4px;
+}
+.info-tip-popup.hidden {
+  display: none;
 }
 
 /* ===== Trout Stress Warning ===== */
