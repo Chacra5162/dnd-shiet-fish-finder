@@ -921,6 +921,34 @@ a { color: var(--accent); }
   margin-top: 12px;
 }
 
+/* ===== Access Info Grid (Fishing / Bank-Pier / Boat) ===== */
+.access-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+.access-info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-surface);
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+.access-info-item svg {
+  flex-shrink: 0;
+}
+.access-info-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.access-info-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 /* ===== Access / Private Property Warnings ===== */
 .access-warning {
   display: flex;
@@ -1923,6 +1951,17 @@ input, select, textarea {
   /* Data grid single column on very small screens */
   .data-grid {
     grid-template-columns: 1fr;
+  }
+  /* Access info compact on small screens */
+  .access-info-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+  }
+  .access-info-item {
+    flex-direction: column;
+    text-align: center;
+    gap: 4px;
+    padding: 8px 6px;
   }
   /* Toast position above detail panel */
   .toast-container {

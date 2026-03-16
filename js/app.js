@@ -410,6 +410,118 @@ window._saveNotes = async function(btn) {
   }
 };
 
+// ===== Access Info (Fishing / Bank-Pier / Boat) =====
+
+function getAccessInfoHtml(wb) {
+  const tags = wb.tags || {};
+  const name = (wb.name || '').toLowerCase();
+  const type = wb.type;
+
+  // --- Fishing ---
+  let fishing = 'unknown';
+  if (tags.fishing === 'yes' || tags.sport === 'fishing' || tags.leisure === 'fishing') {
+    fishing = 'yes';
+  } else if (tags.fishing === 'no') {
+    fishing = 'no';
+  } else if (type === 'fishing_pier') {
+    fishing = 'yes';
+  } else if (name.includes('fishing') || name.includes('fish ')) {
+    fishing = 'yes';
+  } else if (tags.access === 'private' || tags.access === 'no') {
+    fishing = 'no';
+  } else if (type === 'boat_landing') {
+    fishing = 'yes'; // boat landings imply fishing access
+  } else if (['lake', 'river', 'stream', 'pond'].includes(type)) {
+    // Public water bodies generally allow fishing unless tagged otherwise
+    if (tags.access === 'yes' || tags.access === 'public' || tags.access === 'permissive' ||
+        tags.leisure === 'park' || tags.boundary === 'national_park') {
+      fishing = 'yes';
+    }
+  }
+
+  // --- Bank / Pier Access ---
+  let bankPier = 'unknown';
+  if (type === 'fishing_pier') {
+    bankPier = 'yes';
+  } else if (tags.man_made === 'pier' || tags['fishing:pier'] === 'yes') {
+    bankPier = 'yes';
+  } else if (name.includes('pier') || name.includes('dock') || name.includes('jetty')) {
+    bankPier = 'yes';
+  } else if (tags.access === 'private' || tags.access === 'no') {
+    bankPier = 'no';
+  } else if (type === 'lake' || type === 'pond' || type === 'river' || type === 'stream') {
+    // Most public water has some bank access
+    if (tags.access === 'yes' || tags.access === 'public' || tags.access === 'permissive' ||
+        tags.leisure === 'park' || tags.sport === 'fishing') {
+      bankPier = 'yes';
+    } else if (type === 'river' || type === 'stream') {
+      bankPier = 'yes'; // rivers/streams generally have bank access at public points
+    }
+  } else if (type === 'boat_landing') {
+    bankPier = 'yes'; // boat landings have shore access
+  }
+
+  // --- Boat Access ---
+  let boat = 'unknown';
+  if (type === 'boat_landing') {
+    boat = 'yes';
+  } else if (tags.boat === 'yes' || tags.boat === 'motor' || tags.boat === 'public' ||
+             tags.leisure === 'slipway' || tags.waterway === 'boat_ramp' ||
+             tags['seamark:type'] === 'harbour') {
+    boat = 'yes';
+  } else if (tags.boat === 'no' || tags.boat === 'private') {
+    boat = 'no';
+  } else if (name.includes('boat ramp') || name.includes('boat landing') || name.includes('launch') || name.includes('marina')) {
+    boat = 'yes';
+  } else if (type === 'pond' || type === 'stream') {
+    boat = 'no'; // ponds and streams generally don't have boat access
+  } else if (type === 'fishing_pier') {
+    boat = 'no';
+  } else if (type === 'lake' || type === 'river') {
+    // Lakes and rivers may have boat access
+    if (tags.access === 'yes' || tags.access === 'public') {
+      boat = 'unknown'; // can't be sure without boat-specific tag
+    }
+  }
+
+  const icon = (status) => {
+    if (status === 'yes') return '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="#2ecc71"/></svg>';
+    if (status === 'no') return '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="#e74c3c"/></svg>';
+    return '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="#f39c12"/></svg>';
+  };
+  const label = (status) => status === 'yes' ? 'Yes' : status === 'no' ? 'No' : 'Unknown';
+  const color = (status) => status === 'yes' ? '#2ecc71' : status === 'no' ? '#e74c3c' : '#f39c12';
+
+  return `
+    <div class="detail-section">
+      <h3>Access Info</h3>
+      <div class="access-info-grid">
+        <div class="access-info-item">
+          ${icon(fishing)}
+          <div>
+            <div class="access-info-label">Fishing</div>
+            <div class="access-info-value" style="color:${color(fishing)}">${label(fishing)}</div>
+          </div>
+        </div>
+        <div class="access-info-item">
+          ${icon(bankPier)}
+          <div>
+            <div class="access-info-label">Bank / Pier</div>
+            <div class="access-info-value" style="color:${color(bankPier)}">${label(bankPier)}</div>
+          </div>
+        </div>
+        <div class="access-info-item">
+          ${icon(boat)}
+          <div>
+            <div class="access-info-label">Boat Access</div>
+            <div class="access-info-value" style="color:${color(boat)}">${label(boat)}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 // ===== Detail Panels =====
 
 async function showWaterDetail(wb, dist) {
@@ -480,31 +592,8 @@ async function showWaterDetail(wb, dist) {
     html += `<div id="tide-area"><div class="loading-inline">Loading tide data...</div></div>`;
   }
 
-  // Tags info
-  if (wb.tags) {
-    const useful = [];
-    if (wb.tags.fishing) useful.push(['Fishing', wb.tags.fishing]);
-    if (wb.tags.access) useful.push(['Access', wb.tags.access]);
-    if (wb.tags.boat) useful.push(['Boat Access', wb.tags.boat]);
-    if (wb.tags.leisure) useful.push(['Leisure', wb.tags.leisure]);
-    if (wb.tags.sport) useful.push(['Sport', wb.tags.sport]);
-
-    if (useful.length > 0) {
-      html += `
-        <div class="detail-section">
-          <h3>Details</h3>
-          <div class="data-grid">
-            ${useful.map(([label, val]) => `
-              <div class="data-card">
-                <div class="label">${escapeHtml(label)}</div>
-                <div class="value">${escapeHtml(val)}</div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `;
-    }
-  }
+  // Access info — always show fishing, bank/pier, and boat access
+  html += getAccessInfoHtml(wb);
 
   // Nearby USGS
   if (nearbyUSGS.length > 0) {
