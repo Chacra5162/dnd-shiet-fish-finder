@@ -269,7 +269,7 @@ a { color: var(--accent); }
   position: fixed;
   bottom: 0;
   left: 0; right: 0;
-  z-index: 1002;
+  z-index: 2800;
   background: var(--bg-card);
   border-radius: var(--radius) var(--radius) 0 0;
   box-shadow: 0 -4px 30px rgba(0,0,0,0.5);
