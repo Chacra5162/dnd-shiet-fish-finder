@@ -900,6 +900,113 @@ a { color: var(--accent); }
   background: var(--accent);
 }
 
+/* ===== Lure Detail Cards ===== */
+.clarity-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  background: rgba(52,152,219,0.12);
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+.lure-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lure-card {
+  background: var(--bg);
+  border: 1px solid rgba(52,152,219,0.15);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.lure-card:hover {
+  border-color: var(--accent);
+}
+.lure-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+}
+.lure-card-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #5dade2;
+}
+.lure-card-toggle {
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  font-weight: bold;
+  transition: transform 0.2s;
+}
+.lure-expanded .lure-card-toggle {
+  transform: rotate(45deg);
+}
+.lure-card-detail {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+  padding: 0 12px;
+}
+.lure-expanded .lure-card-detail {
+  max-height: 600px;
+  padding: 0 12px 12px;
+}
+.lure-spec-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.lure-spec {
+  background: var(--bg-surface);
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.lure-spec-label {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 2px;
+}
+.lure-spec-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.lure-spec-section {
+  margin-bottom: 10px;
+}
+.lure-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.color-chip {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  background: rgba(241,196,15,0.1);
+  color: #f1c40f;
+  border: 1px solid rgba(241,196,15,0.2);
+}
+.lure-spec-text {
+  font-size: 0.82rem;
+  color: var(--text);
+  line-height: 1.4;
+  margin-top: 4px;
+}
+.lure-item-simple {
+  padding: 2px 0;
+}
+
 .loading-inline {
   color: var(--text-muted);
   font-size: 0.85rem;
