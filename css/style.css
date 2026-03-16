@@ -542,6 +542,269 @@ a { color: var(--accent); }
   color: var(--stream);
 }
 
+/* ===== Auth Modal ===== */
+.auth-modal-content {
+  max-width: 400px;
+}
+.auth-subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.form-field label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.form-field input {
+  background: var(--bg-surface);
+  border: 1px solid rgba(52,152,219,0.2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.form-field input:focus {
+  border-color: var(--accent);
+}
+.auth-error {
+  background: rgba(231,76,60,0.15);
+  border: 1px solid rgba(231,76,60,0.3);
+  color: #e74c3c;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-primary:hover { background: #2980b9; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.auth-toggle {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-decoration: underline;
+}
+
+/* ===== Place Action Buttons (in detail panel) ===== */
+.place-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.place-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: var(--bg-surface);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.place-action-btn:hover { border-color: var(--accent); }
+.place-action-btn.active-favorite {
+  background: rgba(241,196,15,0.15);
+  border-color: #f1c40f;
+  color: #f1c40f;
+}
+.place-action-btn.active-visited {
+  background: rgba(46,204,113,0.15);
+  border-color: #2ecc71;
+  color: #2ecc71;
+}
+.place-action-btn.active-avoid {
+  background: rgba(231,76,60,0.15);
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+
+/* Notes input in detail panel */
+.place-notes-section {
+  margin-top: 12px;
+}
+.place-notes-input {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid rgba(52,152,219,0.2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 60px;
+  outline: none;
+}
+.place-notes-input:focus { border-color: var(--accent); }
+.place-notes-save {
+  margin-top: 6px;
+  padding: 6px 14px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+/* ===== My Places Panel ===== */
+.places-panel {
+  position: fixed;
+  top: 56px;
+  right: 0;
+  z-index: 1001;
+  background: var(--bg-card);
+  border-left: 1px solid rgba(52,152,219,0.2);
+  border-bottom: 1px solid rgba(52,152,219,0.2);
+  border-radius: 0 0 0 var(--radius);
+  width: 320px;
+  max-width: 90vw;
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+.places-panel.hidden {
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.places-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding: 0 12px;
+}
+.places-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 10px 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+.places-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.places-tab[data-tab="favorite"].active { color: #f1c40f; border-bottom-color: #f1c40f; }
+.places-tab[data-tab="visited"].active { color: #2ecc71; border-bottom-color: #2ecc71; }
+.places-tab[data-tab="avoid"].active { color: #e74c3c; border-bottom-color: #e74c3c; }
+
+.places-list {
+  padding: 12px;
+}
+.places-empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 20px 0;
+}
+.place-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.place-list-item:hover { background: rgba(52,152,219,0.12); }
+.place-list-item .place-item-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.place-list-item .place-item-type {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.place-list-item .place-item-notes {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 2px;
+}
+.place-list-item .place-item-remove {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  font-size: 1.1rem;
+}
+.place-list-item .place-item-remove:hover { color: #e74c3c; }
+
+/* User badge in header */
+.user-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(52,152,219,0.12);
+  border-radius: 16px;
+  font-size: 0.75rem;
+  color: var(--accent);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Marker overlays for user-saved places */
+.marker-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--bg);
+  z-index: 10;
+}
+.marker-badge-favorite { background: #f1c40f; }
+.marker-badge-visited { background: #2ecc71; }
+.marker-badge-avoid { background: #e74c3c; }
+
 /* ===== Responsive ===== */
 @media (min-width: 768px) {
   .detail-panel {

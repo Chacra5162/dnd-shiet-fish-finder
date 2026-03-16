@@ -1,4 +1,4 @@
-const CACHE_NAME = 'waterway-finder-v1';
+const CACHE_NAME = 'waterway-finder-v2';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const STATIC_ASSETS = [
   './js/api.js',
   './js/cache.js',
   './js/map.js',
+  './js/supabase.js',
   './manifest.json',
   './icons/favicon.svg',
 ];
@@ -15,6 +16,7 @@ const STATIC_ASSETS = [
 const EXTERNAL_ASSETS = [
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
 ];
 
 // Install: cache static assets
@@ -41,10 +43,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // API calls — network first, no caching at SW level (IndexedDB handles it)
+  // API calls — network first, no caching at SW level
   if (
     url.hostname === 'waterservices.usgs.gov' ||
-    url.hostname === 'overpass-api.de'
+    url.hostname === 'overpass-api.de' ||
+    url.hostname.includes('supabase.co')
   ) {
     event.respondWith(
       fetch(event.request).catch(() => {
