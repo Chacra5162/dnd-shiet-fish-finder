@@ -9,6 +9,7 @@ import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, find
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, getPlaceStatuses, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan } from './supabase.js';
 import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml } from './fishing.js';
 import { TIME_WINDOWS, fetchForecast, estimateTraffic, generateGearChecklist, getForecastCardHtml, getTrafficBadgeHtml, getGearChecklistHtml, getTripSummaryCardHtml, friendlyDate } from './tripPlan.js';
+import { CATEGORIES, getArsenalItems, addArsenalItem, updateArsenalItem, deleteArsenalItem, getPhotoUrl, filterItems, getUniqueColors, getUniqueWeights } from './arsenal.js';
 
 // ===== State =====
 let userLat = 37.54; // Default: Richmond, VA
@@ -22,6 +23,9 @@ let userTrips = [];
 let currentTripsTab = 'upcoming';
 // Trip plan wizard state
 let tripWizard = { wb: null, forecast: null, traffic: null, selectedSpecies: [] };
+// Arsenal state
+let arsenalItems = [];
+let arsenalFilters = { category: 'all', color: '', weight: '', search: '' };
 
 // ===== DOM refs =====
 const $ = (sel) => document.querySelector(sel);
@@ -32,6 +36,9 @@ const detailPanel = $('#detail-panel');
 const detailContent = $('#detail-content');
 const infoModal = $('#info-modal');
 const authModal = $('#auth-modal');
+const arsenalPanel = $('#arsenal-panel');
+const arsenalGrid = $('#arsenal-grid');
+const arsenalFormModal = $('#arsenal-form-modal');
 const tripModal = $('#trip-modal');
 const tripsPanel = $('#trips-panel');
 const tripsList = $('#trips-list');
@@ -730,6 +737,163 @@ window._removeListPlace = async function(placeId) {
   }
 };
 
+// ===== Arsenal =====
+
+async function loadArsenal() {
+  const user = getUser();
+  if (!user) return;
+  try {
+    arsenalItems = await getArsenalItems(user.id);
+  } catch (e) {
+    console.warn('Failed to load arsenal:', e);
+  }
+}
+
+function openArsenal() {
+  const user = getUser();
+  if (!user) { authModal.classList.remove('hidden'); return; }
+  arsenalPanel.classList.remove('hidden');
+  populateArsenalFilters();
+  renderArsenal();
+}
+
+function populateArsenalFilters() {
+  // Category dropdown
+  const catSelect = $('#arsenal-cat-filter');
+  catSelect.innerHTML = '<option value="all">All Categories</option>' +
+    Object.entries(CATEGORIES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+
+  // Color + weight dropdowns from current items
+  const colorSelect = $('#arsenal-color-filter');
+  const colors = getUniqueColors(arsenalItems);
+  colorSelect.innerHTML = '<option value="">Any Color</option>' +
+    colors.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('');
+
+  const weightSelect = $('#arsenal-weight-filter');
+  const weights = getUniqueWeights(arsenalItems);
+  weightSelect.innerHTML = '<option value="">Any Weight</option>' +
+    weights.map(w => `<option value="${escapeAttr(w)}">${escapeHtml(w)}</option>`).join('');
+}
+
+function renderArsenal() {
+  const filtered = filterItems(arsenalItems, arsenalFilters);
+  $('#arsenal-count').textContent = `${filtered.length} item${filtered.length !== 1 ? 's' : ''}${arsenalFilters.category !== 'all' || arsenalFilters.search ? ' (filtered)' : ''}`;
+
+  if (filtered.length === 0) {
+    arsenalGrid.innerHTML = arsenalItems.length === 0
+      ? '<p class="places-empty">No items yet — tap + to add your first lure</p>'
+      : '<p class="places-empty">No items match your filters</p>';
+    return;
+  }
+
+  arsenalGrid.innerHTML = filtered.map(item => {
+    const photoUrl = getPhotoUrl(item.photo_path);
+    const catLabel = CATEGORIES[item.category] || item.category;
+    const meta = [item.color, item.weight, item.brand].filter(Boolean).join(' · ');
+    return `
+      <div class="arsenal-card" onclick="window._viewArsenalItem('${item.id}')">
+        <div class="arsenal-card-photo">
+          ${photoUrl
+            ? `<img src="${photoUrl}" alt="${escapeAttr(item.name)}" loading="lazy">`
+            : '<span class="no-photo">🎣</span>'}
+        </div>
+        <div class="arsenal-card-info">
+          <div class="arsenal-card-name">${escapeHtml(item.name)}</div>
+          ${meta ? `<div class="arsenal-card-meta">${escapeHtml(meta)}</div>` : ''}
+          <span class="arsenal-card-cat">${catLabel}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openArsenalForm(editItem) {
+  const form = $('#arsenal-form');
+  form.reset();
+  $('#af-photo-preview').innerHTML = '<span class="no-photo-placeholder">No photo</span>';
+  $('#af-edit-id').value = '';
+
+  // Populate category dropdown
+  const catSelect = $('#af-category');
+  catSelect.innerHTML = Object.entries(CATEGORIES).map(([k, v]) =>
+    `<option value="${k}">${v}</option>`
+  ).join('');
+
+  if (editItem) {
+    $('#arsenal-form-title').textContent = 'Edit Item';
+    $('#af-submit').textContent = 'Save Changes';
+    $('#af-name').value = editItem.name;
+    $('#af-category').value = editItem.category;
+    $('#af-color').value = editItem.color || '';
+    $('#af-weight').value = editItem.weight || '';
+    $('#af-brand').value = editItem.brand || '';
+    $('#af-size').value = editItem.size || '';
+    $('#af-notes').value = editItem.notes || '';
+    $('#af-edit-id').value = editItem.id;
+    if (editItem.photo_path) {
+      $('#af-photo-preview').innerHTML = `<img src="${getPhotoUrl(editItem.photo_path)}" alt="Current photo">`;
+    }
+  } else {
+    $('#arsenal-form-title').textContent = 'Add to Arsenal';
+    $('#af-submit').textContent = 'Add Item';
+  }
+
+  arsenalFormModal.classList.remove('hidden');
+}
+
+window._viewArsenalItem = function(itemId) {
+  const item = arsenalItems.find(i => i.id === itemId);
+  if (!item) return;
+
+  const photoUrl = getPhotoUrl(item.photo_path);
+  const catLabel = CATEGORIES[item.category] || item.category;
+
+  // Show in detail panel (reuse the bottom sheet)
+  detailContent.innerHTML = `
+    ${photoUrl ? `<div style="margin:-20px -20px 12px;"><img src="${photoUrl}" alt="${escapeAttr(item.name)}" style="width:100%;max-height:250px;object-fit:cover;border-radius:12px 12px 0 0;"></div>` : ''}
+    <h2>${escapeHtml(item.name)}</h2>
+    <span class="detail-type-badge" style="background:var(--accent);color:#fff;">${catLabel}</span>
+    ${item.brand ? `<span style="color:var(--text-muted);font-size:0.85rem;margin-left:8px;">${escapeHtml(item.brand)}</span>` : ''}
+
+    <div class="data-grid" style="margin-top:12px;">
+      ${item.color ? `<div class="data-card"><div class="label">Color</div><div class="value" style="font-size:0.9rem">${escapeHtml(item.color)}</div></div>` : ''}
+      ${item.weight ? `<div class="data-card"><div class="label">Weight</div><div class="value" style="font-size:0.9rem">${escapeHtml(item.weight)}</div></div>` : ''}
+      ${item.size ? `<div class="data-card"><div class="label">Size</div><div class="value" style="font-size:0.9rem">${escapeHtml(item.size)}</div></div>` : ''}
+    </div>
+
+    ${item.notes ? `<div class="detail-section"><h3>Notes</h3><p style="font-size:0.85rem;color:var(--text-muted);">${escapeHtml(item.notes)}</p></div>` : ''}
+
+    <div class="arsenal-detail-actions">
+      <button class="btn-secondary" onclick="window._editArsenalItem('${item.id}')">Edit</button>
+      <button class="btn-secondary delete-btn" style="color:#e74c3c;border-color:rgba(231,76,60,0.3);" onclick="window._deleteArsenalItem('${item.id}','${escapeAttr(item.photo_path || '')}')">Delete</button>
+    </div>
+  `;
+  detailPanel.classList.remove('hidden');
+};
+
+window._editArsenalItem = function(itemId) {
+  const item = arsenalItems.find(i => i.id === itemId);
+  if (!item) return;
+  detailPanel.classList.add('hidden');
+  openArsenalForm(item);
+};
+
+window._deleteArsenalItem = async function(itemId, photoPath) {
+  if (!confirm('Delete this item from your arsenal?')) return;
+  const user = getUser();
+  if (!user) return;
+  try {
+    await deleteArsenalItem(user.id, itemId, photoPath || null);
+    arsenalItems = arsenalItems.filter(i => i.id !== itemId);
+    detailPanel.classList.add('hidden');
+    renderArsenal();
+    populateArsenalFilters();
+    toast('Item deleted');
+  } catch (e) {
+    toast(`Error: ${e.message}`, true);
+  }
+};
+
 // ===== Trip Planner =====
 
 window._openTripPlan = function(wbJson) {
@@ -1123,6 +1287,87 @@ function setupEventListeners() {
       currentPlacesTab = tab.dataset.tab;
       renderPlacesList();
     });
+  });
+
+  // === Arsenal ===
+  $('#btn-arsenal').addEventListener('click', async () => {
+    await loadArsenal();
+    openArsenal();
+  });
+  $('#btn-close-arsenal').addEventListener('click', () => arsenalPanel.classList.add('hidden'));
+  $('#btn-arsenal-add').addEventListener('click', () => openArsenalForm(null));
+  $('#btn-close-arsenal-form').addEventListener('click', () => arsenalFormModal.classList.add('hidden'));
+  arsenalFormModal.addEventListener('click', (e) => { if (e.target === arsenalFormModal) arsenalFormModal.classList.add('hidden'); });
+
+  // Arsenal filters
+  ['arsenal-cat-filter', 'arsenal-color-filter', 'arsenal-weight-filter'].forEach(id => {
+    $(`#${id}`).addEventListener('change', () => {
+      arsenalFilters.category = $('#arsenal-cat-filter').value;
+      arsenalFilters.color = $('#arsenal-color-filter').value;
+      arsenalFilters.weight = $('#arsenal-weight-filter').value;
+      renderArsenal();
+    });
+  });
+  $('#arsenal-search').addEventListener('input', () => {
+    arsenalFilters.search = $('#arsenal-search').value;
+    renderArsenal();
+  });
+
+  // Arsenal photo preview
+  $('#af-photo').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        $('#af-photo-preview').innerHTML = `<img src="${ev.target.result}" alt="Preview">`;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  // Arsenal form submit
+  $('#arsenal-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const user = getUser();
+    if (!user) return;
+
+    const btn = $('#af-submit');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const photoFile = $('#af-photo').files[0] || null;
+    const editId = $('#af-edit-id').value;
+
+    const itemData = {
+      name: $('#af-name').value.trim(),
+      category: $('#af-category').value,
+      color: $('#af-color').value.trim(),
+      weight: $('#af-weight').value.trim(),
+      brand: $('#af-brand').value.trim(),
+      size: $('#af-size').value.trim(),
+      notes: $('#af-notes').value.trim(),
+    };
+
+    try {
+      if (editId) {
+        const updated = await updateArsenalItem(user.id, editId, itemData, photoFile);
+        const idx = arsenalItems.findIndex(i => i.id === editId);
+        if (idx >= 0) arsenalItems[idx] = updated;
+        toast('Item updated');
+      } else {
+        const added = await addArsenalItem(user.id, itemData, photoFile);
+        arsenalItems.push(added);
+        toast('Item added to arsenal!');
+      }
+      arsenalFormModal.classList.add('hidden');
+      populateArsenalFilters();
+      renderArsenal();
+    } catch (err) {
+      toast(`Error: ${err.message}`, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = editId ? 'Save Changes' : 'Add Item';
+    }
   });
 
   // === Trip Plan Modal ===

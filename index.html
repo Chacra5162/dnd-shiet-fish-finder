@@ -120,6 +120,9 @@
       <button id="btn-my-places" class="icon-btn" title="My saved places">
         <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor"/></svg>
       </button>
+      <button id="btn-arsenal" class="icon-btn" title="My Arsenal">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M20 6h-2.18c.11-.31.18-.65.18-1a3 3 0 00-3-3c-1.05 0-1.95.56-2.47 1.38L12 4.26l-.53-.88A2.97 2.97 0 009 2a3 3 0 00-3 3c0 .35.07.69.18 1H4c-1.11 0-2 .89-2 2v3c0 .55.45 1 1 1h1v7c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-7h1c.55 0 1-.45 1-1V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm9 16H6v-7h12v7zm2-9H4V8h16v3z" fill="currentColor"/></svg>
+      </button>
       <button id="btn-my-trips" class="icon-btn" title="My trip plans">
         <svg viewBox="0 0 24 24" width="20" height="20"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z" fill="currentColor"/></svg>
       </button>
@@ -198,6 +201,92 @@
     <button id="btn-close-detail" class="close-btn detail-close">&times;</button>
     <div id="detail-content" class="detail-content">
       <!-- Populated dynamically -->
+    </div>
+  </div>
+
+  <!-- Arsenal Panel (full-screen overlay) -->
+  <div id="arsenal-panel" class="arsenal-overlay hidden">
+    <div class="arsenal-container">
+      <header class="arsenal-header">
+        <h2>My Arsenal</h2>
+        <button id="btn-close-arsenal" class="close-btn">&times;</button>
+      </header>
+
+      <!-- Filters -->
+      <div class="arsenal-filters">
+        <select id="arsenal-cat-filter" class="arsenal-select">
+          <option value="all">All Categories</option>
+        </select>
+        <input type="text" id="arsenal-search" class="arsenal-search-input" placeholder="Search name, brand, color...">
+        <select id="arsenal-color-filter" class="arsenal-select">
+          <option value="">Any Color</option>
+        </select>
+        <select id="arsenal-weight-filter" class="arsenal-select">
+          <option value="">Any Weight</option>
+        </select>
+      </div>
+
+      <div class="arsenal-count" id="arsenal-count"></div>
+
+      <!-- Item grid -->
+      <div id="arsenal-grid" class="arsenal-grid">
+        <p class="places-empty">Loading...</p>
+      </div>
+
+      <!-- Add button (FAB) -->
+      <button id="btn-arsenal-add" class="arsenal-fab" title="Add item">+</button>
+    </div>
+  </div>
+
+  <!-- Arsenal Add/Edit Modal -->
+  <div id="arsenal-form-modal" class="modal hidden">
+    <div class="modal-content" style="max-width:420px;">
+      <button id="btn-close-arsenal-form" class="close-btn">&times;</button>
+      <h2 id="arsenal-form-title">Add to Arsenal</h2>
+      <form id="arsenal-form" class="auth-form">
+        <div class="form-field">
+          <label for="af-name">Name *</label>
+          <input type="text" id="af-name" required placeholder="e.g. Sexy Shad Crankbait">
+        </div>
+        <div class="form-field">
+          <label for="af-category">Category *</label>
+          <select id="af-category" required class="arsenal-select"></select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="form-field">
+            <label for="af-color">Color</label>
+            <input type="text" id="af-color" placeholder="e.g. Chartreuse/White">
+          </div>
+          <div class="form-field">
+            <label for="af-weight">Weight</label>
+            <input type="text" id="af-weight" placeholder="e.g. 3/8 oz">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="form-field">
+            <label for="af-brand">Brand</label>
+            <input type="text" id="af-brand" placeholder="e.g. Strike King">
+          </div>
+          <div class="form-field">
+            <label for="af-size">Size</label>
+            <input type="text" id="af-size" placeholder="e.g. 2.5 inch">
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="af-notes">Notes</label>
+          <textarea id="af-notes" class="place-notes-input" placeholder="Any notes..." rows="2"></textarea>
+        </div>
+        <div class="form-field">
+          <label for="af-photo">Photo</label>
+          <div class="photo-upload-area" id="af-photo-area">
+            <input type="file" id="af-photo" accept="image/*" capture="environment" style="display:none;">
+            <div id="af-photo-preview" class="photo-preview"></div>
+            <button type="button" class="btn-secondary" onclick="document.getElementById('af-photo').click()">Choose Photo</button>
+          </div>
+        </div>
+        <input type="hidden" id="af-edit-id" value="">
+        <button type="submit" id="af-submit" class="btn-primary">Add Item</button>
+      </form>
     </div>
   </div>
 
