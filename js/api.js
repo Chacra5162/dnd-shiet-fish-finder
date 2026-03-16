@@ -499,21 +499,26 @@ function getFishingLinks(lat, lon, waterType, waterName) {
 function getCommonSpecies(waterType, lat, lon) {
   const eastern = lon > -78;
   const mountain = lon < -80;
+  const coastal = lon > -76.5; // tidal/coastal — speckled trout, redfish, flounder territory
 
   const species = {
     lake: eastern
-      ? ['Largemouth Bass', 'Channel Catfish', 'Bluegill', 'Crappie', 'Striped Bass', 'White Perch']
+      ? ['Largemouth Bass', 'Blue Catfish', 'Channel Catfish', 'Bluegill', 'Crappie', 'Striped Bass', 'White Perch']
       : mountain
-        ? ['Smallmouth Bass', 'Walleye', 'Muskie', 'Rainbow Trout', 'Brown Trout']
-        : ['Largemouth Bass', 'Striped Bass', 'Walleye', 'Catfish', 'Crappie', 'Bluegill'],
+        ? ['Smallmouth Bass', 'Largemouth Bass', 'Striped Bass', 'Muskie', 'Rainbow Trout', 'Brown Trout']
+        : ['Largemouth Bass', 'Striped Bass', 'Smallmouth Bass', 'Crappie', 'Bluegill', 'Channel Catfish'],
     river: eastern
-      ? ['Striped Bass', 'Shad', 'Catfish', 'Largemouth Bass', 'Herring']
+      ? (coastal
+        ? ['Striped Bass', 'Blue Catfish', 'Speckled Trout', 'Red Drum', 'Flounder', 'White Perch', 'Shad']
+        : ['Striped Bass', 'Blue Catfish', 'Shad', 'White Perch', 'Largemouth Bass', 'Channel Catfish', 'Herring'])
       : mountain
         ? ['Smallmouth Bass', 'Rainbow Trout', 'Brown Trout', 'Brook Trout', 'Muskie']
-        : ['Smallmouth Bass', 'Catfish', 'Largemouth Bass', 'Striped Bass', 'Sunfish'],
+        : ['Smallmouth Bass', 'Channel Catfish', 'Largemouth Bass', 'Striped Bass', 'Sunfish'],
     stream: mountain
       ? ['Brook Trout', 'Rainbow Trout', 'Brown Trout']
-      : ['Sunfish', 'Smallmouth Bass', 'Creek Chub', 'Bluegill', 'Rock Bass'],
+      : (coastal
+        ? ['Speckled Trout', 'Red Drum', 'Flounder', 'White Perch']
+        : ['Sunfish', 'Smallmouth Bass', 'Creek Chub', 'Bluegill', 'Rock Bass']),
     pond: ['Largemouth Bass', 'Bluegill', 'Channel Catfish', 'Crappie'],
   };
 

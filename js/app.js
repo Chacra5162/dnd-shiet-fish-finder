@@ -231,9 +231,6 @@ async function loadData() {
 
     toast(`Found ${waterBodies.length} water bodies, ${usgsSites.length} USGS stations`);
 
-    // Load user places after map data
-    await loadUserPlaces();
-
   } catch (err) {
     console.error('Load error:', err);
     toast('Error loading data — try again later', true);
@@ -422,7 +419,7 @@ async function showWaterDetail(wb, dist) {
     <div class="detail-section">
       <h3>Species — Tap for What to Use</h3>
       <div class="species-selector" id="species-selector">
-        ${species.map((s, i) => `<button class="species-chip" data-species="${escapeAttr(s)}" onclick="window._selectSpecies(this, ${wb.lat}, ${wb.lon})">${escapeHtml(s)}</button>`).join('')}
+        ${species.map((s, i) => `<button class="species-chip" data-species="${escapeAttr(s)}" onclick="window._selectSpecies(this, ${wb.lat}, ${wb.lon})" disabled>${escapeHtml(s)}</button>`).join('')}
       </div>
     </div>
   `;
@@ -526,6 +523,9 @@ async function loadWeatherForDetail(lat, lon, waterType) {
     const weather = await fetchWeather(lat, lon);
     area.innerHTML = getWeatherCardHtml(weather);
     window._currentWeather = weather;
+
+    // Enable species chips now that weather is loaded
+    document.querySelectorAll('#species-selector .species-chip').forEach(btn => btn.disabled = false);
 
     // Best fishing times
     const timesArea = document.getElementById('best-times-area');
@@ -724,6 +724,8 @@ window._goToPlace = function(el) {
   if (wb) {
     const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
     showWaterDetail(wb, dist);
+  } else {
+    toast('This water body may be filtered out or outside the current radius. Check your filters.', true);
   }
 };
 
@@ -1374,7 +1376,8 @@ function setupEventListeners() {
 
     try {
       if (editId) {
-        const updated = await updateArsenalItem(user.id, editId, itemData, photoFile);
+        const oldItem = arsenalItems.find(i => i.id === editId);
+        const updated = await updateArsenalItem(user.id, editId, itemData, photoFile, oldItem?.photo_path);
         const idx = arsenalItems.findIndex(i => i.id === editId);
         if (idx >= 0) arsenalItems[idx] = updated;
         toast('Item updated');

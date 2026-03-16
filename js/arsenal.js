@@ -46,7 +46,9 @@ async function addArsenalItem(userId, item, photoFile) {
 
   // Upload photo if provided
   if (photoFile) {
-    const ext = photoFile.name.split('.').pop().toLowerCase();
+    const ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
+    const rawExt = photoFile.name.split('.').pop().toLowerCase();
+    const ext = ALLOWED_EXTS.includes(rawExt) ? rawExt : 'jpg';
     const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const { error: uploadError } = await client()
       .storage.from('arsenal-photos')
@@ -74,9 +76,15 @@ async function addArsenalItem(userId, item, photoFile) {
   return data;
 }
 
-async function updateArsenalItem(userId, itemId, updates, newPhotoFile) {
+async function updateArsenalItem(userId, itemId, updates, newPhotoFile, oldPhotoPath) {
   if (newPhotoFile) {
-    const ext = newPhotoFile.name.split('.').pop().toLowerCase();
+    // Delete old photo if replacing
+    if (oldPhotoPath) {
+      await client().storage.from('arsenal-photos').remove([oldPhotoPath]).catch(() => {});
+    }
+    const ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
+    const rawExt = newPhotoFile.name.split('.').pop().toLowerCase();
+    const ext = ALLOWED_EXTS.includes(rawExt) ? rawExt : 'jpg';
     const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const { error: uploadError } = await client()
       .storage.from('arsenal-photos')
@@ -119,8 +127,8 @@ function getPhotoUrl(photoPath) {
 function filterItems(items, { category, color, weight, search } = {}) {
   return items.filter(item => {
     if (category && category !== 'all' && item.category !== category) return false;
-    if (color && !item.color.toLowerCase().includes(color.toLowerCase())) return false;
-    if (weight && !item.weight.toLowerCase().includes(weight.toLowerCase())) return false;
+    if (color && !(item.color || '').toLowerCase().includes(color.toLowerCase())) return false;
+    if (weight && !(item.weight || '').toLowerCase().includes(weight.toLowerCase())) return false;
     if (search) {
       const q = search.toLowerCase();
       const haystack = `${item.name} ${item.brand} ${item.color} ${item.notes}`.toLowerCase();

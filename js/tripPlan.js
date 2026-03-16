@@ -4,7 +4,7 @@
  */
 
 import {
-  getRecommendation, SPECIES_DATA, rateFishActivity,
+  getRecommendation, SPECIES_DATA, rateFishActivity, getPressureTrend,
   getTempBracket, getWaterClarity, degToCompass, getMoonPhase,
 } from './fishing.js';
 
@@ -79,10 +79,8 @@ async function fetchForecast(lat, lon, date, timeWindow) {
     timeWindowLabel: win.label,
   };
 
-  // Add derived fields
-  forecast.pressureTrend = forecast.pressureMsl > 1022 ? 'high'
-    : forecast.pressureMsl > 1013 ? 'stable'
-    : forecast.pressureMsl > 1005 ? 'falling' : 'low';
+  // Add derived fields — use shared pressure logic from fishing.js
+  forecast.pressureTrend = getPressureTrend(forecast.pressureMsl);
   forecast.conditions = describeCode(forecast.weatherCode);
   forecast.fishActivity = rateFishActivity(forecast);
 

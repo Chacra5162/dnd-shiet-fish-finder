@@ -1369,6 +1369,10 @@ a { color: var(--accent); }
   border-color: var(--accent);
   background: rgba(52,152,219,0.1);
 }
+.species-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .species-chip.species-active {
   background: var(--accent);
   color: #fff;

@@ -954,7 +954,7 @@ const LURE_DB = {
       stained: ['Chartreuse Shad', 'White/Chartreuse'],
       muddy: ['Chartreuse/White', 'Bright White'],
     },
-    rig: 'Heavy swimbait rod, 20-30lb braid. Check local regs — some states limit hook count to 3. Slow roll.',
+    rig: 'Heavy swimbait rod, 20-30lb braid. IMPORTANT: VA limits hooks/lures on umbrella rigs — verify current VA DWR regulations before use. NC also has restrictions. Slow roll.',
     retrieve: 'Steady slow retrieve at bait school depth. Mimic a school of baitfish. Use electronics to find depth.',
   },
   'Road Runner': {
@@ -1530,11 +1530,17 @@ const LURE_DB = {
 
 // ===== Derive water clarity from weather =====
 function getWaterClarity(weather) {
-  // Heavy rain = muddy, some rain = stained, dry = clear
+  // Current-hour precipitation
   if (weather.precipitation > 0.25) return 'muddy';
   if (weather.precipitation > 0.05) return 'stained';
-  // Also consider recent conditions via cloud/humidity as proxy
-  if (weather.humidity > 85 && weather.cloudCover > 80) return 'stained';
+  // Forecast rain probability as proxy for recent/upcoming rain
+  if (weather.precipProbability > 70) return 'muddy';
+  if (weather.precipProbability > 40) return 'stained';
+  // High humidity + heavy cloud = likely recent rain or saturated ground
+  if (weather.humidity > 90 && weather.cloudCover > 85) return 'muddy';
+  if (weather.humidity > 80 && weather.cloudCover > 70) return 'stained';
+  // Even light current precip with any precip > 0 biases stained
+  if (weather.precipitation > 0.01) return 'stained';
   return 'clear';
 }
 
@@ -1708,6 +1714,43 @@ const SPECIES_DATA = {
     },
     baits: ['Small worm pieces', 'Bread', 'Corn'],
     depthTips: { cold: 'Deeper pools', mild: 'Riffles & runs', warm: 'Shallow runs, pools', hot: 'Shaded pools' },
+  },
+  'Blue Catfish': {
+    lures: {
+      cold: ['Jig tipped with bait'], mild: ['Jig tipped with bait'], warm: ['Jig tipped with bait'], hot: ['Jig tipped with bait'],
+    },
+    baits: ['Cut Gizzard Shad', 'Cut Skipjack Herring', 'Live Shad', 'Fresh Cut Bait (Bunker)', 'Chicken Liver'],
+    depthTips: { cold: 'Deep channel ledges 20-40ft, anchor and wait', mild: 'Channel edges & hard bottom 15-30ft', warm: 'Main channel ledges, bridge pilings 10-25ft, night fishing productive', hot: 'Deep channels 20-40ft, fish at night for best action' },
+  },
+  'Speckled Trout': {
+    lures: {
+      cold: ['Jig tipped with bait', 'Small Jig', 'Suspending Minnow'],
+      mild: ['Jerkbait', 'Small Jig', 'Grub', 'Popper'],
+      warm: ['Topwater Plug', 'Popper', 'Swimbait', 'Grub', 'Jerkbait'],
+      hot: ['Swimbait', 'Grub', 'Small Jig', 'Topwater Plug'],
+    },
+    baits: ['Live Shrimp', 'Live Mud Minnows', 'Cut Mullet', 'Fishbites'],
+    depthTips: { cold: 'Deep holes & channels 8-15ft, slow presentation', mild: 'Grass flats & oyster bars 3-8ft, work edges', warm: 'Grass flats at dawn/dusk 2-5ft, shade at midday', hot: 'Deeper grass edges 4-8ft, early morning topwater' },
+  },
+  'Red Drum': {
+    lures: {
+      cold: ['Jig tipped with bait', 'Small Jig', 'Grub'],
+      mild: ['Spinnerbait', 'Grub', 'Swimbait', 'Small Spoon'],
+      warm: ['Small Spoon', 'Topwater Plug', 'Swimbait', 'Grub'],
+      hot: ['Small Spoon', 'Swimbait', 'Topwater Plug', 'Popper'],
+    },
+    baits: ['Cut Blue Crab', 'Live Shrimp', 'Cut Mullet', 'Live Mud Minnows', 'Fishbites'],
+    depthTips: { cold: 'Deep holes & channels 10-20ft, slow bait on bottom', mild: 'Oyster bars, marsh edges, flats 2-6ft', warm: 'Shallow flats & marsh drains 1-4ft at dawn/dusk, sight fish', hot: 'Early/late shallow flats, midday deeper structure 6-12ft' },
+  },
+  'Flounder': {
+    lures: {
+      cold: ['Jig tipped with bait', 'Small Jig'],
+      mild: ['Grub', 'Swimbait', 'Bucktail Jig'],
+      warm: ['Bucktail Jig', 'Grub', 'Swimbait', 'Inline Spinner'],
+      hot: ['Bucktail Jig', 'Grub', 'Swimbait'],
+    },
+    baits: ['Live Mud Minnows', 'Live Finger Mullet', 'Strip Bait (Bluefish belly)', 'Gulp Swimming Mullet'],
+    depthTips: { cold: 'Offshore — flounder migrate out in winter', mild: 'Inlets & channel edges 5-15ft as fish migrate in', warm: 'Sandy bottom near structure 3-10ft, work the tide changes', hot: 'Inlets, bridges, dock pilings 5-15ft, incoming tide best' },
   },
 };
 
@@ -1893,6 +1936,7 @@ export {
   getWaterClarity,
   degToCompass,
   getMoonPhase,
+  getPressureTrend,
   getTroutStressWarning,
   getBestFishingTimes,
   getBestTimesHtml,
