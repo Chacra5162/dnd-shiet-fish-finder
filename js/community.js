@@ -112,9 +112,21 @@ function resizeImage(file, maxWidth) {
   });
 }
 
+// Get recent posts across ALL water bodies (global feed)
+async function getRecentPosts(limit = 30, offset = 0) {
+  const { data, error } = await client()
+    .from('community_posts')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw error;
+  return data || [];
+}
+
 export {
   generateWaterBodyKey,
   getCommunityPosts,
+  getRecentPosts,
   addCommunityPost,
   deleteCommunityPost,
   getCommunityPhotoUrl,

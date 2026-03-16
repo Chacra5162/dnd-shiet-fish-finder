@@ -133,6 +133,9 @@
       <button id="btn-filter" class="icon-btn" title="Filter water bodies">
         <svg viewBox="0 0 24 24" width="20" height="20"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" fill="currentColor"/></svg>
       </button>
+      <button id="btn-social" class="icon-btn" title="Social Feed">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" fill="currentColor"/></svg>
+      </button>
       <button id="btn-my-places" class="icon-btn" title="My saved places">
         <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor"/></svg>
       </button>
@@ -432,6 +435,25 @@
       <h3>Coverage</h3>
       <p>Focused on Virginia and North Carolina. Water body data is cached locally to save bandwidth — refreshes weekly. USGS real-time data refreshes hourly.</p>
       <p class="version">v2.0.0</p>
+    </div>
+  </div>
+
+  <!-- Social Feed Panel -->
+  <div id="social-panel" class="arsenal-overlay hidden">
+    <div class="arsenal-container">
+      <header class="arsenal-header">
+        <h2>Social Feed</h2>
+        <button id="btn-close-social" class="close-btn">&times;</button>
+      </header>
+      <div class="social-tabs">
+        <button class="social-tab active" data-tab="all" onclick="window._setSocialTab(this)">All</button>
+        <button class="social-tab" data-tab="catch" onclick="window._setSocialTab(this)">Catches</button>
+        <button class="social-tab" data-tab="photo" onclick="window._setSocialTab(this)">Photos</button>
+      </div>
+      <div id="social-feed" class="social-feed">
+        <div class="loading-inline">Loading feed...</div>
+      </div>
+      <button id="social-load-more" class="community-load-more hidden" onclick="window._loadMoreSocial()">Load more</button>
     </div>
   </div>
 

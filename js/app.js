@@ -10,7 +10,7 @@ import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlac
 import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml } from './fishing.js';
 import { TIME_WINDOWS, fetchForecast, estimateTraffic, generateGearChecklist, getForecastCardHtml, getTrafficBadgeHtml, getGearChecklistHtml, getTripSummaryCardHtml, friendlyDate } from './tripPlan.js';
 import { CATEGORIES, getArsenalItems, addArsenalItem, updateArsenalItem, deleteArsenalItem, getPhotoUrl, filterItems, getUniqueColors, getUniqueWeights } from './arsenal.js';
-import { generateWaterBodyKey, getCommunityPosts, addCommunityPost, deleteCommunityPost, getCommunityPhotoUrl } from './community.js';
+import { generateWaterBodyKey, getCommunityPosts, getRecentPosts, addCommunityPost, deleteCommunityPost, getCommunityPhotoUrl } from './community.js';
 
 // ===== State =====
 let userLat = 37.54; // Default: Richmond, VA
@@ -1041,6 +1041,120 @@ function timeAgo(date) {
   return date.toLocaleDateString();
 }
 
+// ===== Social Feed =====
+
+let socialPosts = [];
+let socialTab = 'all';
+let socialOffset = 0;
+const SOCIAL_PAGE = 30;
+
+async function openSocialFeed() {
+  const panel = document.getElementById('social-panel');
+  panel.classList.remove('hidden');
+  socialOffset = 0;
+  socialPosts = [];
+  await loadSocialFeed(false);
+}
+
+async function loadSocialFeed(append) {
+  const feedEl = document.getElementById('social-feed');
+  const moreBtn = document.getElementById('social-load-more');
+  if (!feedEl) return;
+
+  if (!append) {
+    feedEl.innerHTML = '<div class="loading-inline">Loading feed...</div>';
+  }
+
+  try {
+    const posts = await getRecentPosts(SOCIAL_PAGE, socialOffset);
+    if (append) {
+      socialPosts = socialPosts.concat(posts);
+    } else {
+      socialPosts = posts;
+    }
+    renderSocialFeed(feedEl);
+    // Show/hide load more
+    if (moreBtn) moreBtn.classList.toggle('hidden', posts.length < SOCIAL_PAGE);
+  } catch (e) {
+    console.warn('Social feed error:', e);
+    if (!append) feedEl.innerHTML = '<p class="community-empty">Could not load feed</p>';
+  }
+}
+
+function renderSocialFeed(container) {
+  const filtered = socialTab === 'all' ? socialPosts : socialPosts.filter(p => p.post_type === socialTab);
+
+  if (!filtered.length) {
+    container.innerHTML = `<p class="community-empty">${socialPosts.length ? 'No posts of this type yet' : 'No posts yet — be the first to share a catch!'}</p>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(post => {
+    const initials = (post.display_name || 'A').slice(0, 2).toUpperCase();
+    const time = timeAgo(new Date(post.created_at));
+    const photoUrl = post.photo_path ? getCommunityPhotoUrl(post.photo_path) : null;
+
+    let catchBadge = '';
+    if (post.post_type === 'catch' && post.species) {
+      const parts = [post.species];
+      if (post.weight_lbs) parts.push(`${post.weight_lbs} lbs`);
+      if (post.length_in) parts.push(`${post.length_in}"`);
+      catchBadge = `<div class="community-catch-badge">${escapeHtml(parts.join(' · '))}</div>`;
+    }
+
+    return `
+      <div class="social-feed-card" onclick="window._goToSocialPost(${post.water_body_lat}, ${post.water_body_lon}, '${escapeAttr(post.water_body_name)}')">
+        <div class="community-post-header">
+          <div class="community-avatar">${escapeHtml(initials)}</div>
+          <div style="flex:1;min-width:0;">
+            <span class="community-post-name">${escapeHtml(post.display_name)}</span>
+            <div class="social-location-tag">${escapeHtml(post.water_body_name)}</div>
+          </div>
+          <span class="community-post-time">${time}</span>
+        </div>
+        ${catchBadge}
+        ${photoUrl ? `<img class="community-post-photo" src="${photoUrl}" alt="Photo" onclick="event.stopPropagation();window._viewPhoto('${photoUrl}')">` : ''}
+        ${post.body ? `<div class="community-post-body">${escapeHtml(post.body)}</div>` : ''}
+        <div class="social-go-hint">Tap to view location</div>
+      </div>
+    `;
+  }).join('');
+}
+
+window._setSocialTab = function(btn) {
+  document.querySelectorAll('.social-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  socialTab = btn.dataset.tab;
+  const feedEl = document.getElementById('social-feed');
+  if (feedEl) renderSocialFeed(feedEl);
+};
+
+window._loadMoreSocial = async function() {
+  socialOffset += SOCIAL_PAGE;
+  await loadSocialFeed(true);
+};
+
+window._goToSocialPost = function(lat, lon, name) {
+  // Close social panel
+  document.getElementById('social-panel').classList.add('hidden');
+
+  // Pan to location
+  panTo(lat, lon, 14);
+
+  // Try to find the water body and open its detail
+  const wb = waterBodies.find(w =>
+    w.name === name && Math.abs(w.lat - lat) < 0.01 && Math.abs(w.lon - lon) < 0.01
+  );
+  if (wb) {
+    const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
+    showWaterDetail(wb, dist);
+  } else {
+    // Water body not in current data set (maybe filtered out or different radius)
+    // Still pan to location and show a toast
+    toast(`${name} — tap a nearby marker for details`);
+  }
+};
+
 // Species chip click handler
 window._selectSpecies = async function(btn, lat, lon) {
   // Toggle active state
@@ -1864,6 +1978,14 @@ function setupEventListeners() {
       currentPlacesTab = tab.dataset.tab;
       renderPlacesList();
     });
+  });
+
+  // === Social Feed ===
+  $('#btn-social').addEventListener('click', () => {
+    openSocialFeed();
+  });
+  $('#btn-close-social').addEventListener('click', () => {
+    document.getElementById('social-panel').classList.add('hidden');
   });
 
   // === License Wallet ===

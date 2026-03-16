@@ -2306,6 +2306,61 @@ input, select, textarea {
 }
 .community-load-more:hover { border-color: var(--accent); }
 
+/* ===== Social Feed ===== */
+.social-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 10px;
+}
+.social-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 10px 8px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  touch-action: manipulation;
+}
+.social-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.social-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 16px;
+}
+.social-feed-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.social-feed-card:hover,
+.social-feed-card:active {
+  border-color: var(--accent);
+}
+.social-location-tag {
+  font-size: 0.72rem;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.social-go-hint {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-align: right;
+  margin-top: 4px;
+  opacity: 0.6;
+}
+
 /* Photo viewer */
 .photo-viewer-content {
   display: flex;
