@@ -849,7 +849,9 @@ window._viewArsenalItem = function(itemId) {
   const photoUrl = getPhotoUrl(item.photo_path);
   const catLabel = CATEGORIES[item.category] || item.category;
 
-  // Show in detail panel (reuse the bottom sheet)
+  // Hide arsenal, show detail
+  arsenalPanel.classList.add('hidden');
+
   detailContent.innerHTML = `
     ${photoUrl ? `<div style="margin:-20px -20px 12px;"><img src="${photoUrl}" alt="${escapeAttr(item.name)}" style="width:100%;max-height:250px;object-fit:cover;border-radius:12px 12px 0 0;"></div>` : ''}
     <h2>${escapeHtml(item.name)}</h2>
@@ -866,6 +868,7 @@ window._viewArsenalItem = function(itemId) {
 
     <div class="arsenal-detail-actions">
       <button class="btn-secondary" onclick="window._editArsenalItem('${item.id}')">Edit</button>
+      <button class="btn-secondary" onclick="window._backToArsenal()">Back to Arsenal</button>
       <button class="btn-secondary delete-btn" style="color:#e74c3c;border-color:rgba(231,76,60,0.3);" onclick="window._deleteArsenalItem('${item.id}','${escapeAttr(item.photo_path || '')}')">Delete</button>
     </div>
   `;
@@ -879,6 +882,11 @@ window._editArsenalItem = function(itemId) {
   openArsenalForm(item);
 };
 
+window._backToArsenal = function() {
+  detailPanel.classList.add('hidden');
+  arsenalPanel.classList.remove('hidden');
+};
+
 window._deleteArsenalItem = async function(itemId, photoPath) {
   if (!confirm('Delete this item from your arsenal?')) return;
   const user = getUser();
@@ -887,6 +895,7 @@ window._deleteArsenalItem = async function(itemId, photoPath) {
     await deleteArsenalItem(user.id, itemId, photoPath || null);
     arsenalItems = arsenalItems.filter(i => i.id !== itemId);
     detailPanel.classList.add('hidden');
+    arsenalPanel.classList.remove('hidden');
     renderArsenal();
     populateArsenalFilters();
     toast('Item deleted');
