@@ -212,7 +212,7 @@ function refreshUserPlaceMarkers() {
   setUserPlaceMarkers(userPlaces, async (place) => {
     panTo(place.lat, place.lon, 14);
 
-    // Find matching water body, loading data if needed
+    // Find matching water body — try loaded data first, then fetch if needed
     let wb = findWaterBody(place.place_name, place.lat, place.lon);
     if (!wb) {
       const bbox = getBBox(place.lat, place.lon, radiusMiles);
@@ -230,12 +230,12 @@ function refreshUserPlaceMarkers() {
         console.warn('Failed to load water bodies for saved place:', e);
       }
     }
-    if (wb) {
-      const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
-      showWaterDetail(wb, dist);
-    } else {
-      toast(`${place.place_name} — tap a nearby marker for details`);
+    // Last resort: build a minimal water body from the saved place data
+    if (!wb) {
+      wb = { name: place.place_name, type: place.place_type || 'pond', lat: place.lat, lon: place.lon, tags: {} };
     }
+    const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
+    showWaterDetail(wb, dist);
   });
 }
 
@@ -1713,7 +1713,7 @@ function renderPlacesList() {
   }
 
   placesList.innerHTML = filtered.map(p => `
-    <div class="place-list-item" data-lat="${p.lat}" data-lon="${p.lon}" data-name="${escapeAttr(p.place_name)}" onclick="window._goToPlace(this)">
+    <div class="place-list-item" data-lat="${p.lat}" data-lon="${p.lon}" data-name="${escapeAttr(p.place_name)}" data-type="${escapeAttr(p.place_type || 'pond')}" onclick="window._goToPlace(this)">
       <div>
         <div class="place-item-name">${escapeHtml(p.place_name)}</div>
         <div class="place-item-type">${p.place_type}</div>
@@ -1754,12 +1754,12 @@ window._goToPlace = async function(el) {
       console.warn('Failed to load water bodies for saved place:', e);
     }
   }
-  if (wb) {
-    const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
-    showWaterDetail(wb, dist);
-  } else {
-    toast(`${name} — tap a nearby marker for details`);
+  // Last resort: build a minimal water body from saved place data
+  if (!wb) {
+    wb = { name, type: el.dataset.type || 'pond', lat, lon, tags: {} };
   }
+  const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
+  showWaterDetail(wb, dist);
 };
 
 window._removeListPlace = async function(placeId) {
