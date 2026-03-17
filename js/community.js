@@ -18,6 +18,7 @@ function generateWaterBodyKey(name, lat, lon) {
 // ===== CRUD =====
 
 async function getCommunityPosts(waterBodyKey, limit = 50, offset = 0) {
+  // Try exact match first
   const { data, error } = await client()
     .from('community_posts')
     .select('id,user_id,display_name,water_body_key,water_body_name,water_body_lat,water_body_lon,post_type,body,photo_path,species,weight_lbs,length_in,created_at')
@@ -25,7 +26,19 @@ async function getCommunityPosts(waterBodyKey, limit = 50, offset = 0) {
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) throw error;
-  return data || [];
+  if (data && data.length > 0) return data;
+
+  // Fallback: match by name prefix (handles toFixed precision changes)
+  const namePrefix = waterBodyKey.split('|')[0];
+  if (!namePrefix) return [];
+  const { data: fallback, error: fbErr } = await client()
+    .from('community_posts')
+    .select('id,user_id,display_name,water_body_key,water_body_name,water_body_lat,water_body_lon,post_type,body,photo_path,species,weight_lbs,length_in,created_at')
+    .like('water_body_key', `${namePrefix}|%`)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (fbErr) throw fbErr;
+  return fallback || [];
 }
 
 async function addCommunityPost(userId, displayName, waterBody, postData, photoFile) {
