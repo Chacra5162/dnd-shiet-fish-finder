@@ -17,7 +17,7 @@ function buildOverpassQuery(south, west, north, east) {
   const bbox = `${south},${west},${north},${east}`;
   // Streamlined query — fewer selectors = faster response, less rate limiting
   return `
-[out:json][timeout:20][maxsize:8388608];
+[out:json][timeout:20][maxsize:67108864];
 (
   way["natural"="water"](${bbox});
   relation["natural"="water"](${bbox});
@@ -226,6 +226,9 @@ async function fetchWaterBodies(south, west, north, east) {
   const waterBodies = [];
   const seen = new Set();
 
+  if (json.remark) {
+    console.warn('Overpass remark:', json.remark);
+  }
   if (!json.elements?.length) {
     console.warn('Overpass returned 0 elements', json);
   }
