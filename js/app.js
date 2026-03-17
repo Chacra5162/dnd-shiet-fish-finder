@@ -247,10 +247,14 @@ async function loadData() {
 
     if (waterResult.status === 'fulfilled') {
       waterBodies = waterResult.value.data;
-      if (waterResult.value.fromCache) toast('Water bodies loaded from cache');
+      if (waterResult.value.partial) {
+        toast('Some water bodies loaded from cache — Overpass API was slow. Try again later for full results.', true);
+      } else if (waterResult.value.fromCache) {
+        // Silent — cache hit is the normal fast path
+      }
     } else {
       console.error('Water body fetch failed:', waterResult.reason);
-      toast('Failed to load water bodies', true);
+      toast('Failed to load water bodies — check your connection and try again', true);
       waterBodies = [];
     }
 

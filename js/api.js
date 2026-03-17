@@ -15,33 +15,18 @@ const OVERPASS_URLS = [
 
 function buildOverpassQuery(south, west, north, east) {
   const bbox = `${south},${west},${north},${east}`;
+  // Streamlined query — fewer selectors = faster response, less rate limiting
   return `
-[out:json][timeout:25][maxsize:16777216];
+[out:json][timeout:20][maxsize:8388608];
 (
   way["natural"="water"](${bbox});
   relation["natural"="water"](${bbox});
-  way["waterway"="river"](${bbox});
-  way["waterway"="stream"](${bbox});
-  way["waterway"="creek"](${bbox});
-  way["waterway"="canal"](${bbox});
-  way["water"="lake"](${bbox});
-  way["water"="pond"](${bbox});
-  way["water"="reservoir"](${bbox});
-  way["water"="river"](${bbox});
-  node["natural"="water"](${bbox});
-  node["leisure"="slipway"](${bbox});
-  way["leisure"="slipway"](${bbox});
-  node["seamark:type"="harbour"](${bbox});
-  node["waterway"="boat_ramp"](${bbox});
-  way["waterway"="boat_ramp"](${bbox});
-  node["leisure"="fishing"](${bbox});
-  way["leisure"="fishing"](${bbox});
-  node["man_made"="pier"]["fishing"="yes"](${bbox});
-  way["man_made"="pier"]["fishing"="yes"](${bbox});
-  node["man_made"="pier"]["leisure"="fishing"](${bbox});
-  way["man_made"="pier"]["leisure"="fishing"](${bbox});
-  node["man_made"="pier"]["access"!="private"]["access"!="no"](${bbox});
-  way["man_made"="pier"]["access"!="private"]["access"!="no"](${bbox});
+  way["waterway"~"river|stream|creek|canal"](${bbox});
+  way["water"~"lake|pond|reservoir|river"](${bbox});
+  nwr["leisure"="slipway"](${bbox});
+  nwr["waterway"="boat_ramp"](${bbox});
+  nwr["leisure"="fishing"](${bbox});
+  nwr["man_made"="pier"]["access"!="private"]["access"!="no"](${bbox});
 );
 out center tags;
 `.trim();
@@ -180,7 +165,7 @@ async function fetchOverpass(query) {
   for (const url of OVERPASS_URLS) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
+      const timeout = setTimeout(() => controller.abort(), 22000); // slightly longer than server timeout:20
       const response = await fetch(url, {
         method: 'POST',
         body: `data=${encodeURIComponent(query)}`,
@@ -192,7 +177,13 @@ async function fetchOverpass(query) {
         lastError = new Error(`Overpass ${response.status} from ${url}`);
         continue;
       }
-      return await response.json();
+      // Verify we got JSON, not an HTML error page (Overpass returns HTML on rate limit)
+      const text = await response.text();
+      if (text.startsWith('<')) {
+        lastError = new Error(`Overpass returned HTML (rate limited?) from ${url}`);
+        continue;
+      }
+      return JSON.parse(text);
     } catch (e) {
       lastError = e;
       console.warn(`Overpass server failed (${url}):`, e.message);
@@ -218,9 +209,19 @@ async function fetchWaterBodies(south, west, north, east) {
     return { data: dedupeWaterBodies(cached), fromCache: true };
   }
 
-  // Fetch fresh data for the full bbox with fallback servers
-  const query = buildOverpassQuery(south, west, north, east);
-  const json = await fetchOverpass(query);
+  // Try to fetch fresh data — but fall back to partial cache if Overpass fails
+  let json;
+  try {
+    const query = buildOverpassQuery(south, west, north, east);
+    json = await fetchOverpass(query);
+  } catch (e) {
+    console.warn('Overpass fetch failed, using cached data:', e.message);
+    // Return whatever we have cached — partial is better than nothing
+    if (cached.length > 0) {
+      return { data: dedupeWaterBodies(cached), fromCache: true, partial: true };
+    }
+    throw e; // No cache at all — propagate the error
+  }
 
   const waterBodies = [];
   const seen = new Set();
