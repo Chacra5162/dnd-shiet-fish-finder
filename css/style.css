@@ -211,8 +211,33 @@ a { color: var(--accent); }
   font-size: 0.95rem;
   color: var(--accent);
 }
-/* Hot Spots */
-.hotspot-btn { color: #e67e22 !important; }
+/* Hot Spots FAB */
+.hotspot-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 16px;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #e67e22, #d35400);
+  color: #fff;
+  border: none;
+  border-radius: 28px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(230,126,34,0.4);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.hotspot-fab:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 8px rgba(230,126,34,0.3);
+}
+.hotspot-fab svg {
+  flex-shrink: 0;
+}
 .hotspots-desc {
   font-size: 0.8rem;
   color: var(--text-muted);
