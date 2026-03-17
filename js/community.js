@@ -12,7 +12,7 @@ function client() {
 
 // Generate a stable key for a water body (same location = same board)
 function generateWaterBodyKey(name, lat, lon) {
-  return `${(name || '').toLowerCase().trim()}|${lat.toFixed(4)}|${lon.toFixed(4)}`;
+  return `${(name || '').toLowerCase().trim()}|${lat.toFixed(3)}|${lon.toFixed(3)}`;
 }
 
 // ===== CRUD =====
