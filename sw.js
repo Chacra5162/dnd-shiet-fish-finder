@@ -1,6 +1,6 @@
-const CACHE_NAME = 'dnd-shiet-fish-finder-v23';
-const TILE_CACHE = 'dnd-tiles-v1';
-const MAX_TILES = 500;
+const CACHE_NAME = 'dnd-shiet-fish-finder-v24';
+const TILE_CACHE = 'dnd-tiles-v2';
+const MAX_TILES = 1500;
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -69,7 +69,9 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Map tiles — cache with network fallback, LRU eviction at 500 entries
-  if (url.hostname.includes('basemaps.cartocdn.com')) {
+  if (url.hostname.includes('basemaps.cartocdn.com') ||
+      url.hostname.includes('arcgisonline.com') ||
+      url.hostname.includes('opentopomap.org')) {
     event.respondWith(
       caches.open(TILE_CACHE).then((cache) =>
         cache.match(event.request).then((cached) => {

@@ -574,6 +574,31 @@ a { color: var(--accent); }
   fill: rgba(52,152,219,0.05);
 }
 
+/* ===== Map Switcher ===== */
+.map-switcher {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 3px;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(52,152,219,0.2);
+}
+.map-switch-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.map-switch-btn:hover { color: var(--text); background: rgba(255,255,255,0.08); }
+.map-switch-btn.active { color: var(--accent); background: rgba(52,152,219,0.2); }
+
 /* ===== Legend ===== */
 .map-legend {
   background: var(--bg-card);

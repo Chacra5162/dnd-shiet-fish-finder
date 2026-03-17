@@ -12,6 +12,9 @@ let radiusCircle = null;
 let waterLayer = null;
 let usgsLayer = null;
 let userPlacesLayer = null;
+let baseLayers = {};
+let navionicsLayer = null;
+let currentBase = 'dark';
 let allWaterBodies = [];
 let allUSGSSites = [];
 let activeFilters = new Set(['lake', 'river', 'stream', 'pond', 'boat_landing', 'fishing_pier', 'usgs']);
@@ -66,11 +69,24 @@ function initMap(lat, lon, radiusMiles) {
     preferCanvas: true,
   });
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  // Base map layers
+  baseLayers.dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
     subdomains: 'abcd',
     maxZoom: 19,
-  }).addTo(map);
+  });
+  baseLayers.satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '&copy; Esri, Maxar, Earthstar Geographics',
+    maxZoom: 19,
+  });
+  baseLayers.topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
+    maxZoom: 17,
+  });
+  baseLayers.dark.addTo(map);
+
+  // Map style switcher control
+  addMapSwitcher();
 
   // User location marker — pulsing blue dot
   userMarker = L.marker([lat, lon], {
@@ -102,6 +118,38 @@ function initMap(lat, lon, radiusMiles) {
   addLegend();
 
   return map;
+}
+
+function addMapSwitcher() {
+  const switcher = L.control({ position: 'topright' });
+  switcher.onAdd = () => {
+    const div = L.DomUtil.create('div', 'map-switcher');
+    div.innerHTML = `
+      <button class="map-switch-btn active" data-layer="dark" title="Dark map">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 3a9 9 0 109 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 01-4.4 2.26 5.403 5.403 0 01-3.14-9.8c-.44-.06-.9-.1-1.36-.1z" fill="currentColor"/></svg>
+      </button>
+      <button class="map-switch-btn" data-layer="satellite" title="Satellite view">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" fill="currentColor"/></svg>
+      </button>
+      <button class="map-switch-btn" data-layer="topo" title="Topographic map">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M14 6l-3.75 5 2.85 3.8-1.6 1.2C9.81 13.75 7 10 7 10l-6 8h22L14 6z" fill="currentColor"/></svg>
+      </button>
+    `;
+    L.DomEvent.disableClickPropagation(div);
+    div.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-layer]');
+      if (!btn) return;
+      const layer = btn.dataset.layer;
+      if (layer === currentBase) return;
+      map.removeLayer(baseLayers[currentBase]);
+      baseLayers[layer].addTo(map);
+      currentBase = layer;
+      div.querySelectorAll('.map-switch-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+    return div;
+  };
+  switcher.addTo(map);
 }
 
 function addLegend() {
