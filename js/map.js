@@ -256,6 +256,46 @@ function findNearbyUSGS(lat, lon, maxMiles = 5) {
     .slice(0, 5);
 }
 
+// ===== Highlight selected marker =====
+let highlightLayer = null;
+
+function highlightMarker(lat, lon, color) {
+  clearHighlight();
+  const c = color || '#f1c40f';
+  highlightLayer = L.layerGroup().addTo(map);
+
+  // Outer pulsing ring
+  L.marker([lat, lon], {
+    icon: L.divIcon({
+      className: 'highlight-pulse-wrapper',
+      html: `<div class="highlight-ring" style="border-color:${c};box-shadow:0 0 20px ${c}"></div>`,
+      iconSize: [80, 80],
+      iconAnchor: [40, 40],
+    }),
+    zIndexOffset: 900,
+    interactive: false,
+  }).addTo(highlightLayer);
+
+  // Bouncing pin
+  L.marker([lat, lon], {
+    icon: L.divIcon({
+      className: 'highlight-pin-wrapper',
+      html: `<div class="highlight-pin" style="background:${c}"><div class="highlight-pin-dot"></div></div>`,
+      iconSize: [24, 40],
+      iconAnchor: [12, 40],
+    }),
+    zIndexOffset: 950,
+    interactive: false,
+  }).addTo(highlightLayer);
+}
+
+function clearHighlight() {
+  if (highlightLayer) {
+    highlightLayer.remove();
+    highlightLayer = null;
+  }
+}
+
 export {
   initMap,
   setMarkers,
@@ -265,4 +305,6 @@ export {
   panTo,
   findNearbyUSGS,
   setUserPlaceMarkers,
+  highlightMarker,
+  clearHighlight,
 };

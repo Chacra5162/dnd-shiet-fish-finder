@@ -5,7 +5,7 @@
  */
 
 import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml, fetchWaterTempHistory, getWaterTempChartHtml } from './api.js';
-import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers } from './map.js';
+import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers, highlightMarker, clearHighlight } from './map.js';
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan, fetchAllRegulations, getRegulationsForWater, getUserGaugeAlerts, saveGaugeAlert, deleteGaugeAlert } from './supabase.js';
 import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, rateFishActivity, rateSpotActivity, getWaterClarity, calculateSolunarPeriods, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml, getHatchCalendarHtml } from './fishing.js';
 import { TIME_WINDOWS, fetchForecast, estimateTraffic, generateGearChecklist, getForecastCardHtml, getTrafficBadgeHtml, getGearChecklistHtml, getTripSummaryCardHtml, friendlyDate } from './tripPlan.js';
@@ -912,6 +912,10 @@ async function loadRegulations(wb, gen) {
 }
 
 async function showWaterDetail(wb, dist) {
+  // Highlight the selected marker on the map
+  const style = { lake: '#2980b9', river: '#1abc9c', stream: '#27ae60', pond: '#8e44ad', boat_landing: '#e67e22', fishing_pier: '#9b59b6' };
+  highlightMarker(wb.lat, wb.lon, style[wb.type] || '#f1c40f');
+
   const nearbyUSGS = findNearbyUSGS(wb.lat, wb.lon, 10);
   const links = getFishingLinks(wb.lat, wb.lon, wb.type, wb.name);
   const species = getCommonSpecies(wb.type, wb.lat, wb.lon);
@@ -2438,6 +2442,7 @@ function setupEventListeners() {
   // Detail panel close
   $('#btn-close-detail').addEventListener('click', () => {
     detailPanel.classList.add('hidden');
+    clearHighlight();
   });
 
   // Recenter
