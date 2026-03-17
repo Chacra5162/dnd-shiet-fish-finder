@@ -141,6 +141,122 @@ function rateFishActivity(w) {
   return Math.max(5, Math.min(95, score));
 }
 
+/**
+ * Per-spot fishing score — layers water body type, USGS real-time data,
+ * solunar timing, and structure proximity on top of the base weather score.
+ * Returns 5-95 with genuine variation between spots.
+ *
+ * @param {object} weather - from fetchWeather()
+ * @param {object} wb - water body {type, lat, lon, name, tags}
+ * @param {object|null} usgs - nearest USGS data {data: {flow, gauge, temp}}
+ * @param {number} usgsDist - distance to USGS station in miles
+ */
+function rateSpotActivity(weather, wb, usgs, usgsDist) {
+  let score = rateFishActivity(weather);
+
+  // --- Water body type modifiers ---
+  // Different types fish better/worse in current conditions
+  const wind = weather.windSpeed || 0;
+  const temp = weather.temp || 65;
+  const precip = weather.precipitation || 0;
+
+  if (wb.type === 'lake') {
+    // Lakes: wind creates current/feeding lanes; overcast helps
+    if (wind >= 8 && wind <= 15) score += 5; // wind pushes bait to banks
+    if (weather.cloudCover > 60) score += 3;
+    if (temp >= 55 && temp <= 80) score += 3; // ideal lake temps
+  } else if (wb.type === 'river') {
+    // Rivers: moderate flow is key; light rain boosts activity
+    if (precip > 0 && precip < 0.15) score += 5; // bugs wash in
+    if (wind < 10) score += 2; // easier to fish
+    score += 3; // rivers generally productive with flow
+  } else if (wb.type === 'stream') {
+    // Streams: low wind critical, rain can muddy or trigger feeding
+    if (wind < 8) score += 4;
+    if (precip > 0 && precip < 0.1) score += 4; // nymph activity up
+    if (temp >= 50 && temp <= 68) score += 4; // trout zone
+    else if (temp > 75) score -= 6; // warm streams = stressed fish
+  } else if (wb.type === 'pond') {
+    // Ponds: calm conditions, overcast, moderate temp
+    if (wind < 5) score += 3;
+    if (weather.cloudCover > 70) score += 4;
+    if (temp >= 60 && temp <= 78) score += 3;
+  } else if (wb.type === 'boat_landing') {
+    // Boat landings = access points, inherently good
+    score += 5;
+    if (wind < 15) score += 2; // safe to launch
+  } else if (wb.type === 'fishing_pier') {
+    // Piers = structure = fish magnets
+    score += 6;
+    if (weather.cloudCover > 50) score += 2; // shade under pier
+  }
+
+  // --- USGS real-time water data (if nearby station within 10 mi) ---
+  if (usgs && usgsDist <= 10) {
+    const proximity = 1 - (usgsDist / 10); // 1.0 at 0mi, 0.0 at 10mi
+    const d = usgs.data || {};
+
+    // Water temperature — specific ranges by water type
+    if (d.temp) {
+      const wt = d.temp.value;
+      if (wb.type === 'stream') {
+        // Trout-friendly: 48-64°F ideal
+        if (wt >= 48 && wt <= 64) score += Math.round(8 * proximity);
+        else if (wt >= 40 && wt <= 70) score += Math.round(3 * proximity);
+        else if (wt > 72) score -= Math.round(8 * proximity); // too warm for trout
+      } else {
+        // Bass/panfish: 58-78°F ideal
+        if (wt >= 58 && wt <= 78) score += Math.round(7 * proximity);
+        else if (wt >= 50 && wt <= 85) score += Math.round(3 * proximity);
+        else if (wt < 45) score -= Math.round(5 * proximity);
+      }
+    }
+
+    // Flow rate — context matters by type
+    if (d.flow) {
+      const flow = d.flow.value;
+      if (wb.type === 'river' || wb.type === 'stream') {
+        // Moderate flow is ideal; too high = muddy/dangerous, too low = sluggish
+        if (flow >= 50 && flow <= 500) score += Math.round(6 * proximity);
+        else if (flow >= 20 && flow <= 1000) score += Math.round(2 * proximity);
+        else if (flow > 2000) score -= Math.round(8 * proximity); // flood conditions
+        else if (flow < 10) score -= Math.round(4 * proximity); // trickle
+      } else if (wb.type === 'lake') {
+        // Inflow to lakes brings food — higher flow nearby = better
+        if (flow >= 100 && flow <= 800) score += Math.round(4 * proximity);
+      }
+    }
+
+    // Gauge height trend (if rising = often good pre-flood, falling = tougher)
+    if (d.gauge) {
+      const gh = d.gauge.value;
+      // Very high gauge = flood danger
+      if (gh > 15) score -= Math.round(10 * proximity);
+      else if (gh > 10) score -= Math.round(4 * proximity);
+    }
+  }
+
+  // --- Solunar overlap bonus ---
+  const now = new Date();
+  const solunar = calculateSolunarPeriods(wb.lat, wb.lon);
+  const allPeriods = [
+    ...(solunar.majorPeriods || []).map(p => ({ ...p, type: 'major' })),
+    ...(solunar.minorPeriods || []).map(p => ({ ...p, type: 'minor' })),
+  ];
+  for (const p of allPeriods) {
+    if (now >= p.start && now <= p.end) {
+      score += p.type === 'major' ? 8 : 4;
+      break;
+    }
+  }
+
+  // --- Named spot bonus — named water bodies tend to be more notable/productive ---
+  const isGenerated = /^(Lake|Pond|River|Creek|Boat Landing|Fishing Pier) #\d+$/.test(wb.name);
+  if (!isGenerated) score += 2;
+
+  return Math.max(5, Math.min(95, score));
+}
+
 // ===== Moon Phase =====
 
 function getMoonPhase(date) {
@@ -2244,6 +2360,7 @@ export {
   getRecommendationHtml,
   SPECIES_DATA,
   rateFishActivity,
+  rateSpotActivity,
   getTempBracket,
   getWaterClarity,
   degToCompass,

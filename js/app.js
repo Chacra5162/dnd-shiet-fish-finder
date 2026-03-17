@@ -7,7 +7,7 @@
 import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml, fetchWaterTempHistory, getWaterTempChartHtml } from './api.js';
 import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers } from './map.js';
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan, fetchAllRegulations, getRegulationsForWater, getUserGaugeAlerts, saveGaugeAlert, deleteGaugeAlert } from './supabase.js';
-import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, rateFishActivity, getWaterClarity, calculateSolunarPeriods, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml, getHatchCalendarHtml } from './fishing.js';
+import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, rateFishActivity, rateSpotActivity, getWaterClarity, calculateSolunarPeriods, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml, getHatchCalendarHtml } from './fishing.js';
 import { TIME_WINDOWS, fetchForecast, estimateTraffic, generateGearChecklist, getForecastCardHtml, getTrafficBadgeHtml, getGearChecklistHtml, getTripSummaryCardHtml, friendlyDate } from './tripPlan.js';
 import { CATEGORIES, getArsenalItems, addArsenalItem, updateArsenalItem, deleteArsenalItem, getPhotoUrl, filterItems, getUniqueColors, getUniqueWeights } from './arsenal.js';
 import { generateWaterBodyKey, getCommunityPosts, getRecentPosts, addCommunityPost, deleteCommunityPost, getCommunityPhotoUrl, resizeImage } from './community.js';
@@ -348,12 +348,16 @@ async function loadHotSpots() {
     // Get weather for user's location (cached if recent)
     const weather = await fetchWeather(userLat, userLon);
 
-    // Score all loaded water bodies using the same weather (same area = similar conditions)
-    const scored = waterBodies.map(wb => ({
-      ...wb,
-      score: rateFishActivity(weather),
-      dist: distanceMiles(userLat, userLon, wb.lat, wb.lon),
-    }));
+    // Score each water body individually using type, nearby USGS data, and solunar
+    const scored = waterBodies.map(wb => {
+      const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
+      // Find nearest USGS station to this water body
+      const nearbyUSGS = findNearbyUSGS(wb.lat, wb.lon, 10);
+      const nearestUSGS = nearbyUSGS.length > 0 ? nearbyUSGS[0] : null;
+      const usgsDist = nearestUSGS ? nearestUSGS.dist : 99;
+      const score = rateSpotActivity(weather, wb, nearestUSGS, usgsDist);
+      return { ...wb, score, dist, hasUSGS: !!nearestUSGS };
+    });
 
     // Sort by score descending, then by distance ascending as tiebreaker
     scored.sort((a, b) => b.score - a.score || a.dist - b.dist);
@@ -378,7 +382,7 @@ async function loadHotSpots() {
         <span class="hotspot-score ${scoreLabel(wb.score)}">${wb.score}</span>
         <div class="hotspot-info">
           <div class="hotspot-name">${escapeHtml(wb.name)}</div>
-          <div class="hotspot-meta">${typeLabel[wb.type] || wb.type} &bull; ${wb.dist.toFixed(1)} mi</div>
+          <div class="hotspot-meta">${typeLabel[wb.type] || wb.type} &bull; ${wb.dist.toFixed(1)} mi${wb.hasUSGS ? ' &bull; Live data' : ''}</div>
         </div>
       </div>
     `).join('');
