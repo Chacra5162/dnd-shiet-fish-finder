@@ -4,8 +4,8 @@
  * Focused on Virginia & North Carolina. Supabase auth + user places.
  */
 
-import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml, fetchWaterTempHistory, getWaterTempChartHtml } from './api.js';
-import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers, highlightMarker, clearHighlight } from './map.js';
+import { fetchWaterBodies, fetchUSGSSites, fetchFishAttractors, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml, fetchWaterTempHistory, getWaterTempChartHtml } from './api.js';
+import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers, setAttractors, highlightMarker, clearHighlight } from './map.js';
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan, fetchAllRegulations, getRegulationsForWater, getUserGaugeAlerts, saveGaugeAlert, deleteGaugeAlert } from './supabase.js';
 import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, rateFishActivity, rateSpotActivity, getWaterClarity, calculateSolunarPeriods, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml, getHatchCalendarHtml } from './fishing.js';
 import { TIME_WINDOWS, fetchForecast, estimateTraffic, generateGearChecklist, getForecastCardHtml, getTrafficBadgeHtml, getGearChecklistHtml, getTripSummaryCardHtml, friendlyDate } from './tripPlan.js';
@@ -275,9 +275,10 @@ async function loadData() {
   const bbox = getBBox(userLat, userLon, radiusMiles);
 
   try {
-    const [waterResult, usgsResult] = await Promise.allSettled([
+    const [waterResult, usgsResult, attractorResult] = await Promise.allSettled([
       fetchWaterBodies(bbox.south, bbox.west, bbox.north, bbox.east),
       fetchUSGSSites(bbox.south, bbox.west, bbox.north, bbox.east),
+      fetchFishAttractors(bbox.south, bbox.west, bbox.north, bbox.east),
     ]);
 
     if (waterResult.status === 'fulfilled') {
@@ -300,6 +301,12 @@ async function loadData() {
       console.error('USGS fetch failed:', usgsResult.reason);
       toast('Failed to load USGS data', true);
       usgsSites = [];
+    }
+
+    // Fish attractors (NC only — fails silently if outside NC)
+    const attractors = attractorResult.status === 'fulfilled' ? attractorResult.value : [];
+    if (attractors.length > 0) {
+      setAttractors(attractors, showAttractorDetail);
     }
 
     // Filter to within radius and user type preferences
@@ -328,7 +335,9 @@ async function loadData() {
     setMarkers(waterBodies, usgsSites, userLat, userLon, showWaterDetail, showUSGSDetail);
     refreshUserPlaceMarkers();
 
-    toast(`Found ${waterBodies.length} water bodies, ${usgsSites.length} USGS stations`);
+    const parts = [`Found ${waterBodies.length} water bodies`, `${usgsSites.length} USGS stations`];
+    if (attractors.length > 0) parts.push(`${attractors.length} fish attractors`);
+    toast(parts.join(', '));
 
   } catch (err) {
     console.error('Load error:', err);
@@ -1484,6 +1493,41 @@ window._selectSpecies = async function(btn) {
     setTimeout(() => recDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
   }
 };
+
+function showAttractorDetail(attractor) {
+  const dist = distanceMiles(userLat, userLon, attractor.lat, attractor.lon);
+  highlightMarker(attractor.lat, attractor.lon, '#f39c12');
+
+  let html = `
+    <h2>${escapeHtml(attractor.name)}</h2>
+    <span class="detail-type-badge" style="background:#f39c12;color:#000;">Fish Attractor</span>
+    <span style="color:var(--text-muted); font-size:0.85rem; margin-left:8px;">${dist.toFixed(1)} mi away</span>
+  `;
+
+  html += '<div class="detail-section"><h3>Structure Details</h3><div class="detail-grid">';
+  if (attractor.structure) html += `<div class="detail-item"><span class="detail-label">Type</span><span>${escapeHtml(attractor.structure)}</span></div>`;
+  if (attractor.quantity) html += `<div class="detail-item"><span class="detail-label">Quantity</span><span>${attractor.quantity} structures</span></div>`;
+  if (attractor.depth) html += `<div class="detail-item"><span class="detail-label">Depth</span><span>${attractor.depth} ft (at full pool)</span></div>`;
+  if (attractor.waterbody) html += `<div class="detail-item"><span class="detail-label">Waterbody</span><span>${escapeHtml(attractor.waterbody)}</span></div>`;
+  html += `<div class="detail-item"><span class="detail-label">Buoy Marker</span><span>${attractor.hasBuoy ? 'Yes' : 'No'}</span></div>`;
+  html += '</div></div>';
+
+  html += `<div class="detail-section" style="margin-top:12px;font-size:0.8rem;color:var(--text-muted);">
+    Data: NC Wildlife Resources Commission
+  </div>`;
+
+  html += `
+    <div style="display:flex;gap:6px;margin-top:8px;">
+      <a href="https://www.google.com/maps/dir/?api=1&destination=${attractor.lat},${attractor.lon}" target="_blank" rel="noopener" class="btn-secondary" style="flex:1;text-align:center;font-size:0.82rem;text-decoration:none;padding:8px;">Google Maps</a>
+      <a href="https://maps.apple.com/?daddr=${attractor.lat},${attractor.lon}&dirflg=d" target="_blank" rel="noopener" class="btn-secondary" style="flex:1;text-align:center;font-size:0.82rem;text-decoration:none;padding:8px;">Apple Maps</a>
+    </div>
+  `;
+
+  detailPanel.innerHTML = `<button id="btn-close-detail" class="close-btn">&times;</button>${html}`;
+  detailPanel.classList.remove('hidden');
+  $('#btn-close-detail').addEventListener('click', () => { detailPanel.classList.add('hidden'); clearHighlight(); });
+  panTo(attractor.lat, attractor.lon, 15);
+}
 
 function showUSGSDetail(site, dist) {
   const links = getFishingLinks(site.lat, site.lon, 'river', site.name);

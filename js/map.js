@@ -12,12 +12,14 @@ let radiusCircle = null;
 let waterLayer = null;
 let usgsLayer = null;
 let userPlacesLayer = null;
+let attractorLayer = null;
 let baseLayers = {};
 let navionicsLayer = null;
 let currentBase = 'dark';
 let allWaterBodies = [];
 let allUSGSSites = [];
-let activeFilters = new Set(['lake', 'river', 'stream', 'pond', 'boat_landing', 'fishing_pier', 'usgs']);
+let allAttractors = [];
+let activeFilters = new Set(['lake', 'river', 'stream', 'pond', 'boat_landing', 'fishing_pier', 'usgs', 'fish_attractor']);
 
 // Color + size config for each water body type (used by circleMarkers on canvas)
 const MARKER_STYLES = {
@@ -26,8 +28,9 @@ const MARKER_STYLES = {
   stream:        { color: '#27ae60', radius: 6,  weight: 2 },
   pond:          { color: '#8e44ad', radius: 7,  weight: 2 },
   boat_landing:  { color: '#e67e22', radius: 9,  weight: 2 },
-  fishing_pier:  { color: '#9b59b6', radius: 9,  weight: 2 },
-  usgs:          { color: '#e74c3c', radius: 9,  weight: 2 },
+  fishing_pier:    { color: '#9b59b6', radius: 9,  weight: 2 },
+  usgs:            { color: '#e74c3c', radius: 9,  weight: 2 },
+  fish_attractor:  { color: '#f39c12', radius: 8,  weight: 2 },
 };
 const DEFAULT_STYLE = { color: '#27ae60', radius: 6, weight: 2 };
 
@@ -112,6 +115,7 @@ function initMap(lat, lon, radiusMiles) {
   // Layer groups
   waterLayer = L.layerGroup().addTo(map);
   usgsLayer = L.layerGroup().addTo(map);
+  attractorLayer = L.layerGroup().addTo(map);
   userPlacesLayer = L.layerGroup().addTo(map);
 
   // Legend
@@ -165,6 +169,7 @@ function addLegend() {
       <div class="legend-item"><div class="legend-dot" style="background:var(--boat-landing)"></div> Boat Landing</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--fishing-pier)"></div> Fishing Pier</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--usgs)"></div> USGS Station</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f39c12"></div> Fish Attractor</div>
       <h4 style="margin-top:6px;">My Places</h4>
       <div class="legend-item"><div class="legend-dot" style="background:#f1c40f"></div> Favorite</div>
       <div class="legend-item"><div class="legend-dot" style="background:#2ecc71"></div> Visited</div>
@@ -304,6 +309,39 @@ function findNearbyUSGS(lat, lon, maxMiles = 5) {
     .slice(0, 5);
 }
 
+// ===== Fish Attractors =====
+
+function setAttractors(attractors, onClickAttractor) {
+  allAttractors = attractors;
+  renderAttractors(onClickAttractor);
+}
+
+function renderAttractors(onClickAttractor) {
+  if (!attractorLayer) return;
+  attractorLayer.clearLayers();
+  if (!activeFilters.has('fish_attractor')) return;
+
+  const style = MARKER_STYLES.fish_attractor;
+  for (const a of allAttractors) {
+    const marker = L.circleMarker([a.lat, a.lon], {
+      renderer: canvasRenderer,
+      radius: style.radius,
+      fillColor: style.color,
+      fillOpacity: 0.9,
+      color: '#fff',
+      weight: style.weight,
+    });
+
+    const tip = `${a.structure || 'Fish Attractor'}${a.depth ? ' (' + a.depth + ' ft)' : ''} - ${a.waterbody || ''}`;
+    marker.bindTooltip(tip, { direction: 'top', offset: [0, -style.radius] });
+
+    if (onClickAttractor) {
+      marker.on('click', () => onClickAttractor(a));
+    }
+    attractorLayer.addLayer(marker);
+  }
+}
+
 // ===== Highlight selected marker =====
 let highlightLayer = null;
 
@@ -353,6 +391,7 @@ export {
   panTo,
   findNearbyUSGS,
   setUserPlaceMarkers,
+  setAttractors,
   highlightMarker,
   clearHighlight,
 };

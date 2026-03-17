@@ -1370,9 +1370,50 @@ function getWaterTempChartHtml(temps) {
   `;
 }
 
+// ===== NC Fish Attractors (NCWRC ArcGIS Feature Service) =====
+
+const NC_ATTRACTORS_URL = 'https://services1.arcgis.com/YfqBAUM5nWR3yhGP/arcgis/rest/services/Fish_Attractors_public_view/FeatureServer/0/query';
+
+async function fetchFishAttractors(south, west, north, east) {
+  // Only fetch for NC area (lat 33.8-36.6)
+  if (south > 36.6 || north < 33.8) return [];
+
+  const params = new URLSearchParams({
+    where: `Latitude >= ${south} AND Latitude <= ${north} AND Longitude >= ${west} AND Longitude <= ${east}`,
+    outFields: 'Latitude,Longitude,Attractor_Type,Structure1,Structure1_Quantity,Full_Pool_Depth_Ft,Waterbody,Installed_With_Buoy',
+    f: 'json',
+    outSR: '4326',
+    resultRecordCount: '500',
+  });
+
+  try {
+    const res = await fetchWithTimeout(`${NC_ATTRACTORS_URL}?${params}`, 12000);
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.features || []).map(f => {
+      const a = f.attributes;
+      return {
+        lat: a.Latitude,
+        lon: a.Longitude,
+        type: 'fish_attractor',
+        name: `${a.Waterbody || 'Unknown'} - ${a.Structure1 || a.Attractor_Type || 'Fish Attractor'}`,
+        structure: a.Structure1 || a.Attractor_Type,
+        quantity: a.Structure1_Quantity,
+        depth: a.Full_Pool_Depth_Ft,
+        waterbody: a.Waterbody,
+        hasBuoy: a.Installed_With_Buoy === 'Yes',
+      };
+    }).filter(a => a.lat && a.lon);
+  } catch (e) {
+    console.warn('Fish attractors fetch failed:', e.message);
+    return [];
+  }
+}
+
 export {
   fetchWaterBodies,
   fetchUSGSSites,
+  fetchFishAttractors,
   getFishingLinks,
 
   getCommonSpecies,

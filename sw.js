@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dnd-shiet-fish-finder-v24';
+const CACHE_NAME = 'dnd-shiet-fish-finder-v25';
 const TILE_CACHE = 'dnd-tiles-v2';
 const MAX_TILES = 1500;
 const STATIC_ASSETS = [
@@ -55,6 +55,7 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('supabase.co') ||
     url.hostname === 'api.open-meteo.com' ||
     url.hostname === 'api.tidesandcurrents.noaa.gov' ||
+    url.hostname.includes('arcgis.com') ||
     url.hostname === 'unpkg.com' ||
     url.hostname === 'cdn.jsdelivr.net'
   ) {
