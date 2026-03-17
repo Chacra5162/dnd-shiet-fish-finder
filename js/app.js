@@ -212,19 +212,27 @@ function refreshUserPlaceMarkers() {
   setUserPlaceMarkers(userPlaces, async (place) => {
     panTo(place.lat, place.lon, 14);
 
-    // Find matching water body — try loaded data first, then fetch if needed
+    // Find matching water body — try loaded data first, then fetch unfiltered if needed
     let wb = findWaterBody(place.place_name, place.lat, place.lon);
     if (!wb) {
       const bbox = getBBox(place.lat, place.lon, radiusMiles);
       try {
         const result = await fetchWaterBodies(bbox.south, bbox.west, bbox.north, bbox.east);
         if (result.data) {
-          for (const w of result.data) {
-            if (!waterBodies.some(e => e.name === w.name && Math.abs(e.lat - w.lat) < 0.001 && Math.abs(e.lon - w.lon) < 0.001)) {
-              waterBodies.push(w);
+          // Search the raw fetched data directly (bypasses filters)
+          wb = result.data.find(w =>
+            w.name === place.place_name && Math.abs(w.lat - place.lat) < 0.01 && Math.abs(w.lon - place.lon) < 0.01
+          );
+          // Also try name-only match on fetched data
+          if (!wb) {
+            let best = null, bestDist = Infinity;
+            for (const w of result.data) {
+              if (w.name !== place.place_name) continue;
+              const d = Math.abs(w.lat - place.lat) + Math.abs(w.lon - place.lon);
+              if (d < bestDist) { bestDist = d; best = w; }
             }
+            wb = best;
           }
-          wb = findWaterBody(place.place_name, place.lat, place.lon);
         }
       } catch (e) {
         console.warn('Failed to load water bodies for saved place:', e);
@@ -1737,18 +1745,24 @@ window._goToPlace = async function(el) {
   // Try to find and show the matching water body
   let wb = findWaterBody(name, lat, lon);
   if (!wb) {
-    // Water body not in current data — reload around the place's location
+    // Water body not in current data — fetch unfiltered data around the place
     const bbox = getBBox(lat, lon, radiusMiles);
     try {
       const result = await fetchWaterBodies(bbox.south, bbox.west, bbox.north, bbox.east);
       if (result.data) {
-        // Merge new water bodies without duplicates
-        for (const w of result.data) {
-          if (!waterBodies.some(e => e.name === w.name && Math.abs(e.lat - w.lat) < 0.001 && Math.abs(e.lon - w.lon) < 0.001)) {
-            waterBodies.push(w);
+        // Search raw fetched data directly (bypasses filters)
+        wb = result.data.find(w =>
+          w.name === name && Math.abs(w.lat - lat) < 0.01 && Math.abs(w.lon - lon) < 0.01
+        );
+        if (!wb) {
+          let best = null, bestDist = Infinity;
+          for (const w of result.data) {
+            if (w.name !== name) continue;
+            const d = Math.abs(w.lat - lat) + Math.abs(w.lon - lon);
+            if (d < bestDist) { bestDist = d; best = w; }
           }
+          wb = best;
         }
-        wb = findWaterBody(name, lat, lon);
       }
     } catch (e) {
       console.warn('Failed to load water bodies for saved place:', e);
