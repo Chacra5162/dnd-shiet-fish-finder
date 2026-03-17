@@ -124,4 +124,20 @@ async function getMultiCached(storeName, south, west, north, east) {
   return { cached, missing, allCells: cells };
 }
 
-export { STORES, getCached, setCache, getMultiCached, gridKey };
+// Batch write multiple grid cells in a single transaction (much faster on mobile)
+async function setCacheBatch(storeName, entries) {
+  if (entries.length === 0) return;
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    const now = Date.now();
+    for (const { key, data } of entries) {
+      store.put({ gridKey: key, data, timestamp: now });
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export { STORES, getCached, setCache, setCacheBatch, getMultiCached, gridKey };

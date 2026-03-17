@@ -3,7 +3,7 @@
  * Only fetches data relevant to the user's current location.
  */
 
-import { STORES, getCached, setCache, getMultiCached, gridKey } from './cache.js';
+import { STORES, getCached, setCache, setCacheBatch, getMultiCached, gridKey } from './cache.js';
 
 // ===== Overpass API (Water Bodies) =====
 
@@ -287,28 +287,37 @@ async function fetchWaterBodies(south, west, north, east) {
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
 
+    // Keep only tags used by the app (classification, access, fishing links)
+    // to reduce memory + IndexedDB serialization overhead on mobile
+    const rawTags = el.tags || {};
+    const keepTags = {};
+    const KEEP_KEYS = ['name', 'alt_name', 'water', 'waterway', 'natural', 'leisure',
+      'man_made', 'access', 'ownership', 'owner', 'operator', 'fishing', 'sport',
+      'boundary', 'landuse', 'club', 'is_in', 'description'];
+    for (const k of KEEP_KEYS) {
+      if (rawTags[k]) keepTags[k] = rawTags[k];
+    }
+
     waterBodies.push({
       id: el.id,
       name,
       type,
       lat,
       lon,
-      tags: el.tags || {},
+      tags: keepTags,
     });
   }
 
-  // Cache per grid cell
+  // Cache per grid cell (single batch transaction for speed on mobile)
   const gridMap = {};
   for (const wb of waterBodies) {
-    const key = gridKey(wb.lat, wb.lon);
-    if (!gridMap[key]) gridMap[key] = [];
-    gridMap[key].push(wb);
+    const k = gridKey(wb.lat, wb.lon);
+    if (!gridMap[k]) gridMap[k] = [];
+    gridMap[k].push(wb);
   }
 
-  for (const [key, items] of Object.entries(gridMap)) {
-    const [lat, lon] = key.split('_').map(Number);
-    await setCache(STORES.waterBodies, lat, lon, items);
-  }
+  const entries = Object.entries(gridMap).map(([key, data]) => ({ key, data }));
+  await setCacheBatch(STORES.waterBodies, entries);
 
   return { data: dedupeWaterBodies([...cached, ...waterBodies]), fromCache: false };
 }
@@ -380,31 +389,39 @@ function collapseByName(items) {
   return result;
 }
 
-// Simple single-linkage spatial clustering.
-// Groups points where any point in the cluster is within `threshold` degrees of another.
+// Grid-based spatial clustering — O(n) instead of O(n²).
+// Buckets points into grid cells of `threshold` size, then merges adjacent cells.
 function spatialCluster(points, threshold) {
+  const grid = new Map();
+  for (const p of points) {
+    const gx = Math.floor(p.lat / threshold);
+    const gy = Math.floor(p.lon / threshold);
+    const key = `${gx}_${gy}`;
+    if (!grid.has(key)) grid.set(key, []);
+    grid.get(key).push(p);
+  }
+
+  // Merge adjacent grid cells into clusters using flood-fill
+  const visited = new Set();
   const clusters = [];
-  const assigned = new Array(points.length).fill(false);
 
-  for (let i = 0; i < points.length; i++) {
-    if (assigned[i]) continue;
-    const cluster = [points[i]];
-    assigned[i] = true;
+  for (const [key, pts] of grid) {
+    if (visited.has(key)) continue;
+    visited.add(key);
+    const cluster = [...pts];
+    const [gx, gy] = key.split('_').map(Number);
+    const queue = [[gx, gy]];
 
-    // Expand cluster: find all unassigned points near any point in cluster
-    let expanded = true;
-    while (expanded) {
-      expanded = false;
-      for (let j = 0; j < points.length; j++) {
-        if (assigned[j]) continue;
-        for (const cp of cluster) {
-          if (Math.abs(points[j].lat - cp.lat) < threshold &&
-              Math.abs(points[j].lon - cp.lon) < threshold) {
-            cluster.push(points[j]);
-            assigned[j] = true;
-            expanded = true;
-            break;
-          }
+    while (queue.length > 0) {
+      const [cx, cy] = queue.pop();
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          if (dx === 0 && dy === 0) continue;
+          const nk = `${cx + dx}_${cy + dy}`;
+          if (visited.has(nk) || !grid.has(nk)) continue;
+          visited.add(nk);
+          cluster.push(...grid.get(nk));
+          queue.push([cx + dx, cy + dy]);
         }
       }
     }
