@@ -32,10 +32,20 @@ let hideUnnamed = localStorage.getItem('wwf_hide_unnamed') === 'true';
 let detailGeneration = 0;
 
 // ===== Place Lookup Helper =====
-function findWaterBody(name, lat, lon, tolerance = 0.002) {
-  return waterBodies.find(w =>
+function findWaterBody(name, lat, lon, tolerance = 0.01) {
+  // Try exact name + close coordinates first
+  let wb = waterBodies.find(w =>
     w.name === name && Math.abs(w.lat - lat) < tolerance && Math.abs(w.lon - lon) < tolerance
   );
+  if (wb) return wb;
+  // Fall back to closest water body by name alone
+  let best = null, bestDist = Infinity;
+  for (const w of waterBodies) {
+    if (w.name !== name) continue;
+    const d = Math.abs(w.lat - lat) + Math.abs(w.lon - lon);
+    if (d < bestDist) { bestDist = d; best = w; }
+  }
+  return best;
 }
 
 // ===== DOM refs =====
@@ -204,24 +214,17 @@ function refreshUserPlaceMarkers() {
 
     // Find matching water body, loading data if needed
     let wb = findWaterBody(place.place_name, place.lat, place.lon);
-    console.log('[place-click] initial lookup:', place.place_name, place.lat, place.lon, '→', wb ? 'FOUND' : 'NOT FOUND', 'waterBodies count:', waterBodies.length);
     if (!wb) {
       const bbox = getBBox(place.lat, place.lon, radiusMiles);
-      console.log('[place-click] fetching water bodies for bbox:', bbox);
       try {
         const result = await fetchWaterBodies(bbox.south, bbox.west, bbox.north, bbox.east);
-        console.log('[place-click] fetched:', result.data?.length, 'water bodies, fromCache:', result.fromCache);
         if (result.data) {
-          // Find closest name match for debugging
-          const nameMatches = result.data.filter(w => w.name === place.place_name);
-          console.log('[place-click] name matches in fetched data:', nameMatches.length, nameMatches.map(w => ({ name: w.name, lat: w.lat, lon: w.lon })));
           for (const w of result.data) {
             if (!waterBodies.some(e => e.name === w.name && Math.abs(e.lat - w.lat) < 0.001 && Math.abs(e.lon - w.lon) < 0.001)) {
               waterBodies.push(w);
             }
           }
           wb = findWaterBody(place.place_name, place.lat, place.lon);
-          console.log('[place-click] after merge, lookup:', wb ? 'FOUND' : 'STILL NOT FOUND', 'waterBodies count:', waterBodies.length);
         }
       } catch (e) {
         console.warn('Failed to load water bodies for saved place:', e);
