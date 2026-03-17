@@ -906,9 +906,9 @@ async function showWaterDetail(wb, dist) {
       <div class="nearby-usgs-list">
         ${nearbyUSGS.map(s => {
           const dataSnippets = [];
-          if (s.data.temp) dataSnippets.push(`${s.data.temp.value}${s.data.temp.unit}`);
-          if (s.data.flow) dataSnippets.push(`${s.data.flow.value} ${s.data.flow.unit}`);
-          if (s.data.gauge) dataSnippets.push(`${s.data.gauge.value} ${s.data.gauge.unit}`);
+          if (s.data.temp) dataSnippets.push(`${s.data.temp.value}${escapeHtml(s.data.temp.unit)}`);
+          if (s.data.flow) dataSnippets.push(`${s.data.flow.value} ${escapeHtml(s.data.flow.unit)}`);
+          if (s.data.gauge) dataSnippets.push(`${s.data.gauge.value} ${escapeHtml(s.data.gauge.unit)}`);
           const dataStr = dataSnippets.length > 0 ? ` — ${dataSnippets.join(', ')}` : '';
           return `
             <div class="nearby-usgs-item" data-site-code="${escapeAttr(s.siteCode)}">
@@ -1435,13 +1435,13 @@ function showUSGSDetail(site, dist) {
     <div class="detail-section">
       <h3>Resources</h3>
       <div class="detail-links">
-        <a href="https://waterdata.usgs.gov/nwis/uv?site_no=${site.siteCode}" target="_blank" rel="noopener" class="detail-link">
+        <a href="https://waterdata.usgs.gov/nwis/uv?site_no=${escapeAttr(site.siteCode)}" target="_blank" rel="noopener" class="detail-link">
           ${linkIcon} USGS Station Data Page
         </a>
-        <a href="https://waterdata.usgs.gov/nwis/inventory/?site_no=${site.siteCode}" target="_blank" rel="noopener" class="detail-link">
+        <a href="https://waterdata.usgs.gov/nwis/inventory/?site_no=${escapeAttr(site.siteCode)}" target="_blank" rel="noopener" class="detail-link">
           ${linkIcon} Station Inventory &amp; History
         </a>
-        <a href="https://water.weather.gov/ahps2/hydrograph.php?gage=USGS-${site.siteCode}" target="_blank" rel="noopener" class="detail-link">
+        <a href="https://water.weather.gov/ahps2/hydrograph.php?gage=USGS-${escapeAttr(site.siteCode)}" target="_blank" rel="noopener" class="detail-link">
           ${linkIcon} NWS River Forecast Hydrograph
         </a>
         ${links.map(l => `
@@ -1572,7 +1572,7 @@ async function renderGaugeAlertSection(site, gen) {
         const statusIcon = a.enabled ? '\u2705' : '\u274C';
         html += `<div style="background:var(--bg-surface);padding:8px 12px;border-radius:8px;font-size:0.82rem;display:flex;justify-content:space-between;align-items:center;">
           <span>${statusIcon} Alert: ${escapeHtml(paramLabel)} ${escapeHtml(a.condition)} ${a.threshold} ${escapeHtml(a.unit || '')}</span>
-          <button class="btn-icon" style="color:var(--danger);font-size:1.1rem;background:none;border:none;cursor:pointer;padding:2px 6px;" title="Delete alert" onclick="window._deleteGaugeAlert('${a.id}', '${site.siteCode}');">&times;</button>
+          <button class="btn-icon" style="color:var(--danger);font-size:1.1rem;background:none;border:none;cursor:pointer;padding:2px 6px;" title="Delete alert" data-alert-id="${escapeAttr(a.id)}" data-site="${escapeAttr(site.siteCode)}" onclick="window._deleteGaugeAlert(this.dataset.alertId, this.dataset.site)">&times;</button>
         </div>`;
       }
       html += '</div>';
@@ -2193,7 +2193,7 @@ window._viewTripGear = function(id) {
   const clarity = trip.forecast ? getWaterClarity(trip.forecast) : 'clear';
   detailContent.innerHTML = `
     <h2>${escapeHtml(trip.place_name)}</h2>
-    <span class="detail-type-badge badge-${trip.place_type}">${trip.place_type}</span>
+    <span class="detail-type-badge badge-${escapeAttr(trip.place_type)}">${escapeHtml(trip.place_type)}</span>
     <span style="color:var(--text-muted);font-size:0.85rem;margin-left:8px;">${friendlyDate(trip.trip_date)}</span>
     ${trip.forecast ? getForecastCardHtml(trip.forecast) : ''}
     ${getGearChecklistHtml(trip.gear_checklist, clarity)}
