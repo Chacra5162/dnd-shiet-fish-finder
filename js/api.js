@@ -192,6 +192,39 @@ async function fetchOverpass(query) {
   throw lastError || new Error('All Overpass servers failed');
 }
 
+// Extract the best available name from OSM tags with multi-field fallback
+function extractBestName(tags, type) {
+  // Primary: explicit name tag
+  if (tags.name) return tags.name;
+  // Alternative / official names
+  if (tags.alt_name) return tags.alt_name;
+  if (tags.official_name) return tags.official_name;
+  if (tags['name:en']) return tags['name:en'];
+  // Operator often contains park/landing name (e.g., "Chesterfield County Parks - Robious Landing")
+  if (tags.operator) {
+    const op = tags.operator;
+    // Extract meaningful part after dash/colon separators
+    const parts = op.split(/\s*[-–:]\s*/);
+    if (parts.length > 1) return parts[parts.length - 1].trim();
+    // If short enough, use whole operator name
+    if (op.length <= 40) return op;
+  }
+  // is_in tag contains containing area (e.g., "Robious Landing Park;Chesterfield;VA")
+  if (tags.is_in) {
+    const first = tags.is_in.split(';')[0].trim();
+    if (first.length > 0 && first.length <= 50) return first;
+  }
+  // Description — use first line, truncated
+  if (tags.description) {
+    const desc = tags.description.split('\n')[0].trim();
+    if (desc.length > 0) return desc.length > 50 ? desc.substring(0, 47) + '...' : desc;
+  }
+  // Destination tag (common on waterways)
+  if (tags.destination) return tags.destination;
+  // No usable name found
+  return null;
+}
+
 // Generate a deterministic name for unnamed water bodies (same coords = same name always)
 function generateName(type, lat, lon) {
   const typeLabels = { lake: 'Lake', pond: 'Pond', river: 'River', stream: 'Creek', boat_landing: 'Boat Landing', fishing_pier: 'Fishing Pier' };
@@ -241,8 +274,8 @@ async function fetchWaterBodies(south, west, north, east) {
 
     const type = classifyWaterBody(el.tags || {});
 
-    // Use OSM name if available, otherwise generate one
-    let name = el.tags?.name;
+    // Use best available name from OSM tags, with multi-field fallback
+    let name = extractBestName(el.tags || {}, type);
     if (!name) {
       // Only include unnamed if it's a way or relation (has area/shape — skip random nodes)
       if (el.type === 'node') continue;

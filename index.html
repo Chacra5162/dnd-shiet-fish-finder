@@ -131,6 +131,9 @@
       <button id="btn-recenter" class="icon-btn" title="Re-center on location">
         <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" fill="currentColor"/></svg>
       </button>
+      <button id="btn-hotspots" class="icon-btn hotspot-btn" title="Top fishing spots right now">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z" fill="currentColor"/></svg>
+      </button>
       <button id="btn-filter" class="icon-btn" title="Filter water bodies">
         <svg viewBox="0 0 24 24" width="20" height="20"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" fill="currentColor"/></svg>
       </button>
@@ -167,6 +170,16 @@
   </div>
 
   <!-- Filter Panel -->
+  <!-- Hot Spots Panel -->
+  <div id="hotspots-panel" class="filter-panel hidden">
+    <div class="filter-header">
+      <h3>Hot Spots Right Now</h3>
+      <button id="btn-close-hotspots" class="close-btn">&times;</button>
+    </div>
+    <p class="hotspots-desc">Ranking nearby water bodies by current fishing conditions...</p>
+    <div id="hotspots-list" class="hotspots-list"></div>
+  </div>
+
   <div id="filter-panel" class="filter-panel hidden">
     <div class="filter-header">
       <h3>Filter Water Bodies</h3>

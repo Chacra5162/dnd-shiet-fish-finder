@@ -72,13 +72,15 @@ function initMap(lat, lon, radiusMiles) {
     maxZoom: 19,
   }).addTo(map);
 
-  // User location marker
-  userMarker = L.circleMarker([lat, lon], {
-    radius: 8,
-    fillColor: '#3498db',
-    fillOpacity: 1,
-    color: '#fff',
-    weight: 3,
+  // User location marker — pulsing blue dot
+  userMarker = L.marker([lat, lon], {
+    icon: L.divIcon({
+      className: 'user-location-marker',
+      html: '<div class="user-pulse-ring"></div><div class="user-dot"></div>',
+      iconSize: [40, 40],
+      iconAnchor: [20, 20],
+    }),
+    zIndexOffset: 1000,
   }).addTo(map).bindPopup('You are here');
 
   // Radius circle

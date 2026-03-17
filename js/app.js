@@ -7,7 +7,7 @@
 import { fetchWaterBodies, fetchUSGSSites, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml, fetchWaterTempHistory, getWaterTempChartHtml } from './api.js';
 import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers } from './map.js';
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan, fetchAllRegulations, getRegulationsForWater, getUserGaugeAlerts, saveGaugeAlert, deleteGaugeAlert } from './supabase.js';
-import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, getWaterClarity, calculateSolunarPeriods, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml, getHatchCalendarHtml } from './fishing.js';
+import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, rateFishActivity, getWaterClarity, calculateSolunarPeriods, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml, getHatchCalendarHtml } from './fishing.js';
 import { TIME_WINDOWS, fetchForecast, estimateTraffic, generateGearChecklist, getForecastCardHtml, getTrafficBadgeHtml, getGearChecklistHtml, getTripSummaryCardHtml, friendlyDate } from './tripPlan.js';
 import { CATEGORIES, getArsenalItems, addArsenalItem, updateArsenalItem, deleteArsenalItem, getPhotoUrl, filterItems, getUniqueColors, getUniqueWeights } from './arsenal.js';
 import { generateWaterBodyKey, getCommunityPosts, getRecentPosts, addCommunityPost, deleteCommunityPost, getCommunityPhotoUrl, resizeImage } from './community.js';
@@ -333,6 +333,70 @@ async function loadData() {
   } catch (err) {
     console.error('Load error:', err);
     toast('Error loading data — try again later', true);
+  }
+}
+
+// ===== Hot Spots — Batch-score water bodies by current fishing conditions =====
+
+async function loadHotSpots() {
+  const list = $('#hotspots-list');
+  const desc = $('#hotspots-panel').querySelector('.hotspots-desc');
+  list.innerHTML = '<div class="hotspot-loading">Fetching weather & scoring spots...</div>';
+  desc.textContent = 'Ranking nearby water bodies by current fishing conditions...';
+
+  try {
+    // Get weather for user's location (cached if recent)
+    const weather = await fetchWeather(userLat, userLon);
+
+    // Score all loaded water bodies using the same weather (same area = similar conditions)
+    const scored = waterBodies.map(wb => ({
+      ...wb,
+      score: rateFishActivity(weather),
+      dist: distanceMiles(userLat, userLon, wb.lat, wb.lon),
+    }));
+
+    // Sort by score descending, then by distance ascending as tiebreaker
+    scored.sort((a, b) => b.score - a.score || a.dist - b.dist);
+
+    // Take top 25
+    const top = scored.slice(0, 25);
+
+    if (top.length === 0) {
+      list.innerHTML = '<div class="hotspot-loading">No water bodies loaded yet. Wait for map to finish loading.</div>';
+      return;
+    }
+
+    const scoreLabel = (s) => s >= 65 ? 'excellent' : s >= 50 ? 'good' : s >= 40 ? 'fair' : 'poor';
+    const scoreName = (s) => s >= 65 ? 'Excellent' : s >= 50 ? 'Good' : s >= 40 ? 'Fair' : 'Poor';
+    const typeLabel = { lake: 'Lake', river: 'River', stream: 'Stream', pond: 'Pond', boat_landing: 'Boat Landing', fishing_pier: 'Pier' };
+
+    desc.textContent = `${scoreName(weather.fishActivity)} conditions right now (${weather.temp}°F, ${weather.conditions})`;
+
+    list.innerHTML = top.map((wb, i) => `
+      <div class="hotspot-item" data-idx="${i}">
+        <span class="hotspot-rank">${i + 1}</span>
+        <span class="hotspot-score ${scoreLabel(wb.score)}">${wb.score}</span>
+        <div class="hotspot-info">
+          <div class="hotspot-name">${escapeHtml(wb.name)}</div>
+          <div class="hotspot-meta">${typeLabel[wb.type] || wb.type} &bull; ${wb.dist.toFixed(1)} mi</div>
+        </div>
+      </div>
+    `).join('');
+
+    // Click to fly to spot and show detail
+    list.querySelectorAll('.hotspot-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.dataset.idx);
+        const wb = top[idx];
+        panTo(wb.lat, wb.lon, 14);
+        showWaterDetail(wb, wb.dist);
+        $('#hotspots-panel').classList.add('hidden');
+      });
+    });
+
+  } catch (err) {
+    console.error('Hot spots error:', err);
+    list.innerHTML = '<div class="hotspot-loading">Failed to load conditions. Try again later.</div>';
   }
 }
 
@@ -2271,6 +2335,20 @@ function setupEventListeners() {
   });
   $('#btn-close-filter').addEventListener('click', () => {
     filterPanel.classList.add('hidden');
+  });
+
+  // Hot Spots panel
+  $('#btn-hotspots').addEventListener('click', () => {
+    const panel = $('#hotspots-panel');
+    panel.classList.toggle('hidden');
+    filterPanel.classList.add('hidden');
+    placesPanel.classList.add('hidden');
+    if (!panel.classList.contains('hidden')) {
+      loadHotSpots();
+    }
+  });
+  $('#btn-close-hotspots').addEventListener('click', () => {
+    $('#hotspots-panel').classList.add('hidden');
   });
 
   // Unnamed filter checkbox — sync initial state

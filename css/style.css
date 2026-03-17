@@ -211,6 +211,70 @@ a { color: var(--accent); }
   font-size: 0.95rem;
   color: var(--accent);
 }
+/* Hot Spots */
+.hotspot-btn { color: #e67e22 !important; }
+.hotspots-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.hotspots-list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.hotspot-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.hotspot-item:hover { background: rgba(52,152,219,0.1); }
+.hotspot-rank {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 20px;
+  text-align: center;
+}
+.hotspot-score {
+  min-width: 42px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+  color: #fff;
+}
+.hotspot-score.excellent { background: #2ecc71; }
+.hotspot-score.good { background: #f39c12; }
+.hotspot-score.fair { background: #e67e22; }
+.hotspot-score.poor { background: #e74c3c; }
+.hotspot-info {
+  flex: 1;
+  min-width: 0;
+}
+.hotspot-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hotspot-meta {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.hotspot-loading {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
 .filter-checkbox {
   display: flex;
   align-items: center;
@@ -1873,6 +1937,37 @@ a { color: var(--accent); }
 }
 
 /* ===== User Place Markers (Favorite / Visited / Avoid) ===== */
+/* ===== User Location Pulsing Marker ===== */
+.user-location-marker {
+  background: none !important;
+  border: none !important;
+}
+.user-dot {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px; height: 14px;
+  background: #3498db;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 0 8px rgba(52,152,219,0.6);
+  z-index: 2;
+}
+.user-pulse-ring {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: rgba(52,152,219,0.25);
+  animation: user-pulse 2s ease-out infinite;
+  z-index: 1;
+}
+@keyframes user-pulse {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+}
+
 .marker-user-place {
   display: flex;
   align-items: center;
