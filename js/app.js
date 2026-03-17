@@ -2355,6 +2355,41 @@ function setupEventListeners() {
     $('#hotspots-panel').classList.add('hidden');
   });
 
+  // More menu (mobile overflow)
+  const moreBtn = $('#btn-more');
+  const headerRight = $('.header-right');
+  if (moreBtn) {
+    moreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const existing = headerRight.querySelector('.overflow-menu-dropdown');
+      if (existing) {
+        existing.remove();
+        return;
+      }
+      // Build dropdown from overflow buttons
+      const dropdown = document.createElement('div');
+      dropdown.className = 'overflow-menu-dropdown';
+      const overflowBtns = headerRight.querySelectorAll('.overflow-btn');
+      overflowBtns.forEach(btn => {
+        const clone = btn.cloneNode(true);
+        clone.addEventListener('click', () => {
+          btn.click();
+          dropdown.remove();
+        });
+        dropdown.appendChild(clone);
+      });
+      headerRight.appendChild(dropdown);
+      // Close on outside click
+      const closeMenu = (ev) => {
+        if (!dropdown.contains(ev.target) && ev.target !== moreBtn) {
+          dropdown.remove();
+          document.removeEventListener('click', closeMenu);
+        }
+      };
+      setTimeout(() => document.addEventListener('click', closeMenu), 0);
+    });
+  }
+
   // Unnamed filter checkbox — sync initial state
   const unnamedCb = document.getElementById('filter-hide-unnamed');
   if (unnamedCb) {
