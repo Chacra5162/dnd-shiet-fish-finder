@@ -15,7 +15,6 @@ const OVERPASS_URLS = [
 
 function buildOverpassQuery(south, west, north, east) {
   const bbox = `${south},${west},${north},${east}`;
-  // Streamlined query — fewer selectors = faster response, less rate limiting
   return `
 [out:json][timeout:20][maxsize:67108864];
 (
@@ -27,6 +26,12 @@ function buildOverpassQuery(south, west, north, east) {
   nwr["waterway"="boat_ramp"](${bbox});
   nwr["leisure"="fishing"](${bbox});
   nwr["man_made"="pier"]["access"!="private"]["access"!="no"](${bbox});
+  way["leisure"="park"]["name"](${bbox});
+  relation["leisure"="park"]["name"](${bbox});
+  way["leisure"="nature_reserve"]["name"](${bbox});
+  relation["leisure"="nature_reserve"]["name"](${bbox});
+  relation["boundary"="protected_area"]["name"](${bbox});
+  way["leisure"="recreation_ground"]["name"](${bbox});
 );
 out center tags;
 `.trim();
@@ -256,9 +261,6 @@ async function fetchWaterBodies(south, west, north, east) {
     throw e; // No cache at all — propagate the error
   }
 
-  const waterBodies = [];
-  const seen = new Set();
-
   if (json.remark) {
     console.warn('Overpass remark:', json.remark);
   }
@@ -266,45 +268,182 @@ async function fetchWaterBodies(south, west, north, east) {
     console.warn('Overpass returned 0 elements', json);
   }
 
+  // --- Pass 1: Separate parks from water features ---
+  const parks = [];
+  const rawFeatures = [];
+  const KEEP_KEYS = ['name', 'alt_name', 'water', 'waterway', 'natural', 'leisure',
+    'man_made', 'access', 'ownership', 'owner', 'operator', 'fishing', 'sport',
+    'boundary', 'landuse', 'club', 'is_in', 'description'];
+
   for (const el of (json.elements || [])) {
-    // Use center coords for ways/relations
     const lat = el.center?.lat || el.lat;
     const lon = el.center?.lon || el.lon;
     if (!lat || !lon) continue;
 
-    const type = classifyWaterBody(el.tags || {});
+    const tags = el.tags || {};
+    const isPark = (tags.leisure === 'park' || tags.leisure === 'nature_reserve' ||
+      tags.leisure === 'recreation_ground' || tags.boundary === 'protected_area') && tags.name;
 
-    // Use best available name from OSM tags, with multi-field fallback
-    let name = extractBestName(el.tags || {}, type);
-    if (!name) {
-      // Only include unnamed if it's a way or relation (has area/shape — skip random nodes)
-      if (el.type === 'node') continue;
-      name = generateName(type, lat, lon);
+    if (isPark) {
+      parks.push({ name: tags.name, lat, lon });
+      continue;
     }
 
-    // Dedupe by name + approximate location
-    const dedupeKey = `${name}_${lat.toFixed(3)}_${lon.toFixed(3)}`;
+    const type = classifyWaterBody(tags);
+    let name = extractBestName(tags, type);
+    const isUnnamed = !name;
+
+    if (isUnnamed) {
+      if (el.type === 'node') continue;
+      name = null; // will be resolved in pass 2
+    }
+
+    const keepTags = {};
+    for (const k of KEEP_KEYS) {
+      if (tags[k]) keepTags[k] = tags[k];
+    }
+
+    rawFeatures.push({ id: el.id, name, type, lat, lon, tags: keepTags, isUnnamed });
+  }
+
+  // --- Pass 2: Build park spatial index for fast proximity lookups ---
+  const PARK_MATCH_DIST = 0.005; // ~0.35 miles — match unnamed features to parks
+  const parkGrid = new Map();
+  const parkGridSize = 0.01;
+  for (const p of parks) {
+    const gk = `${Math.floor(p.lat / parkGridSize)}_${Math.floor(p.lon / parkGridSize)}`;
+    if (!parkGrid.has(gk)) parkGrid.set(gk, []);
+    parkGrid.get(gk).push(p);
+  }
+
+  function findNearestPark(lat, lon) {
+    const gx = Math.floor(lat / parkGridSize);
+    const gy = Math.floor(lon / parkGridSize);
+    let best = null, bestDist = PARK_MATCH_DIST;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const cell = parkGrid.get(`${gx + dx}_${gy + dy}`);
+        if (!cell) continue;
+        for (const p of cell) {
+          const d = Math.abs(p.lat - lat) + Math.abs(p.lon - lon);
+          if (d < bestDist) { bestDist = d; best = p; }
+        }
+      }
+    }
+    return best;
+  }
+
+  // --- Pass 3: Name unnamed features from parks + group co-located features ---
+  const CLUSTER_DIST = 0.003; // ~0.2 miles — group nearby unnamed features
+  const clusterGrid = new Map();
+  const cgSize = CLUSTER_DIST;
+
+  // Group unnamed features into spatial clusters
+  for (const f of rawFeatures) {
+    if (!f.isUnnamed) continue;
+    const gk = `${Math.floor(f.lat / cgSize)}_${Math.floor(f.lon / cgSize)}`;
+    if (!clusterGrid.has(gk)) clusterGrid.set(gk, []);
+    clusterGrid.get(gk).push(f);
+  }
+
+  // Merge adjacent grid cells and pick best name for each cluster
+  const clusterVisited = new Set();
+  const clusteredIds = new Set();
+
+  for (const [key, items] of clusterGrid) {
+    if (clusterVisited.has(key)) continue;
+    clusterVisited.add(key);
+
+    // Flood-fill adjacent cells
+    const cluster = [...items];
+    const [gx, gy] = key.split('_').map(Number);
+    const queue = [[gx, gy]];
+    while (queue.length > 0) {
+      const [cx, cy] = queue.pop();
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          if (dx === 0 && dy === 0) continue;
+          const nk = `${cx + dx}_${cy + dy}`;
+          if (clusterVisited.has(nk) || !clusterGrid.has(nk)) continue;
+          clusterVisited.add(nk);
+          cluster.push(...clusterGrid.get(nk));
+          queue.push([cx + dx, cy + dy]);
+        }
+      }
+    }
+
+    if (cluster.length < 2) continue; // single features handled normally
+
+    // This cluster has multiple unnamed features close together — merge them
+    // Find centroid
+    const cLat = cluster.reduce((s, f) => s + f.lat, 0) / cluster.length;
+    const cLon = cluster.reduce((s, f) => s + f.lon, 0) / cluster.length;
+
+    // Try to name from nearby park
+    const park = findNearestPark(cLat, cLon);
+    // Collect unique types for label
+    const types = [...new Set(cluster.map(f => f.type))];
+    const typeLabels = { boat_landing: 'Boat Landing', fishing_pier: 'Pier', lake: 'Lake', pond: 'Pond', river: 'River', stream: 'Creek' };
+    const typeSummary = types.map(t => typeLabels[t] || t).join(' & ');
+
+    const mergedName = park
+      ? `${park.name} (${typeSummary})`
+      : `${typeSummary} Area`;
+
+    // Pick the "best" type: prefer boat_landing > fishing_pier > others
+    const typePriority = ['boat_landing', 'fishing_pier', 'lake', 'river', 'pond', 'stream'];
+    const bestType = typePriority.find(t => types.includes(t)) || types[0];
+
+    // Pick richest tags from cluster
+    const bestFeature = cluster.reduce((a, b) =>
+      Object.keys(b.tags).length > Object.keys(a.tags).length ? b : a
+    );
+
+    // Mark all cluster members as consumed
+    for (const f of cluster) clusteredIds.add(f.id);
+
+    // Add the merged entry
+    rawFeatures.push({
+      id: bestFeature.id,
+      name: mergedName,
+      type: bestType,
+      lat: cLat,
+      lon: cLon,
+      tags: bestFeature.tags,
+      isUnnamed: false,
+    });
+  }
+
+  // --- Pass 4: Finalize all features (name remaining unnamed, dedupe) ---
+  const waterBodies = [];
+  const seen = new Set();
+
+  for (const f of rawFeatures) {
+    if (clusteredIds.has(f.id)) continue; // already merged into a cluster
+
+    let name = f.name;
+    if (!name) {
+      // Try park proximity for lone unnamed features
+      const park = findNearestPark(f.lat, f.lon);
+      if (park) {
+        const typeLabel = { boat_landing: 'Boat Landing', fishing_pier: 'Pier', lake: 'Lake', pond: 'Pond', river: 'River', stream: 'Creek' };
+        name = `${park.name} - ${typeLabel[f.type] || f.type}`;
+      } else {
+        name = generateName(f.type, f.lat, f.lon);
+      }
+    }
+
+    const dedupeKey = `${name}_${f.lat.toFixed(3)}_${f.lon.toFixed(3)}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
 
-    // Keep only tags used by the app (classification, access, fishing links)
-    // to reduce memory + IndexedDB serialization overhead on mobile
-    const rawTags = el.tags || {};
-    const keepTags = {};
-    const KEEP_KEYS = ['name', 'alt_name', 'water', 'waterway', 'natural', 'leisure',
-      'man_made', 'access', 'ownership', 'owner', 'operator', 'fishing', 'sport',
-      'boundary', 'landuse', 'club', 'is_in', 'description'];
-    for (const k of KEEP_KEYS) {
-      if (rawTags[k]) keepTags[k] = rawTags[k];
-    }
-
     waterBodies.push({
-      id: el.id,
+      id: f.id,
       name,
-      type,
-      lat,
-      lon,
-      tags: keepTags,
+      type: f.type,
+      lat: f.lat,
+      lon: f.lon,
+      tags: f.tags,
     });
   }
 
