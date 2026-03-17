@@ -199,15 +199,32 @@ async function loadUserPlaces() {
 }
 
 function refreshUserPlaceMarkers() {
-  setUserPlaceMarkers(userPlaces, (place) => {
-    // Find matching water body and show detail, or just pan
-    const wb = findWaterBody(place.place_name, place.lat, place.lon);
+  setUserPlaceMarkers(userPlaces, async (place) => {
+    panTo(place.lat, place.lon, 14);
+
+    // Find matching water body, loading data if needed
+    let wb = findWaterBody(place.place_name, place.lat, place.lon);
+    if (!wb) {
+      const bbox = getBBox(place.lat, place.lon, radiusMiles);
+      try {
+        const result = await fetchWaterBodies(bbox.south, bbox.west, bbox.north, bbox.east);
+        if (result.data) {
+          for (const w of result.data) {
+            if (!waterBodies.some(e => e.name === w.name && Math.abs(e.lat - w.lat) < 0.001 && Math.abs(e.lon - w.lon) < 0.001)) {
+              waterBodies.push(w);
+            }
+          }
+          wb = findWaterBody(place.place_name, place.lat, place.lon);
+        }
+      } catch (e) {
+        console.warn('Failed to load water bodies for saved place:', e);
+      }
+    }
     if (wb) {
       const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
       showWaterDetail(wb, dist);
     } else {
-      panTo(place.lat, place.lon, 14);
-      toast(`${place.place_name} — ${place.status}`);
+      toast(`${place.place_name} — tap a nearby marker for details`);
     }
   });
 }
@@ -1699,7 +1716,7 @@ function renderPlacesList() {
   `).join('');
 }
 
-window._goToPlace = function(el) {
+window._goToPlace = async function(el) {
   const lat = parseFloat(el.dataset.lat);
   const lon = parseFloat(el.dataset.lon);
   const name = el.dataset.name;
@@ -1708,12 +1725,30 @@ window._goToPlace = function(el) {
   placesPanel.classList.add('hidden');
 
   // Try to find and show the matching water body
-  const wb = findWaterBody(name, lat, lon);
+  let wb = findWaterBody(name, lat, lon);
+  if (!wb) {
+    // Water body not in current data — reload around the place's location
+    const bbox = getBBox(lat, lon, radiusMiles);
+    try {
+      const result = await fetchWaterBodies(bbox.south, bbox.west, bbox.north, bbox.east);
+      if (result.data) {
+        // Merge new water bodies without duplicates
+        for (const w of result.data) {
+          if (!waterBodies.some(e => e.name === w.name && Math.abs(e.lat - w.lat) < 0.001 && Math.abs(e.lon - w.lon) < 0.001)) {
+            waterBodies.push(w);
+          }
+        }
+        wb = findWaterBody(name, lat, lon);
+      }
+    } catch (e) {
+      console.warn('Failed to load water bodies for saved place:', e);
+    }
+  }
   if (wb) {
     const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
     showWaterDetail(wb, dist);
   } else {
-    toast('This water body may be filtered out or outside the current radius. Check your filters.', true);
+    toast(`${name} — tap a nearby marker for details`);
   }
 };
 
