@@ -895,7 +895,7 @@ async function showWaterDetail(wb, dist) {
   }
 
   // Access info — collapsible
-  html += collapsibleSection('Access Info', getAccessInfoHtml(wb));
+  html += collapsibleSection('Access Info', getAccessInfoHtml(wb), true);
 
   // Regulations — collapsible (loaded async from Supabase)
   html += collapsibleSection('Regulations', '<div id="regulations-area"><div class="loading-inline">Loading regulations...</div></div>');
