@@ -250,7 +250,7 @@ async function saveGaugeAlert(alert) {
   const client = getClient();
   const { data, error } = await client
     .from('gauge_alerts')
-    .insert({ user_id: currentUser.id, ...alert })
+    .insert({ ...alert, user_id: currentUser.id }) // user_id LAST — cannot be overwritten by spread
     .select().single();
   if (error) throw error;
   return data;

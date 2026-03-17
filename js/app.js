@@ -1204,18 +1204,20 @@ window._submitCommunityPost = async function() {
   }
 };
 
-window._deleteCommunityPost = async function(el) {
+window._deleteCommunityPost = function(el) {
   const user = getUser();
   if (!user) return;
   const postId = el.dataset.postId;
   const photoPath = el.dataset.photo;
-  try {
-    await deleteCommunityPost(user.id, postId, photoPath || null);
-    toast('Post deleted');
-    if (communityCurrentWb) loadCommunityBoard(communityCurrentWb);
-  } catch (e) {
-    toast(`Error: ${e.message}`, true);
-  }
+  showInlineConfirm('Delete this post?', 'Delete', async () => {
+    try {
+      await deleteCommunityPost(user.id, postId, photoPath || null);
+      toast('Post deleted');
+      if (communityCurrentWb) loadCommunityBoard(communityCurrentWb);
+    } catch (e) {
+      toast(`Error: ${e.message}`, true);
+    }
+  });
 };
 
 window._viewPhoto = function(url) {

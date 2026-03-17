@@ -82,10 +82,7 @@ async function updateArsenalItem(userId, itemId, updates, newPhotoFile, oldPhoto
     if (newPhotoFile.size > 10 * 1024 * 1024) throw new Error('Photo must be under 10 MB');
     const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
     if (newPhotoFile.type && !ALLOWED_MIME.includes(newPhotoFile.type)) throw new Error('Invalid file type — use JPG, PNG, GIF, or WebP');
-    // Delete old photo if replacing
-    if (oldPhotoPath) {
-      await client().storage.from('arsenal-photos').remove([oldPhotoPath]).catch(() => {});
-    }
+    // Upload new photo first (don't delete old until DB update succeeds)
     const ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
     const rawExt = newPhotoFile.name.split('.').pop().toLowerCase();
     const ext = ALLOWED_EXTS.includes(rawExt) ? rawExt : 'jpg';
@@ -97,6 +94,7 @@ async function updateArsenalItem(userId, itemId, updates, newPhotoFile, oldPhoto
     updates.photo_path = fileName;
   }
 
+  // DB update verifies ownership via user_id filter
   const { data, error } = await client()
     .from('user_arsenal')
     .update(updates)
@@ -105,20 +103,26 @@ async function updateArsenalItem(userId, itemId, updates, newPhotoFile, oldPhoto
     .select()
     .single();
   if (error) throw error;
+
+  // Only delete old photo AFTER DB update confirmed ownership
+  if (newPhotoFile && oldPhotoPath) {
+    await client().storage.from('arsenal-photos').remove([oldPhotoPath]).catch(() => {});
+  }
   return data;
 }
 
 async function deleteArsenalItem(userId, itemId, photoPath) {
-  // Delete photo from storage if exists
-  if (photoPath) {
-    await client().storage.from('arsenal-photos').remove([photoPath]).catch(() => {});
-  }
+  // Delete DB row FIRST to verify ownership, THEN delete storage
   const { error } = await client()
     .from('user_arsenal')
     .delete()
     .eq('id', itemId)
     .eq('user_id', userId);
   if (error) throw error;
+  // Only delete storage after confirmed DB ownership
+  if (photoPath) {
+    await client().storage.from('arsenal-photos').remove([photoPath]).catch(() => {});
+  }
 }
 
 function getPhotoUrl(photoPath) {

@@ -75,15 +75,17 @@ async function addCommunityPost(userId, displayName, waterBody, postData, photoF
 }
 
 async function deleteCommunityPost(userId, postId, photoPath) {
-  if (photoPath) {
-    await client().storage.from(BUCKET).remove([photoPath]).catch(() => {});
-  }
+  // Delete DB row FIRST to verify ownership, THEN delete storage
   const { error } = await client()
     .from('community_posts')
     .delete()
     .eq('id', postId)
     .eq('user_id', userId);
   if (error) throw error;
+  // Only delete storage after confirmed DB ownership
+  if (photoPath) {
+    await client().storage.from(BUCKET).remove([photoPath]).catch(() => {});
+  }
 }
 
 function getCommunityPhotoUrl(photoPath) {
