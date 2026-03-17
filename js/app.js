@@ -305,7 +305,7 @@ async function loadData() {
     // Filter to within radius and user type preferences
     waterBodies = waterBodies.filter(wb => {
       if (distanceMiles(userLat, userLon, wb.lat, wb.lon) > radiusMiles) return false;
-      if (waterTypePrefs && !waterTypePrefs.includes(wb.type)) return false;
+      if (waterTypePrefs?.length && !waterTypePrefs.includes(wb.type)) return false;
       return true;
     });
     usgsSites = usgsSites.filter(s =>

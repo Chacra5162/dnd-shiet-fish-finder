@@ -226,7 +226,11 @@ async function fetchWaterBodies(south, west, north, east) {
   const waterBodies = [];
   const seen = new Set();
 
-  for (const el of json.elements) {
+  if (!json.elements?.length) {
+    console.warn('Overpass returned 0 elements', json);
+  }
+
+  for (const el of (json.elements || [])) {
     // Use center coords for ways/relations
     const lat = el.center?.lat || el.lat;
     const lon = el.center?.lon || el.lon;
