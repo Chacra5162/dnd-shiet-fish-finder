@@ -2560,6 +2560,7 @@ function setupEventListeners() {
 
   // === Social Feed ===
   $('#btn-social').addEventListener('click', () => {
+    if (!getUser()) { authModal.classList.remove('hidden'); return; }
     openSocialFeed();
   });
   $('#btn-close-social').addEventListener('click', () => {
@@ -2568,6 +2569,7 @@ function setupEventListeners() {
 
   // === License Wallet ===
   $('#btn-licenses').addEventListener('click', () => {
+    if (!getUser()) { authModal.classList.remove('hidden'); return; }
     openLicensePanel();
   });
   $('#btn-close-licenses').addEventListener('click', () => {
@@ -2576,6 +2578,7 @@ function setupEventListeners() {
 
   // === Arsenal ===
   $('#btn-arsenal').addEventListener('click', async () => {
+    if (!getUser()) { authModal.classList.remove('hidden'); return; }
     await loadArsenal();
     openArsenal();
   });
