@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dnd-shiet-fish-finder-v13';
+const CACHE_NAME = 'dnd-shiet-fish-finder-v14';
 const TILE_CACHE = 'dnd-tiles-v1';
 const MAX_TILES = 500;
 const STATIC_ASSETS = [
@@ -46,7 +46,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // API calls — network first, no caching at SW level
+  // API calls + CDN scripts — network first, no caching at SW level
   if (
     url.hostname === 'waterservices.usgs.gov' ||
     url.hostname === 'overpass-api.de' ||
@@ -54,7 +54,9 @@ self.addEventListener('fetch', (event) => {
     url.hostname === 'maps.mail.ru' ||
     url.hostname.includes('supabase.co') ||
     url.hostname === 'api.open-meteo.com' ||
-    url.hostname === 'api.tidesandcurrents.noaa.gov'
+    url.hostname === 'api.tidesandcurrents.noaa.gov' ||
+    url.hostname === 'unpkg.com' ||
+    url.hostname === 'cdn.jsdelivr.net'
   ) {
     event.respondWith(
       fetch(event.request).catch(() => {
