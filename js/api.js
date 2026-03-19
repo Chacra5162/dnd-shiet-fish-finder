@@ -714,20 +714,26 @@ function mergeColocated(items) {
       .trim();
   }
 
-  // Check if two names refer to the same water body
-  function sameWater(a, b) {
+  const genericPattern = /^(lake|pond|river|creek|boat landing|fishing pier) #\d+$/;
+  const areaPattern = /\b(area|& )/.test.bind(/\b(area|& )/);
+
+  // Check if two entries refer to the same water body — conservative to avoid eating distinct lakes
+  function sameWater(a, b, typeA, typeB) {
     const ba = baseName(a);
     const bb = baseName(b);
     if (!ba || !bb) return false;
     // Exact base match: "James River" and "James River - Boat Landing"
     if (ba === bb) return true;
-    // One contains the other: "James River" contains "james"
+    // One is a sub-name of the other: "James River" ↔ "James River - Boat Landing"
     if (ba.includes(bb) || bb.includes(ba)) return true;
-    // Generic numbered names always merge with named features nearby
-    if (/^(lake|pond|river|creek|boat landing|fishing pier) #\d+$/.test(ba)) return true;
-    if (/^(lake|pond|river|creek|boat landing|fishing pier) #\d+$/.test(bb)) return true;
-    // "River & Creek Area" type merged names
-    if (ba.includes(' area') || bb.includes(' area')) return true;
+    // Access point (boat_landing/pier) with generic name near a named water body — merge
+    const aGeneric = genericPattern.test(ba) || areaPattern(ba);
+    const bGeneric = genericPattern.test(bb) || areaPattern(bb);
+    const accessTypes = ['boat_landing', 'fishing_pier'];
+    if (aGeneric && accessTypes.includes(typeA) && !bGeneric) return true;
+    if (bGeneric && accessTypes.includes(typeB) && !aGeneric) return true;
+    // Do NOT merge two standalone water bodies just because one is unnamed —
+    // "Lake #123" near "Rock Creek Lake" are likely different lakes
     return false;
   }
 
@@ -753,7 +759,7 @@ function mergeColocated(items) {
           if (j <= i || merged.has(j)) continue;
           const other = items[j];
           const dist = Math.abs(wb.lat - other.lat) + Math.abs(wb.lon - other.lon);
-          if (dist < MERGE_DIST && sameWater(wb.name, other.name)) {
+          if (dist < MERGE_DIST && sameWater(wb.name, other.name, wb.type, other.type)) {
             candidates.push(j);
           }
         }
