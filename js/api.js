@@ -274,6 +274,7 @@ async function fetchWaterBodies(south, west, north, east) {
   const KEEP_KEYS = ['name', 'alt_name', 'water', 'waterway', 'natural', 'leisure',
     'man_made', 'access', 'ownership', 'owner', 'operator', 'fishing', 'sport',
     'boundary', 'landuse', 'club', 'is_in', 'description'];
+  const unnamedWayIds = []; // track unnamed waterway ways for parent relation lookup
 
   for (const el of (json.elements || [])) {
     const lat = el.center?.lat || el.lat;
@@ -295,7 +296,11 @@ async function fetchWaterBodies(south, west, north, east) {
 
     if (isUnnamed) {
       if (el.type === 'node') continue;
-      name = null; // will be resolved in pass 2
+      // Track unnamed waterway ways for parent relation name resolution
+      if (el.type === 'way' && (tags.waterway || tags.water === 'river')) {
+        unnamedWayIds.push(el.id);
+      }
+      name = null; // will be resolved in pass 1.5 or pass 2
     }
 
     const keepTags = {};
@@ -304,6 +309,47 @@ async function fetchWaterBodies(south, west, north, east) {
     }
 
     rawFeatures.push({ id: el.id, name, type, lat, lon, tags: keepTags, isUnnamed });
+  }
+
+  // --- Pass 1.5: Resolve unnamed waterway names from parent relations ---
+  if (unnamedWayIds.length > 0) {
+    try {
+      const parentQuery = `[out:json][timeout:10];way(id:${unnamedWayIds.join(',')});(rel(bw)["name"]["waterway"];rel(bw)["name"]["natural"="water"];rel(bw)["name"]["water"];);out tags;`;
+      const parentJson = await fetchOverpass(parentQuery);
+      // Build map: relation id -> name, then map way membership
+      if (parentJson.elements?.length) {
+        // We need way->relation mapping, so do a second query to get members
+        const relIds = parentJson.elements.map(r => r.id);
+        const relNames = {};
+        for (const r of parentJson.elements) {
+          relNames[r.id] = r.tags.name;
+        }
+        // Query relation members to map ways to relation names
+        const memberQuery = `[out:json][timeout:10];rel(id:${relIds.join(',')});out body;`;
+        const memberJson = await fetchOverpass(memberQuery);
+        const wayToName = {};
+        if (memberJson.elements?.length) {
+          for (const rel of memberJson.elements) {
+            const relName = relNames[rel.id];
+            if (!relName || !rel.members) continue;
+            for (const m of rel.members) {
+              if (m.type === 'way' && unnamedWayIds.includes(m.ref)) {
+                wayToName[m.ref] = relName;
+              }
+            }
+          }
+        }
+        // Apply resolved names to unnamed features
+        for (const f of rawFeatures) {
+          if (f.isUnnamed && wayToName[f.id]) {
+            f.name = wayToName[f.id];
+            f.isUnnamed = false;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Parent relation name lookup failed (non-fatal):', e.message);
+    }
   }
 
   // --- Pass 2: Build park spatial index for fast proximity lookups ---
@@ -846,10 +892,27 @@ function getFishingLinks(lat, lon, waterType, waterName) {
 }
 
 // Species commonly found in VA/NC waters
-function getCommonSpecies(waterType, lat, lon) {
+function getCommonSpecies(waterType, lat, lon, waterName) {
   const eastern = lon > -78;
   const mountain = lon < -80;
   const coastal = lon > -76.5; // tidal/coastal — speckled trout, redfish, flounder territory
+  // Tidal zone: eastern rivers between the fall line (~Richmond) and the bay
+  const tidal = eastern && !mountain && lon > -77.8 && lon < -76;
+  const nameLower = (waterName || '').toLowerCase();
+
+  // Tidal rivers (James, Chickahominy, Rappahannock, York, etc.) have a distinct fishery
+  const isTidalRiver = tidal && (waterType === 'river' || waterType === 'boat_landing') &&
+    (nameLower.includes('james') || nameLower.includes('chickahominy') ||
+     nameLower.includes('rappahannock') || nameLower.includes('york') ||
+     nameLower.includes('mattaponi') || nameLower.includes('pamunkey') ||
+     nameLower.includes('appomattox') || nameLower.includes('elizabeth') ||
+     nameLower.includes('nansemond') || (!nameLower || nameLower.startsWith('river #')));
+
+  if (isTidalRiver) {
+    return ['Blue Catfish', 'Striped Bass', 'Largemouth Bass', 'Snakehead', 'Flathead Catfish',
+      'Channel Catfish', 'White Perch', 'American Shad', 'Hickory Shad', 'Longnose Gar',
+      'White Catfish', 'Carp', 'Herring'];
+  }
 
   const species = {
     lake: eastern
@@ -860,7 +923,7 @@ function getCommonSpecies(waterType, lat, lon) {
     river: eastern
       ? (coastal
         ? ['Striped Bass', 'Blue Catfish', 'Speckled Trout', 'Red Drum', 'Flounder', 'White Perch', 'American Shad', 'Hickory Shad', 'Spot', 'Croaker']
-        : ['Striped Bass', 'Blue Catfish', 'American Shad', 'Hickory Shad', 'White Perch', 'Largemouth Bass', 'Channel Catfish', 'Herring', 'Carp'])
+        : ['Striped Bass', 'Blue Catfish', 'American Shad', 'Hickory Shad', 'White Perch', 'Largemouth Bass', 'Channel Catfish', 'Flathead Catfish', 'Snakehead', 'Longnose Gar', 'Herring', 'Carp'])
       : mountain
         ? ['Smallmouth Bass', 'Spotted Bass', 'Rainbow Trout', 'Brown Trout', 'Brook Trout', 'Muskie']
         : ['Smallmouth Bass', 'Spotted Bass', 'Channel Catfish', 'Largemouth Bass', 'Striped Bass', 'Sunfish', 'Carp'],
@@ -873,7 +936,7 @@ function getCommonSpecies(waterType, lat, lon) {
     boat_landing: eastern
       ? (coastal
         ? ['Striped Bass', 'Blue Catfish', 'Speckled Trout', 'Red Drum', 'Flounder']
-        : ['Largemouth Bass', 'Blue Catfish', 'Striped Bass', 'Crappie', 'Channel Catfish'])
+        : ['Blue Catfish', 'Striped Bass', 'Largemouth Bass', 'Snakehead', 'Flathead Catfish', 'Channel Catfish', 'Crappie'])
       : ['Largemouth Bass', 'Smallmouth Bass', 'Striped Bass', 'Channel Catfish', 'Crappie'],
     fishing_pier: coastal
       ? ['Speckled Trout', 'Red Drum', 'Flounder', 'Spot', 'Croaker', 'Bluefish', 'Sheepshead']

@@ -548,7 +548,7 @@ const TROUT_SPECIES = ['Rainbow Trout', 'Brown Trout', 'Brook Trout'];
 const troutWarningDismissed = new Set();
 
 function isTroutLocation(wb) {
-  const species = getCommonSpecies(wb.type, wb.lat, wb.lon);
+  const species = getCommonSpecies(wb.type, wb.lat, wb.lon, wb.name);
   return species.some(s => TROUT_SPECIES.includes(s));
 }
 
@@ -562,7 +562,7 @@ function isTroutStockedName(name, lat, lon) {
 }
 
 function getTroutWarningHtml(wb, context = 'detail') {
-  const species = getCommonSpecies(wb.type, wb.lat, wb.lon);
+  const species = getCommonSpecies(wb.type, wb.lat, wb.lon, wb.name);
   const troutFound = species.filter(s => TROUT_SPECIES.includes(s));
   const nameHint = isTroutStockedName(wb.name, wb.lat, wb.lon);
 
@@ -927,7 +927,7 @@ async function showWaterDetail(wb, dist) {
 
   const nearbyUSGS = findNearbyUSGS(wb.lat, wb.lon, 10);
   const links = getFishingLinks(wb.lat, wb.lon, wb.type, wb.name);
-  const species = getCommonSpecies(wb.type, wb.lat, wb.lon);
+  const species = getCommonSpecies(wb.type, wb.lat, wb.lon, wb.name);
   const typeLabel = { lake: 'Lake / Reservoir', river: 'River', stream: 'Stream / Creek', pond: 'Pond', boat_landing: 'Boat Landing', fishing_pier: 'Fishing Pier' };
 
   let html = `
@@ -1236,7 +1236,7 @@ function renderCommunityPosts(posts, container) {
 }
 
 function getCommunityFormHtml(wb) {
-  const species = getCommonSpecies(wb.type, wb.lat, wb.lon);
+  const species = getCommonSpecies(wb.type, wb.lat, wb.lon, wb.name);
   return `
     <div class="community-form">
       <div class="community-tab-bar">
@@ -2134,7 +2134,7 @@ async function handleGetForecast() {
     $('#trip-traffic-area').innerHTML = getTrafficBadgeHtml(traffic);
 
     // Populate species selector
-    const species = getCommonSpecies(wb.type, wb.lat, wb.lon);
+    const species = getCommonSpecies(wb.type, wb.lat, wb.lon, wb.name);
     const selectorEl = $('#trip-species-selector');
     selectorEl.innerHTML = species.map(s =>
       `<button class="species-chip" data-species="${escapeAttr(s)}" onclick="window._toggleTripSpecies(this)">${escapeHtml(s)}</button>`
