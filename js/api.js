@@ -568,7 +568,11 @@ function dedupeWaterBodies(items) {
   // Second pass: collapse same-named water bodies into a single representative point.
   // A creek named "Big Creek" may appear as 20+ OSM segments along its length —
   // keep only the most central point per name per cluster.
-  return collapseByName(unique);
+  const collapsed = collapseByName(unique);
+
+  // Third pass: merge nearby entries that refer to the same water body but have different types.
+  // E.g., "James River" (river) + "James River - Boat Landing" (boat_landing) within 0.5 mi → single entry.
+  return mergeColocated(collapsed);
 }
 
 // For named entries: group by exact name + type, then cluster spatially.
@@ -684,6 +688,131 @@ function pickRepresentative(cluster) {
     const wbDist = (wb.lat - cLat) ** 2 + (wb.lon - cLon) ** 2;
     return wbDist < bestDist ? wb : best;
   });
+}
+
+// Merge co-located entries that clearly refer to the same place.
+// A "James River - Boat Landing" next to "James River" should be one entry.
+// A generic "Boat Landing #xxx" next to "James River" should merge into "James River".
+function mergeColocated(items) {
+  const MERGE_DIST = 0.008; // ~0.55 miles
+  const grid = new Map();
+  const gSize = 0.01;
+
+  // Index all items by grid cell
+  for (let i = 0; i < items.length; i++) {
+    const wb = items[i];
+    const gk = `${Math.floor(wb.lat / gSize)}_${Math.floor(wb.lon / gSize)}`;
+    if (!grid.has(gk)) grid.set(gk, []);
+    grid.get(gk).push(i);
+  }
+
+  // Extract base water name: "James River - Boat Landing" → "james river"
+  function baseName(name) {
+    return (name || '').toLowerCase()
+      .replace(/\s*-\s*(boat landing|boat ramp|fishing pier|pier|ramp|landing|creek|river|lake|stream)$/i, '')
+      .replace(/\s*\(.*\)$/, '')
+      .trim();
+  }
+
+  // Check if two names refer to the same water body
+  function sameWater(a, b) {
+    const ba = baseName(a);
+    const bb = baseName(b);
+    if (!ba || !bb) return false;
+    // Exact base match: "James River" and "James River - Boat Landing"
+    if (ba === bb) return true;
+    // One contains the other: "James River" contains "james"
+    if (ba.includes(bb) || bb.includes(ba)) return true;
+    // Generic numbered names always merge with named features nearby
+    if (/^(lake|pond|river|creek|boat landing|fishing pier) #\d+$/.test(ba)) return true;
+    if (/^(lake|pond|river|creek|boat landing|fishing pier) #\d+$/.test(bb)) return true;
+    // "River & Creek Area" type merged names
+    if (ba.includes(' area') || bb.includes(' area')) return true;
+    return false;
+  }
+
+  // Type priority: prefer boat_landing > fishing_pier > river > lake > stream > pond
+  const typePri = { boat_landing: 6, fishing_pier: 5, river: 4, lake: 3, stream: 2, pond: 1 };
+
+  const merged = new Set(); // indices consumed by merges
+  const result = [];
+
+  for (let i = 0; i < items.length; i++) {
+    if (merged.has(i)) continue;
+    const wb = items[i];
+    const gx = Math.floor(wb.lat / gSize);
+    const gy = Math.floor(wb.lon / gSize);
+
+    // Find nearby items to merge with
+    const candidates = [];
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const cell = grid.get(`${gx + dx}_${gy + dy}`);
+        if (!cell) continue;
+        for (const j of cell) {
+          if (j <= i || merged.has(j)) continue;
+          const other = items[j];
+          const dist = Math.abs(wb.lat - other.lat) + Math.abs(wb.lon - other.lon);
+          if (dist < MERGE_DIST && sameWater(wb.name, other.name)) {
+            candidates.push(j);
+          }
+        }
+      }
+    }
+
+    if (candidates.length === 0) {
+      result.push(wb);
+      continue;
+    }
+
+    // Merge: pick the best entry from this group
+    const group = [wb, ...candidates.map(j => items[j])];
+    for (const j of candidates) merged.add(j);
+
+    // Pick the entry with the best (most specific real) name
+    // Prefer named > generic, then prefer boat_landing/fishing_pier type, then most tags
+    const best = group.reduce((a, b) => {
+      const aGeneric = /^(Lake|Pond|River|Creek|Boat Landing|Fishing Pier) #\d+$/.test(a.name) || a.name.endsWith(' Area');
+      const bGeneric = /^(Lake|Pond|River|Creek|Boat Landing|Fishing Pier) #\d+$/.test(b.name) || b.name.endsWith(' Area');
+      if (aGeneric && !bGeneric) return b;
+      if (!aGeneric && bGeneric) return a;
+      // Both named or both generic — prefer the one with access infrastructure
+      const aPri = typePri[a.type] || 0;
+      const bPri = typePri[b.type] || 0;
+      if (aPri !== bPri) return bPri > aPri ? b : a;
+      // More tags = richer data
+      return Object.keys(b.tags || {}).length > Object.keys(a.tags || {}).length ? b : a;
+    });
+
+    // Merge tags from all entries and keep the best type info
+    const allTypes = [...new Set(group.map(g => g.type))];
+    const hasAccess = allTypes.some(t => t === 'boat_landing' || t === 'fishing_pier');
+    const mergedTags = { ...best.tags };
+    for (const g of group) {
+      for (const [k, v] of Object.entries(g.tags || {})) {
+        if (!mergedTags[k]) mergedTags[k] = v;
+      }
+    }
+
+    // If the best name is a sub-name like "James River - Boat Landing", use the parent name
+    // but keep the type as boat_landing for the access indicator
+    let finalName = best.name;
+    const dashIdx = finalName.indexOf(' - ');
+    if (dashIdx > 0 && hasAccess) {
+      // Keep the full name with the access suffix
+    } else if (dashIdx > 0) {
+      finalName = finalName.substring(0, dashIdx);
+    }
+
+    result.push({
+      ...best,
+      name: finalName,
+      type: hasAccess ? (allTypes.includes('boat_landing') ? 'boat_landing' : 'fishing_pier') : best.type,
+      tags: mergedTags,
+    });
+  }
+
+  return result;
 }
 
 
@@ -944,8 +1073,8 @@ function getCommonSpecies(waterType, lat, lon, waterName) {
   const eastern = lon > -78;
   const mountain = lon < -80;
   const coastal = lon > -76.5; // tidal/coastal — speckled trout, redfish, flounder territory
-  // Tidal zone: eastern rivers between the fall line (~Richmond) and the bay
-  const tidal = eastern && !mountain && lon > -77.8 && lon < -76;
+  // Tidal zone: eastern rivers between the fall line (~Richmond) and the Chesapeake Bay
+  const tidal = eastern && !mountain && lon > -77.8;
   const nameLower = (waterName || '').toLowerCase();
 
   // Tidal rivers (James, Chickahominy, Rappahannock, York, etc.) have a distinct fishery
