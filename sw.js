@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dnd-shiet-fish-finder-v29';
+const CACHE_NAME = 'dnd-shiet-fish-finder-v30';
 const TILE_CACHE = 'dnd-tiles-v2';
 const MAX_TILES = 1500;
 const STATIC_ASSETS = [

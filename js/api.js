@@ -1059,6 +1059,18 @@ function getFishingLinks(lat, lon, waterType, waterName) {
     });
   }
 
+  // Nautical chart / depth map for navigable waters
+  if (lon > -78 && (waterType === 'river' || waterType === 'boat_landing' || waterType === 'lake')) {
+    links.push({
+      label: 'Nautical Chart & Depth Map (iBoating)',
+      url: `https://fishing-app.gpsnauticalcharts.com/i-boating-fishing-web-app/fishing-marine-charts-navigation.html#13/${lat}/${lon}`,
+    });
+    links.push({
+      label: 'NOAA Chart Viewer',
+      url: `https://www.charts.noaa.gov/InteractiveCatalog/nrnc.shtml#center=${lat},${lon}&zoom=0.04`,
+    });
+  }
+
   // Directions
   links.push({
     label: `Google Maps Directions`,
