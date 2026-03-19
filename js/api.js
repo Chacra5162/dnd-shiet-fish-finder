@@ -226,6 +226,12 @@ function extractBestName(tags, type) {
   }
   // Destination tag (common on waterways)
   if (tags.destination) return tags.destination;
+  // Wikipedia tag (e.g., "en:James River" → "James River")
+  if (tags.wikipedia) {
+    const wp = tags.wikipedia;
+    const colonIdx = wp.indexOf(':');
+    return colonIdx >= 0 ? wp.substring(colonIdx + 1) : wp;
+  }
   // No usable name found
   return null;
 }
@@ -273,7 +279,8 @@ async function fetchWaterBodies(south, west, north, east) {
   const rawFeatures = [];
   const KEEP_KEYS = ['name', 'alt_name', 'water', 'waterway', 'natural', 'leisure',
     'man_made', 'access', 'ownership', 'owner', 'operator', 'fishing', 'sport',
-    'boundary', 'landuse', 'club', 'is_in', 'description'];
+    'boundary', 'landuse', 'club', 'is_in', 'description', 'wikipedia', 'wikidata',
+    'tidal', 'destination'];
   const unnamedWayIds = []; // track unnamed waterway ways for parent relation lookup
 
   for (const el of (json.elements || [])) {
@@ -458,6 +465,47 @@ async function fetchWaterBodies(south, west, north, east) {
       tags: bestFeature.tags,
       isUnnamed: false,
     });
+  }
+
+  // --- Pass 3.5: Associate unnamed features with nearby named water bodies ---
+  // Build spatial index of named water features for proximity matching
+  const WATER_MATCH_DIST = 0.008; // ~0.55 miles — match boat ramps to nearby rivers/lakes
+  const namedWaters = rawFeatures.filter(f => !f.isUnnamed && !clusteredIds.has(f.id) &&
+    (f.type === 'river' || f.type === 'lake' || f.type === 'stream'));
+  const waterGrid = new Map();
+  const wgSize = 0.01;
+  for (const w of namedWaters) {
+    const gk = `${Math.floor(w.lat / wgSize)}_${Math.floor(w.lon / wgSize)}`;
+    if (!waterGrid.has(gk)) waterGrid.set(gk, []);
+    waterGrid.get(gk).push(w);
+  }
+
+  function findNearestNamedWater(lat, lon) {
+    const gx = Math.floor(lat / wgSize);
+    const gy = Math.floor(lon / wgSize);
+    let best = null, bestDist = WATER_MATCH_DIST;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const cell = waterGrid.get(`${gx + dx}_${gy + dy}`);
+        if (!cell) continue;
+        for (const w of cell) {
+          const d = Math.abs(w.lat - lat) + Math.abs(w.lon - lon);
+          if (d < bestDist) { bestDist = d; best = w; }
+        }
+      }
+    }
+    return best;
+  }
+
+  // Name unnamed boat landings, piers, and other features from nearby water bodies
+  for (const f of rawFeatures) {
+    if (!f.isUnnamed || clusteredIds.has(f.id)) continue;
+    const nearWater = findNearestNamedWater(f.lat, f.lon);
+    if (nearWater) {
+      const typeLabel = { boat_landing: 'Boat Landing', fishing_pier: 'Fishing Pier', river: 'River', stream: 'Creek', lake: 'Lake', pond: 'Pond' };
+      f.name = `${nearWater.name} - ${typeLabel[f.type] || f.type}`;
+      f.isUnnamed = false;
+    }
   }
 
   // --- Pass 4: Finalize all features (name remaining unnamed, dedupe) ---
