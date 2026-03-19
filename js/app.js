@@ -925,16 +925,25 @@ async function loadWaterConditions(wb, gen) {
   if (!area) return;
 
   const isTidal = isTidalWater(wb.lat, wb.lon, wb.type);
+  const eastern = wb.lon > -78;
   const reservoir = (wb.type === 'lake') ? findUSACEReservoir(wb.lat, wb.lon, wb.name) : null;
 
-  // Fetch in parallel: NOAA water temp (tidal), water depth (coastal/bay), reservoir level
+  // Check if a nearby USGS site already has water temp
+  const nearbyUSGS = findNearbyUSGS(wb.lat, wb.lon, 10);
+  const usgsHasTemp = nearbyUSGS.some(s => s.data?.temp);
+
+  // Fetch in parallel: NOAA water temp, water depth (coastal/bay), reservoir level
   const promises = [];
-  if (isTidal) promises.push(fetchNOAAWaterTemp(wb.lat, wb.lon).catch(() => null));
+
+  // NOAA temp: fetch for any eastern location if USGS doesn't have temp nearby
+  if (eastern && !usgsHasTemp) promises.push(fetchNOAAWaterTemp(wb.lat, wb.lon).catch(() => null));
   else promises.push(Promise.resolve(null));
 
+  // Depth: fetch for tidal and eastern coastal locations
   if (isTidal || wb.lon > -77) promises.push(fetchWaterDepth(wb.lat, wb.lon).catch(() => null));
   else promises.push(Promise.resolve(null));
 
+  // Reservoir level
   if (reservoir) promises.push(fetchReservoirLevel(reservoir).catch(() => null));
   else promises.push(Promise.resolve(null));
 
@@ -943,7 +952,17 @@ async function loadWaterConditions(wb, gen) {
 
   const cards = [];
 
-  if (noaaTemp) {
+  // Show USGS water temp if available from nearby gauge
+  const usgsTemp = nearbyUSGS.find(s => s.data?.temp);
+  if (usgsTemp) {
+    cards.push(`
+      <div class="data-card">
+        <div class="label">Water Temp</div>
+        <div class="value" style="color:#e67e22;">${usgsTemp.data.temp.value}${escapeHtml(usgsTemp.data.temp.unit)}</div>
+        <div style="font-size:0.6rem;color:var(--text-muted);">USGS ${escapeHtml(usgsTemp.name)}</div>
+      </div>
+    `);
+  } else if (noaaTemp) {
     cards.push(`
       <div class="data-card">
         <div class="label">Water Temp</div>

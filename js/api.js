@@ -1662,26 +1662,20 @@ const NOAA_COOPS_BASE = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagett
 
 // Fetch current water temperature from nearest NOAA tidal station
 async function fetchNOAAWaterTemp(lat, lon) {
-  // Find nearest station from the tide station list in fishing.js
-  // Hardcode the station IDs that have water_temperature product
+  // Only stations verified to serve water_temperature product
   const tempStations = [
     { id: '8638610', name: 'Sewells Point', lat: 36.9467, lon: -76.3300 },
-    { id: '8638863', name: 'CBBT', lat: 36.9667, lon: -76.1133 },
     { id: '8632200', name: 'Kiptopeke', lat: 37.1667, lon: -75.9883 },
     { id: '8635750', name: 'Lewisetta', lat: 37.9950, lon: -76.4633 },
-    { id: '8636580', name: 'Windmill Point', lat: 37.6150, lon: -76.2900 },
-    { id: '8637624', name: 'Gloucester Point', lat: 37.2467, lon: -76.5000 },
     { id: '8637689', name: 'Yorktown', lat: 37.2267, lon: -76.4783 },
     { id: '8639348', name: 'Money Point', lat: 36.7767, lon: -76.3017 },
     { id: '8631044', name: 'Wachapreague', lat: 37.6078, lon: -75.6858 },
-    { id: '8652587', name: 'Oregon Inlet', lat: 35.7956, lon: -75.5481 },
     { id: '8656483', name: 'Beaufort NC', lat: 34.7200, lon: -76.6700 },
     { id: '8658120', name: 'Wilmington NC', lat: 34.2267, lon: -77.9533 },
-    { id: '8654467', name: 'Hatteras NC', lat: 35.2094, lon: -75.6903 },
     { id: '8651370', name: 'Duck NC', lat: 36.1833, lon: -75.7467 },
   ];
 
-  let best = null, bestDist = 40; // max 40 miles
+  let best = null, bestDist = 80; // max 80 miles — tidal stations are sparse
   for (const s of tempStations) {
     const d = distanceMiles(lat, lon, s.lat, s.lon);
     if (d < bestDist) { bestDist = d; best = s; }
