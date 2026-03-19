@@ -598,6 +598,7 @@ a { color: var(--accent); }
 }
 .map-switch-btn:hover { color: var(--text); background: rgba(255,255,255,0.08); }
 .map-switch-btn.active { color: var(--accent); background: rgba(52,152,219,0.2); }
+.depth-switcher { margin-top: 4px; }
 
 /* ===== Legend ===== */
 .map-legend {

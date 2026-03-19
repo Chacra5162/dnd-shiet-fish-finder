@@ -15,6 +15,8 @@ let userPlacesLayer = null;
 let attractorLayer = null;
 let baseLayers = {};
 let navionicsLayer = null;
+let depthOverlay = null;
+let depthMode = null; // null, 'ocean', 'nautical'
 let currentBase = 'dark';
 let allWaterBodies = [];
 let allUSGSSites = [];
@@ -154,6 +156,98 @@ function addMapSwitcher() {
     return div;
   };
   switcher.addTo(map);
+
+  // Depth / Chart overlay control
+  const depthCtrl = L.control({ position: 'topright' });
+  depthCtrl.onAdd = () => {
+    const div = L.DomUtil.create('div', 'map-switcher depth-switcher');
+    div.innerHTML = `
+      <button class="map-switch-btn" data-depth="ocean" title="Ocean depth map">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M2 17l2-1c2-2 4-2 6 0s4 2 6 0 4-2 6 0l2 1v2l-2-1c-2-2-4-2-6 0s-4 2-6 0-4-2-6 0l-2 1v-2zm0-5l2-1c2-2 4-2 6 0s4 2 6 0 4-2 6 0l2 1v2l-2-1c-2-2-4-2-6 0s-4 2-6 0-4-2-6 0l-2 1v-2zm0-5l2-1c2-2 4-2 6 0s4 2 6 0 4-2 6 0l2 1v2l-2-1c-2-2-4-2-6 0s-4 2-6 0-4-2-6 0l-2 1V7z" fill="currentColor"/></svg>
+      </button>
+      <button class="map-switch-btn" data-depth="nautical" title="Nautical chart overlay">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M7 17L3 13V11l4 4L17 5l4 4L7 17z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.5"/></svg>
+      </button>
+    `;
+    L.DomEvent.disableClickPropagation(div);
+    div.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-depth]');
+      if (!btn) return;
+      const mode = btn.dataset.depth;
+      toggleDepthOverlay(mode, div);
+    });
+    return div;
+  };
+  depthCtrl.addTo(map);
+}
+
+function toggleDepthOverlay(mode, container) {
+  // Remove existing overlay
+  if (depthOverlay) {
+    map.removeLayer(depthOverlay);
+    depthOverlay = null;
+  }
+
+  // Toggle off if same mode clicked again
+  if (depthMode === mode) {
+    depthMode = null;
+    container.querySelectorAll('.map-switch-btn').forEach(b => b.classList.remove('active'));
+    return;
+  }
+
+  depthMode = mode;
+  container.querySelectorAll('.map-switch-btn').forEach(b => b.classList.remove('active'));
+  container.querySelector(`[data-depth="${mode}"]`).classList.add('active');
+
+  if (mode === 'ocean') {
+    // Esri Ocean basemap (shows underwater topography + depth shading)
+    const oceanBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '&copy; Esri, GEBCO, NOAA',
+      maxZoom: 16,
+      opacity: 0.7,
+    });
+    const oceanRef = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 16,
+      opacity: 0.9,
+    });
+    depthOverlay = L.layerGroup([oceanBase, oceanRef]).addTo(map);
+  } else if (mode === 'nautical') {
+    // NOAA ENC (Electronic Navigational Chart) — depth soundings, contours, channels
+    depthOverlay = L.tileLayer.wms('https://gis.charttools.noaa.gov/arcgis/rest/services/MCS/ENCOnline/MapServer/export', {
+      layers: 'show:0,1,2,3,4,5,6,7',
+      format: 'image/png',
+      transparent: true,
+      opacity: 0.75,
+      maxZoom: 18,
+      attribution: '&copy; NOAA Office of Coast Survey',
+      // WMS params via custom URL builder
+    });
+    // Use ArcGIS export as a dynamic tile layer instead of WMS
+    depthOverlay = L.tileLayer('', {
+      maxZoom: 18,
+      opacity: 0.75,
+      attribution: '&copy; NOAA',
+    });
+    // Override getTileUrl for ArcGIS REST export
+    depthOverlay.getTileUrl = function(coords) {
+      const tileSize = 256;
+      const nwPoint = coords.scaleBy(L.point(tileSize, tileSize));
+      const sePoint = nwPoint.add(L.point(tileSize, tileSize));
+      const nw = map.unproject(nwPoint, coords.z);
+      const se = map.unproject(sePoint, coords.z);
+      // Convert to Web Mercator (3857)
+      const toMerc = (lat, lon) => {
+        const x = lon * 20037508.34 / 180;
+        let y = Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180);
+        y = y * 20037508.34 / 180;
+        return [x, y];
+      };
+      const [x1, y1] = toMerc(se.lat, nw.lng);
+      const [x2, y2] = toMerc(nw.lat, se.lng);
+      return `https://gis.charttools.noaa.gov/arcgis/rest/services/MCS/ENCOnline/MapServer/export?bbox=${x1},${y1},${x2},${y2}&bboxSR=3857&imageSR=3857&size=${tileSize},${tileSize}&format=png&transparent=true&f=image`;
+    };
+    depthOverlay.addTo(map);
+  }
 }
 
 function addLegend() {
