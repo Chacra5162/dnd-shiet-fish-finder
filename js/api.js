@@ -1656,6 +1656,193 @@ async function fetchFishAttractors(south, west, north, east) {
   }
 }
 
+// ===== NOAA Tidal Station Water Temperature =====
+
+const NOAA_COOPS_BASE = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
+
+// Fetch current water temperature from nearest NOAA tidal station
+async function fetchNOAAWaterTemp(lat, lon) {
+  // Find nearest station from the tide station list in fishing.js
+  // Hardcode the station IDs that have water_temperature product
+  const tempStations = [
+    { id: '8638610', name: 'Sewells Point', lat: 36.9467, lon: -76.3300 },
+    { id: '8638863', name: 'CBBT', lat: 36.9667, lon: -76.1133 },
+    { id: '8632200', name: 'Kiptopeke', lat: 37.1667, lon: -75.9883 },
+    { id: '8635750', name: 'Lewisetta', lat: 37.9950, lon: -76.4633 },
+    { id: '8636580', name: 'Windmill Point', lat: 37.6150, lon: -76.2900 },
+    { id: '8637624', name: 'Gloucester Point', lat: 37.2467, lon: -76.5000 },
+    { id: '8637689', name: 'Yorktown', lat: 37.2267, lon: -76.4783 },
+    { id: '8639348', name: 'Money Point', lat: 36.7767, lon: -76.3017 },
+    { id: '8631044', name: 'Wachapreague', lat: 37.6078, lon: -75.6858 },
+    { id: '8652587', name: 'Oregon Inlet', lat: 35.7956, lon: -75.5481 },
+    { id: '8656483', name: 'Beaufort NC', lat: 34.7200, lon: -76.6700 },
+    { id: '8658120', name: 'Wilmington NC', lat: 34.2267, lon: -77.9533 },
+    { id: '8654467', name: 'Hatteras NC', lat: 35.2094, lon: -75.6903 },
+    { id: '8651370', name: 'Duck NC', lat: 36.1833, lon: -75.7467 },
+  ];
+
+  let best = null, bestDist = 40; // max 40 miles
+  for (const s of tempStations) {
+    const d = distanceMiles(lat, lon, s.lat, s.lon);
+    if (d < bestDist) { bestDist = d; best = s; }
+  }
+
+  if (!best) return null;
+
+  try {
+    const params = new URLSearchParams({
+      date: 'latest',
+      station: best.id,
+      product: 'water_temperature',
+      units: 'english',
+      time_zone: 'lst_ldt',
+      format: 'json',
+    });
+    const res = await fetchWithTimeout(`${NOAA_COOPS_BASE}?${params}`, 8000);
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json.error || !json.data?.length) return null;
+
+    const reading = json.data[json.data.length - 1];
+    return {
+      temp: parseFloat(reading.v),
+      unit: '°F',
+      station: best.name,
+      stationId: best.id,
+      distance: Math.round(bestDist * 10) / 10,
+      time: reading.t,
+    };
+  } catch (e) {
+    console.warn('NOAA water temp fetch failed:', e.message);
+    return null;
+  }
+}
+
+// ===== NOAA DEM Bathymetry (Coastal/Bay Depth) =====
+
+// Point query for water depth at a given coordinate
+// Returns depth in feet (negative = below water) or null if no data
+async function fetchWaterDepth(lat, lon) {
+  try {
+    const url = `https://gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/DEM_all/ImageServer/identify?geometry=${lon},${lat}&geometryType=esriGeometryPoint&returnGeometry=false&f=json`;
+    const res = await fetchWithTimeout(url, 8000);
+    if (!res.ok) return null;
+    const json = await res.json();
+
+    const elevation = json?.value;
+    if (elevation === undefined || elevation === null || elevation === 'NoData') return null;
+
+    const meters = parseFloat(elevation);
+    if (isNaN(meters)) return null;
+
+    // Positive = above water, negative = below water
+    // Only return if it's underwater (negative elevation)
+    if (meters >= 0) return null;
+
+    const feet = Math.round(Math.abs(meters) * 3.28084 * 10) / 10;
+    return {
+      depthFt: feet,
+      depthM: Math.round(Math.abs(meters) * 10) / 10,
+      source: 'NOAA Coastal DEM',
+    };
+  } catch (e) {
+    console.warn('NOAA depth query failed:', e.message);
+    return null;
+  }
+}
+
+// ===== USACE Reservoir Data =====
+
+const USACE_BASE = 'https://cwms-data.usace.army.mil/cwms-data';
+
+// Map known VA/NC reservoirs to their USACE timeseries names
+const USACE_RESERVOIRS = [
+  { name: 'John H. Kerr Reservoir', altNames: ['kerr', 'buggs island'], office: 'SAW', tsPrefix: 'ROA JHK', lat: 36.600, lon: -78.330 },
+  { name: 'Philpott Lake', altNames: ['philpott'], office: 'SAW', tsPrefix: 'ROA PLP', lat: 36.785, lon: -80.030 },
+  { name: 'Lake Moomaw', altNames: ['moomaw', 'gathright'], office: 'NAO', tsPrefix: 'Moomaw', lat: 37.950, lon: -79.940 },
+  { name: 'Falls Lake', altNames: ['falls'], office: 'SAW', tsPrefix: 'NEU FLP', lat: 36.020, lon: -78.690 },
+  { name: 'B. Everett Jordan Lake', altNames: ['jordan'], office: 'SAW', tsPrefix: 'CFR BEJ', lat: 35.730, lon: -79.050 },
+  { name: 'Lake Gaston', altNames: ['gaston'], office: 'SAW', tsPrefix: 'ROA GAS', lat: 36.520, lon: -77.880 },
+  { name: 'Smith Mountain Lake', altNames: ['smith mountain'], office: 'NAO', tsPrefix: 'Smith Mountain', lat: 37.060, lon: -79.540 },
+];
+
+// Find matching USACE reservoir for a water body
+function findUSACEReservoir(lat, lon, waterName) {
+  const nameLower = (waterName || '').toLowerCase();
+
+  // Try name match first
+  for (const r of USACE_RESERVOIRS) {
+    if (nameLower.includes(r.name.toLowerCase()) || r.altNames.some(a => nameLower.includes(a))) {
+      return r;
+    }
+  }
+
+  // Proximity match (within 5 miles)
+  for (const r of USACE_RESERVOIRS) {
+    if (distanceMiles(lat, lon, r.lat, r.lon) < 5) return r;
+  }
+
+  return null;
+}
+
+// Fetch current reservoir pool level from USACE CWMS
+async function fetchReservoirLevel(reservoir) {
+  if (!reservoir) return null;
+
+  const now = new Date();
+  const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
+  const begin = dayAgo.toISOString();
+  const end = now.toISOString();
+
+  // Try common timeseries name patterns for pool elevation
+  const tsPatterns = [
+    `${reservoir.tsPrefix}.Elev.Inst.15Minutes.0.USGS-raw`,
+    `${reservoir.tsPrefix}.Elev.Inst.30Minutes.0.Rev-DCP`,
+    `${reservoir.tsPrefix}.Elev.Inst.1Hour.0.Rev-DCP`,
+    `${reservoir.tsPrefix}.Elev.Inst.15Minutes.0.Rev-DCP`,
+  ];
+
+  for (const tsName of tsPatterns) {
+    try {
+      const params = new URLSearchParams({
+        name: tsName,
+        office: reservoir.office,
+        format: 'json',
+        begin,
+        end,
+      });
+      const res = await fetchWithTimeout(`${USACE_BASE}/timeseries?${params}`, 10000);
+      if (!res.ok) continue;
+      const json = await res.json();
+
+      const values = json?.values?.values || json?.['time-series']?.['time-series']?.[0]?.values?.[0]?.value;
+      // CWMS v3 format
+      if (json.values) {
+        const entries = json.values;
+        if (Array.isArray(entries) && entries.length > 0) {
+          // Find the latest non-zero value
+          for (let i = entries.length - 1; i >= 0; i--) {
+            const [ts, val, quality] = entries[i];
+            if (val !== null && val !== 0) {
+              return {
+                elevation: Math.round(val * 100) / 100,
+                unit: 'ft',
+                time: new Date(ts).toLocaleString(),
+                reservoir: reservoir.name,
+                source: 'USACE',
+              };
+            }
+          }
+        }
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+
+  return null;
+}
+
 export {
   fetchWaterBodies,
   fetchUSGSSites,
@@ -1675,4 +1862,9 @@ export {
   getTrendHtml,
   fetchWaterTempHistory,
   getWaterTempChartHtml,
+
+  fetchNOAAWaterTemp,
+  fetchWaterDepth,
+  findUSACEReservoir,
+  fetchReservoirLevel,
 };

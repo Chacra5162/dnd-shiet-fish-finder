@@ -4,7 +4,7 @@
  * Focused on Virginia & North Carolina. Supabase auth + user places.
  */
 
-import { fetchWaterBodies, fetchUSGSSites, fetchFishAttractors, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml, fetchWaterTempHistory, getWaterTempChartHtml } from './api.js';
+import { fetchWaterBodies, fetchUSGSSites, fetchFishAttractors, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml, fetchWaterTempHistory, getWaterTempChartHtml, fetchNOAAWaterTemp, fetchWaterDepth, findUSACEReservoir, fetchReservoirLevel } from './api.js';
 import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers, setAttractors, highlightMarker, clearHighlight } from './map.js';
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan, fetchAllRegulations, getRegulationsForWater, getUserGaugeAlerts, saveGaugeAlert, deleteGaugeAlert } from './supabase.js';
 import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, rateFishActivity, rateSpotActivity, getWaterClarity, calculateSolunarPeriods, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml, getHatchCalendarHtml } from './fishing.js';
@@ -920,6 +920,71 @@ async function loadRegulations(wb, gen) {
   }
 }
 
+async function loadWaterConditions(wb, gen) {
+  const area = document.getElementById('water-conditions-area');
+  if (!area) return;
+
+  const isTidal = isTidalWater(wb.lat, wb.lon, wb.type);
+  const reservoir = (wb.type === 'lake') ? findUSACEReservoir(wb.lat, wb.lon, wb.name) : null;
+
+  // Fetch in parallel: NOAA water temp (tidal), water depth (coastal/bay), reservoir level
+  const promises = [];
+  if (isTidal) promises.push(fetchNOAAWaterTemp(wb.lat, wb.lon).catch(() => null));
+  else promises.push(Promise.resolve(null));
+
+  if (isTidal || wb.lon > -77) promises.push(fetchWaterDepth(wb.lat, wb.lon).catch(() => null));
+  else promises.push(Promise.resolve(null));
+
+  if (reservoir) promises.push(fetchReservoirLevel(reservoir).catch(() => null));
+  else promises.push(Promise.resolve(null));
+
+  const [noaaTemp, depth, resLevel] = await Promise.all(promises);
+  if (gen !== detailGeneration) return;
+
+  const cards = [];
+
+  if (noaaTemp) {
+    cards.push(`
+      <div class="data-card">
+        <div class="label">Water Temp</div>
+        <div class="value" style="color:#e67e22;">${noaaTemp.temp.toFixed(1)}°F</div>
+        <div style="font-size:0.6rem;color:var(--text-muted);">${escapeHtml(noaaTemp.station)} (${noaaTemp.distance} mi)</div>
+      </div>
+    `);
+  }
+
+  if (depth) {
+    cards.push(`
+      <div class="data-card">
+        <div class="label">Water Depth</div>
+        <div class="value" style="color:#3498db;">${depth.depthFt} ft</div>
+        <div style="font-size:0.6rem;color:var(--text-muted);">${depth.depthM}m &bull; ${escapeHtml(depth.source)}</div>
+      </div>
+    `);
+  }
+
+  if (resLevel) {
+    cards.push(`
+      <div class="data-card">
+        <div class="label">Pool Level</div>
+        <div class="value" style="color:#2980b9;">${resLevel.elevation} ft</div>
+        <div style="font-size:0.6rem;color:var(--text-muted);">USACE &bull; ${escapeHtml(resLevel.time)}</div>
+      </div>
+    `);
+  }
+
+  if (cards.length === 0) return;
+
+  area.innerHTML = `
+    <div class="detail-section">
+      <h3>Water Conditions</h3>
+      <div class="data-cards-row" style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${cards.join('')}
+      </div>
+    </div>
+  `;
+}
+
 async function showWaterDetail(wb, dist) {
   // Highlight the selected marker on the map
   const style = { lake: '#2980b9', river: '#1abc9c', stream: '#27ae60', pond: '#8e44ad', boat_landing: '#e67e22', fishing_pier: '#9b59b6' };
@@ -1010,6 +1075,9 @@ async function showWaterDetail(wb, dist) {
     html += getHatchCalendarHtml(wb.lat, wb.lon);
   }
 
+  // Water conditions placeholder (water temp, depth, reservoir level — loaded async)
+  html += `<div id="water-conditions-area"></div>`;
+
   // Access info — collapsible
   html += collapsibleSection('Access Info', getAccessInfoHtml(wb), true);
 
@@ -1092,6 +1160,9 @@ async function showWaterDetail(wb, dist) {
 
   // Async: load regulations from Supabase
   loadRegulations(wb, gen);
+
+  // Async: load water conditions (NOAA temp, depth, USACE reservoir level)
+  loadWaterConditions(wb, gen);
 }
 
 // Fetch weather, best times, and tides for the detail panel
