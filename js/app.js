@@ -939,9 +939,8 @@ async function loadWaterConditions(wb, gen) {
   if (eastern && !usgsHasTemp) promises.push(fetchNOAAWaterTemp(wb.lat, wb.lon).catch(() => null));
   else promises.push(Promise.resolve(null));
 
-  // Depth: fetch for tidal and eastern coastal locations
-  if (isTidal || wb.lon > -77) promises.push(fetchWaterDepth(wb.lat, wb.lon).catch(() => null));
-  else promises.push(Promise.resolve(null));
+  // Depth: try for all water bodies (NOAA DEM covers coastal/bay, returns null for inland)
+  promises.push(fetchWaterDepth(wb.lat, wb.lon).catch(() => null));
 
   // Reservoir level
   if (reservoir) promises.push(fetchReservoirLevel(reservoir).catch(() => null));

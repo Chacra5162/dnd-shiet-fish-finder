@@ -162,11 +162,17 @@ function addMapSwitcher() {
   depthCtrl.onAdd = () => {
     const div = L.DomUtil.create('div', 'map-switcher depth-switcher');
     div.innerHTML = `
-      <button class="map-switch-btn" data-depth="ocean" title="Ocean depth map">
+      <button class="map-switch-btn" data-depth="hydro" title="USGS Hydro — rivers, lakes, streams">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" fill="currentColor"/></svg>
+      </button>
+      <button class="map-switch-btn" data-depth="ustopo" title="USGS Topo — contour lines">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M14 6l-3.75 5 2.85 3.8-1.6 1.2C9.81 13.75 7 10 7 10l-6 8h22L14 6z" fill="currentColor"/></svg>
+      </button>
+      <button class="map-switch-btn" data-depth="ocean" title="Ocean depth — coastal/bay bathymetry">
         <svg viewBox="0 0 24 24" width="16" height="16"><path d="M2 17l2-1c2-2 4-2 6 0s4 2 6 0 4-2 6 0l2 1v2l-2-1c-2-2-4-2-6 0s-4 2-6 0-4-2-6 0l-2 1v-2zm0-5l2-1c2-2 4-2 6 0s4 2 6 0 4-2 6 0l2 1v2l-2-1c-2-2-4-2-6 0s-4 2-6 0-4-2-6 0l-2 1v-2zm0-5l2-1c2-2 4-2 6 0s4 2 6 0 4-2 6 0l2 1v2l-2-1c-2-2-4-2-6 0s-4 2-6 0-4-2-6 0l-2 1V7z" fill="currentColor"/></svg>
       </button>
-      <button class="map-switch-btn" data-depth="nautical" title="Nautical chart overlay">
-        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M7 17L3 13V11l4 4L17 5l4 4L7 17z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.5"/></svg>
+      <button class="map-switch-btn" data-depth="nautical" title="NOAA Nautical — chart overlay">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z" fill="currentColor"/></svg>
       </button>
     `;
     L.DomEvent.disableClickPropagation(div);
@@ -199,8 +205,24 @@ function toggleDepthOverlay(mode, container) {
   container.querySelectorAll('.map-switch-btn').forEach(b => b.classList.remove('active'));
   container.querySelector(`[data-depth="${mode}"]`).classList.add('active');
 
-  if (mode === 'ocean') {
-    // Esri Ocean basemap (shows underwater topography + depth shading)
+  if (mode === 'hydro') {
+    // USGS Hydro — detailed water features (rivers, lakes, streams) with surrounding topo
+    // Works everywhere in the US, shows stream/river detail with shaded relief
+    depthOverlay = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSHydroCached/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '&copy; USGS The National Map',
+      maxZoom: 16,
+      opacity: 0.8,
+    }).addTo(map);
+  } else if (mode === 'ustopo') {
+    // USGS Topo — full topographic map with contour lines around all water bodies
+    // Shows elevation contours, water features, roads — works everywhere in the US
+    depthOverlay = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '&copy; USGS The National Map',
+      maxZoom: 16,
+      opacity: 0.85,
+    }).addTo(map);
+  } else if (mode === 'ocean') {
+    // Esri Ocean basemap — underwater topography + depth shading for coastal/bay areas
     const oceanBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', {
       attribution: '&copy; Esri, GEBCO, NOAA',
       maxZoom: 16,
@@ -212,30 +234,19 @@ function toggleDepthOverlay(mode, container) {
     });
     depthOverlay = L.layerGroup([oceanBase, oceanRef]).addTo(map);
   } else if (mode === 'nautical') {
-    // NOAA ENC (Electronic Navigational Chart) — depth soundings, contours, channels
-    depthOverlay = L.tileLayer.wms('https://gis.charttools.noaa.gov/arcgis/rest/services/MCS/ENCOnline/MapServer/export', {
-      layers: 'show:0,1,2,3,4,5,6,7',
-      format: 'image/png',
-      transparent: true,
-      opacity: 0.75,
-      maxZoom: 18,
-      attribution: '&copy; NOAA Office of Coast Survey',
-      // WMS params via custom URL builder
-    });
-    // Use ArcGIS export as a dynamic tile layer instead of WMS
+    // NOAA ENC — navigational chart with depth soundings, contours, channels
+    // Only covers navigable waterways (coastal, bay, major tidal rivers)
     depthOverlay = L.tileLayer('', {
       maxZoom: 18,
       opacity: 0.75,
-      attribution: '&copy; NOAA',
+      attribution: '&copy; NOAA Office of Coast Survey',
     });
-    // Override getTileUrl for ArcGIS REST export
     depthOverlay.getTileUrl = function(coords) {
       const tileSize = 256;
       const nwPoint = coords.scaleBy(L.point(tileSize, tileSize));
       const sePoint = nwPoint.add(L.point(tileSize, tileSize));
       const nw = map.unproject(nwPoint, coords.z);
       const se = map.unproject(sePoint, coords.z);
-      // Convert to Web Mercator (3857)
       const toMerc = (lat, lon) => {
         const x = lon * 20037508.34 / 180;
         let y = Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180);
