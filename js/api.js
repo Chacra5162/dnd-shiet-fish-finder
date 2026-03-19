@@ -1074,61 +1074,254 @@ function getFishingLinks(lat, lon, waterType, waterName) {
   return links;
 }
 
-// Species commonly found in VA/NC waters
+// Species commonly found in VA/NC waters — seasonal awareness
 function getCommonSpecies(waterType, lat, lon, waterName) {
   const eastern = lon > -78;
   const mountain = lon < -80;
-  const coastal = lon > -76.5; // tidal/coastal — speckled trout, redfish, flounder territory
-  // Tidal zone: eastern rivers between the fall line (~Richmond) and the Chesapeake Bay
+  const coastal = lon > -76.5;
   const tidal = eastern && !mountain && lon > -77.8;
   const nameLower = (waterName || '').toLowerCase();
+  const month = new Date().getMonth() + 1; // 1-12
 
-  // Tidal rivers (James, Chickahominy, Rappahannock, York, etc.) have a distinct fishery
-  const isTidalRiver = tidal && (waterType === 'river' || waterType === 'boat_landing') &&
-    (nameLower.includes('james') || nameLower.includes('chickahominy') ||
-     nameLower.includes('rappahannock') || nameLower.includes('york') ||
-     nameLower.includes('mattaponi') || nameLower.includes('pamunkey') ||
-     nameLower.includes('appomattox') || nameLower.includes('elizabeth') ||
-     nameLower.includes('nansemond') || (!nameLower || nameLower.startsWith('river #')));
+  // Tidal rivers: James, Chickahominy, Rappahannock, York, etc.
+  const tidalRiverNames = ['james', 'chickahominy', 'rappahannock', 'york',
+    'mattaponi', 'pamunkey', 'appomattox', 'elizabeth', 'nansemond'];
+  const isTidalRiver = tidal &&
+    (waterType === 'river' || waterType === 'boat_landing' || waterType === 'fishing_pier') &&
+    (tidalRiverNames.some(n => nameLower.includes(n)) ||
+     !nameLower || nameLower.startsWith('river #') || nameLower.startsWith('boat landing #'));
 
   if (isTidalRiver) {
-    return ['Blue Catfish', 'Striped Bass', 'Largemouth Bass', 'Snakehead', 'Flathead Catfish',
-      'Channel Catfish', 'White Perch', 'American Shad', 'Hickory Shad', 'Longnose Gar',
-      'White Catfish', 'Carp', 'Herring'];
+    // Base tidal river species — top 10 year-round
+    const base = [
+      'Blue Catfish', 'Striped Bass', 'American Shad', 'Largemouth Bass', 'Snakehead',
+      'Flathead Catfish', 'Channel Catfish', 'White Perch', 'Hickory Shad', 'Longnose Gar',
+    ];
+    // Seasonal additions
+    if (month >= 3 && month <= 5) {
+      // Spring: shad run, herring run, stripers spawning
+      base.push('Blueback Herring', 'Alewife', 'White Catfish');
+    } else if (month >= 6 && month <= 9) {
+      // Summer: snakehead peak, blue catfish peak, gar active
+      base.push('Carp', 'White Catfish', 'Bowfin');
+    } else if (month >= 10 && month <= 11) {
+      // Fall: stripers feeding heavy, catfish still strong
+      base.push('Carp', 'Herring', 'White Catfish');
+    } else {
+      // Winter: trophy blue catfish, slow bite
+      base.push('Carp', 'White Catfish', 'Herring');
+    }
+    return base;
+  }
+
+  // Coastal rivers and piers
+  if (coastal && (waterType === 'river' || waterType === 'boat_landing' || waterType === 'fishing_pier')) {
+    const base = ['Striped Bass', 'Blue Catfish', 'Speckled Trout', 'Red Drum', 'Flounder',
+      'White Perch', 'American Shad', 'Hickory Shad', 'Spot', 'Croaker'];
+    if (month >= 5 && month <= 10) base.push('Bluefish', 'Cobia', 'Sheepshead');
+    return base;
+  }
+
+  // Eastern non-coastal rivers
+  if (eastern && !coastal && (waterType === 'river' || waterType === 'boat_landing')) {
+    const base = ['Striped Bass', 'Blue Catfish', 'American Shad', 'Hickory Shad', 'White Perch',
+      'Largemouth Bass', 'Channel Catfish', 'Flathead Catfish', 'Snakehead', 'Longnose Gar'];
+    if (month >= 3 && month <= 5) base.push('Blueback Herring', 'Alewife');
+    else base.push('Carp', 'Herring');
+    return base;
   }
 
   const species = {
     lake: eastern
-      ? ['Largemouth Bass', 'Blue Catfish', 'Channel Catfish', 'Bluegill', 'Crappie', 'Striped Bass', 'White Perch', 'Carp']
+      ? ['Largemouth Bass', 'Blue Catfish', 'Channel Catfish', 'Bluegill', 'Crappie', 'Striped Bass', 'White Perch', 'Carp', 'Flathead Catfish', 'Bowfin']
       : mountain
-        ? ['Smallmouth Bass', 'Largemouth Bass', 'Striped Bass', 'Muskie', 'Rainbow Trout', 'Brown Trout', 'Walleye']
-        : ['Largemouth Bass', 'Striped Bass', 'Smallmouth Bass', 'Crappie', 'Bluegill', 'Channel Catfish', 'Carp'],
-    river: eastern
-      ? (coastal
-        ? ['Striped Bass', 'Blue Catfish', 'Speckled Trout', 'Red Drum', 'Flounder', 'White Perch', 'American Shad', 'Hickory Shad', 'Spot', 'Croaker']
-        : ['Striped Bass', 'Blue Catfish', 'American Shad', 'Hickory Shad', 'White Perch', 'Largemouth Bass', 'Channel Catfish', 'Flathead Catfish', 'Snakehead', 'Longnose Gar', 'Herring', 'Carp'])
-      : mountain
-        ? ['Smallmouth Bass', 'Spotted Bass', 'Rainbow Trout', 'Brown Trout', 'Brook Trout', 'Muskie']
-        : ['Smallmouth Bass', 'Spotted Bass', 'Channel Catfish', 'Largemouth Bass', 'Striped Bass', 'Sunfish', 'Carp'],
+        ? ['Smallmouth Bass', 'Largemouth Bass', 'Striped Bass', 'Muskie', 'Rainbow Trout', 'Brown Trout', 'Walleye', 'Bluegill', 'Crappie', 'Channel Catfish']
+        : ['Largemouth Bass', 'Striped Bass', 'Smallmouth Bass', 'Crappie', 'Bluegill', 'Channel Catfish', 'Carp', 'White Perch', 'Catfish', 'Walleye'],
+    river: mountain
+      ? ['Smallmouth Bass', 'Spotted Bass', 'Rainbow Trout', 'Brown Trout', 'Brook Trout', 'Muskie', 'Rock Bass', 'Fallfish', 'Redbreast Sunfish', 'Channel Catfish']
+      : ['Smallmouth Bass', 'Spotted Bass', 'Channel Catfish', 'Largemouth Bass', 'Striped Bass', 'Sunfish', 'Carp', 'Rock Bass', 'Redbreast Sunfish', 'Fallfish'],
     stream: mountain
-      ? ['Brook Trout', 'Rainbow Trout', 'Brown Trout']
+      ? ['Brook Trout', 'Rainbow Trout', 'Brown Trout', 'Smallmouth Bass', 'Rock Bass', 'Creek Chub', 'Fallfish', 'Redbreast Sunfish', 'Sculpin', 'Dace']
       : (coastal
-        ? ['Speckled Trout', 'Red Drum', 'Flounder', 'White Perch']
-        : ['Sunfish', 'Smallmouth Bass', 'Creek Chub', 'Bluegill', 'Rock Bass']),
-    pond: ['Largemouth Bass', 'Bluegill', 'Channel Catfish', 'Crappie', 'Carp'],
-    boat_landing: eastern
-      ? (coastal
-        ? ['Striped Bass', 'Blue Catfish', 'Speckled Trout', 'Red Drum', 'Flounder']
-        : ['Blue Catfish', 'Striped Bass', 'Largemouth Bass', 'Snakehead', 'Flathead Catfish', 'Channel Catfish', 'Crappie'])
-      : ['Largemouth Bass', 'Smallmouth Bass', 'Striped Bass', 'Channel Catfish', 'Crappie'],
+        ? ['Speckled Trout', 'Red Drum', 'Flounder', 'White Perch', 'Spot', 'Croaker', 'Mullet', 'Blue Crab', 'Sheepshead', 'Bluefish']
+        : ['Sunfish', 'Smallmouth Bass', 'Creek Chub', 'Bluegill', 'Rock Bass', 'Redbreast Sunfish', 'Fallfish', 'Channel Catfish', 'Largemouth Bass', 'Carp']),
+    pond: ['Largemouth Bass', 'Bluegill', 'Channel Catfish', 'Crappie', 'Carp', 'Green Sunfish', 'Pumpkinseed', 'Bullhead', 'Golden Shiner', 'Chain Pickerel'],
     fishing_pier: coastal
-      ? ['Speckled Trout', 'Red Drum', 'Flounder', 'Spot', 'Croaker', 'Bluefish', 'Sheepshead']
+      ? ['Speckled Trout', 'Red Drum', 'Flounder', 'Spot', 'Croaker', 'Bluefish', 'Sheepshead', 'Cobia', 'Spanish Mackerel', 'Black Drum']
       : eastern
-        ? ['Striped Bass', 'Blue Catfish', 'White Perch', 'Channel Catfish', 'Crappie']
-        : ['Largemouth Bass', 'Channel Catfish', 'Bluegill', 'Crappie', 'Smallmouth Bass'],
+        ? ['Striped Bass', 'Blue Catfish', 'White Perch', 'Channel Catfish', 'Crappie', 'Largemouth Bass', 'American Shad', 'Snakehead', 'Carp', 'Longnose Gar']
+        : ['Largemouth Bass', 'Channel Catfish', 'Bluegill', 'Crappie', 'Smallmouth Bass', 'Rock Bass', 'Sunfish', 'Carp', 'Chain Pickerel', 'Fallfish'],
   };
 
   return species[waterType] || species.pond;
+}
+
+// Seasonal fishing events (runs, spawns, stocking) for the current month/location
+function getSeasonalEvents(waterType, lat, lon, waterName) {
+  const month = new Date().getMonth() + 1;
+  const eastern = lon > -78;
+  const mountain = lon < -80;
+  const coastal = lon > -76.5;
+  const tidal = eastern && lon > -77.8;
+  const nameLower = (waterName || '').toLowerCase();
+  const tidalRiverNames = ['james', 'chickahominy', 'rappahannock', 'york',
+    'mattaponi', 'pamunkey', 'appomattox'];
+  const isTidalRiver = tidal && (waterType === 'river' || waterType === 'boat_landing') &&
+    (tidalRiverNames.some(n => nameLower.includes(n)) || !nameLower || nameLower.startsWith('river #'));
+
+  const events = [];
+
+  // === TIDAL RIVER EVENTS ===
+  if (isTidalRiver) {
+    if (month >= 2 && month <= 4) {
+      events.push({
+        type: 'run',
+        title: 'American Shad Run',
+        desc: 'Shad are migrating upriver to spawn. Peak fishing mid-March through April. Fish below dams and at river bends.',
+        species: 'American Shad',
+        peak: month === 3 || month === 4,
+      });
+      events.push({
+        type: 'run',
+        title: 'Hickory Shad Run',
+        desc: 'Hickory shad run slightly earlier than American shad. Aggressive strikers — small darts and shad rigs.',
+        species: 'Hickory Shad',
+        peak: month === 3,
+      });
+    }
+    if (month >= 3 && month <= 5) {
+      events.push({
+        type: 'run',
+        title: 'Herring Run',
+        desc: 'Blueback herring and alewife migrating upriver. Major forage for stripers and catfish.',
+        species: 'Blueback Herring',
+        peak: month === 4,
+      });
+      events.push({
+        type: 'spawn',
+        title: 'Striped Bass Spawning',
+        desc: 'Stripers moving into tidal rivers to spawn. Trophy fish possible. Check regulations — spawning season restrictions may apply.',
+        species: 'Striped Bass',
+        peak: month === 4 || month === 5,
+      });
+    }
+    if (month >= 5 && month <= 8) {
+      events.push({
+        type: 'spawn',
+        title: 'Blue Catfish Peak',
+        desc: 'Blue catfish spawning in June-July. Trophy fish (50+ lbs) common in the tidal James. Fresh cut bait on bottom rigs.',
+        species: 'Blue Catfish',
+        peak: month === 6 || month === 7,
+      });
+      events.push({
+        type: 'spawn',
+        title: 'Snakehead Spawning',
+        desc: 'Snakehead guarding fry balls in shallow water. Sight-fishing opportunities. Topwater frogs and chatterbaits.',
+        species: 'Snakehead',
+        peak: month === 6 || month === 7,
+      });
+    }
+    if (month >= 9 && month <= 11) {
+      events.push({
+        type: 'run',
+        title: 'Fall Striper Run',
+        desc: 'Striped bass feeding heavily before winter. Follow the bait schools. Topwater action early morning.',
+        species: 'Striped Bass',
+        peak: month === 10,
+      });
+    }
+  }
+
+  // === COASTAL EVENTS ===
+  if (coastal && (waterType === 'river' || waterType === 'fishing_pier' || waterType === 'boat_landing')) {
+    if (month >= 4 && month <= 6) {
+      events.push({
+        type: 'run',
+        title: 'Cobia Migration',
+        desc: 'Cobia arriving in Chesapeake Bay. Sight-cast with live eels or jigs. Peak late May-June.',
+        species: 'Cobia',
+        peak: month === 5 || month === 6,
+      });
+    }
+    if (month >= 5 && month <= 10) {
+      events.push({
+        type: 'run',
+        title: 'Red Drum Run',
+        desc: 'Red drum (puppy drum) in shallow flats and marshes. Peak fall run Sept-Oct with bulls on the beach.',
+        species: 'Red Drum',
+        peak: month >= 9,
+      });
+    }
+    if (month >= 9 && month <= 11) {
+      events.push({
+        type: 'run',
+        title: 'Speckled Trout Fall Run',
+        desc: 'Specks moving into creeks and flats as water cools. Soft plastics and MirrOlures. Best bite Oct-Nov.',
+        species: 'Speckled Trout',
+        peak: month === 10 || month === 11,
+      });
+    }
+  }
+
+  // === MOUNTAIN / TROUT EVENTS ===
+  if (mountain && (waterType === 'stream' || waterType === 'river')) {
+    if (month >= 3 && month <= 5) {
+      events.push({
+        type: 'stocking',
+        title: 'Spring Trout Stocking',
+        desc: 'VA DWR stocking rainbow and brown trout in designated waters. Check the stocking schedule for specific dates.',
+        species: 'Rainbow Trout',
+        peak: month === 3 || month === 4,
+      });
+    }
+    if (month >= 10 && month <= 11) {
+      events.push({
+        type: 'spawn',
+        title: 'Brook Trout Spawning',
+        desc: 'Native brookies spawning in headwater streams. Catch-and-release encouraged. Small dry flies and nymphs.',
+        species: 'Brook Trout',
+        peak: month === 10,
+      });
+      events.push({
+        type: 'stocking',
+        title: 'Fall Trout Stocking',
+        desc: 'Fall stocking of rainbow trout in delayed harvest streams.',
+        species: 'Rainbow Trout',
+        peak: false,
+      });
+    }
+  }
+
+  // === LAKE EVENTS ===
+  if (waterType === 'lake' || waterType === 'pond') {
+    if (month >= 4 && month <= 6) {
+      events.push({
+        type: 'spawn',
+        title: 'Bass Spawning',
+        desc: 'Largemouth and smallmouth bass on beds in shallow water. Sight-fishing opportunities. Soft plastics near cover.',
+        species: 'Largemouth Bass',
+        peak: month === 5,
+      });
+      events.push({
+        type: 'spawn',
+        title: 'Bluegill & Crappie Beds',
+        desc: 'Panfish spawning in shallow sandy/gravel areas. Colony nests visible. Small jigs and live bait.',
+        species: 'Bluegill',
+        peak: month === 5 || month === 6,
+      });
+    }
+    if (month >= 10 && month <= 12) {
+      events.push({
+        type: 'run',
+        title: 'Fall Crappie Bite',
+        desc: 'Crappie schooling near structure and drop-offs as water cools. Minnows and small jigs at 10-15ft.',
+        species: 'Crappie',
+        peak: month === 11,
+      });
+    }
+  }
+
+  return events;
 }
 
 
@@ -1844,6 +2037,7 @@ export {
   getFishingLinks,
 
   getCommonSpecies,
+  getSeasonalEvents,
   getBBox,
   distanceMiles,
   assessPrivateProperty,

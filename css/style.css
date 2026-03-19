@@ -1582,6 +1582,42 @@ a { color: var(--accent); }
 .trip-action-btn.complete-btn:hover { border-color: #2ecc71; color: #2ecc71; }
 .trip-action-btn.delete-btn:hover { border-color: #e74c3c; color: #e74c3c; }
 
+/* ===== Seasonal Events ===== */
+.seasonal-event {
+  background: var(--bg-surface);
+  border: 1px solid rgba(52,152,219,0.15);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.seasonal-event.event-peak {
+  border-color: rgba(231,76,60,0.4);
+  background: rgba(231,76,60,0.05);
+}
+.event-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+.event-icon { font-size: 1.1rem; }
+.event-peak-badge {
+  background: #e74c3c;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  letter-spacing: 0.5px;
+  margin-left: auto;
+}
+.event-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 4px 0 0 0;
+  line-height: 1.35;
+}
+
 /* ===== Species Selector & Tackle Recs ===== */
 .species-selector {
   display: flex;

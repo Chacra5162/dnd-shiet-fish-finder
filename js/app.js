@@ -4,7 +4,7 @@
  * Focused on Virginia & North Carolina. Supabase auth + user places.
  */
 
-import { fetchWaterBodies, fetchUSGSSites, fetchFishAttractors, getFishingLinks, getCommonSpecies, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml, fetchWaterTempHistory, getWaterTempChartHtml, fetchNOAAWaterTemp, fetchWaterDepth, findUSACEReservoir, fetchReservoirLevel } from './api.js';
+import { fetchWaterBodies, fetchUSGSSites, fetchFishAttractors, getFishingLinks, getCommonSpecies, getSeasonalEvents, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml, fetchWaterTempHistory, getWaterTempChartHtml, fetchNOAAWaterTemp, fetchWaterDepth, findUSACEReservoir, fetchReservoirLevel } from './api.js';
 import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers, setAttractors, highlightMarker, clearHighlight } from './map.js';
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan, fetchAllRegulations, getRegulationsForWater, getUserGaugeAlerts, saveGaugeAlert, deleteGaugeAlert } from './supabase.js';
 import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, rateFishActivity, rateSpotActivity, getWaterClarity, calculateSolunarPeriods, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml, getHatchCalendarHtml } from './fishing.js';
@@ -1077,6 +1077,27 @@ async function showWaterDetail(wb, dist) {
       </div>
     </div>
   `;
+
+  // Seasonal events (runs, spawns, stocking)
+  const events = getSeasonalEvents(wb.type, wb.lat, wb.lon, wb.name);
+  if (events.length > 0) {
+    const eventIcons = { run: '\u{1F30A}', spawn: '\u{1F3AF}', stocking: '\u{1F69A}' };
+    html += `
+      <div class="detail-section">
+        <h3>What's Happening Now</h3>
+        ${events.map(e => `
+          <div class="seasonal-event ${e.peak ? 'event-peak' : ''}">
+            <div class="event-header">
+              <span class="event-icon">${eventIcons[e.type] || '\u{1F41F}'}</span>
+              <strong>${escapeHtml(e.title)}</strong>
+              ${e.peak ? '<span class="event-peak-badge">PEAK</span>' : ''}
+            </div>
+            <p class="event-desc">${escapeHtml(e.desc)}</p>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
 
   // Weather + best times + tide placeholder (loaded async)
   html += `<div id="weather-rec-area"><div class="loading-inline">Loading weather data...</div></div>`;
