@@ -7,16 +7,8 @@ import {
   getRecommendation, SPECIES_DATA, rateFishActivity, getPressureTrend,
   getTempBracket, getWaterClarity, degToCompass, getMoonPhase, describeWeatherCode,
 } from './fishing.js';
-
-function escapeHtml(str) {
-  return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function fetchWithTimeout(url, ms) {
-  const c = new AbortController();
-  const t = setTimeout(() => c.abort(), ms);
-  return fetch(url, { signal: c.signal }).finally(() => clearTimeout(t));
-}
+import { escapeHtml } from './utils/html.js';
+import { fetchWithTimeout } from './utils/fetch.js';
 
 // ===== Hourly Forecast =====
 
@@ -122,26 +114,29 @@ function friendlyDate(dateStr) {
 // Compute US federal holidays algorithmically (works for any year)
 function getUSHolidays(year) {
   const holidays = [];
+  const add = (d) => { if (d) holidays.push(d); };
   // New Year's Day
-  holidays.push(`${year}-01-01`);
+  add(`${year}-01-01`);
   // MLK Day — 3rd Monday in January
-  holidays.push(nthWeekday(year, 0, 1, 3));
+  add(nthWeekday(year, 0, 1, 3));
   // Presidents' Day — 3rd Monday in February
-  holidays.push(nthWeekday(year, 1, 1, 3));
+  add(nthWeekday(year, 1, 1, 3));
   // Memorial Day — last Monday in May
-  holidays.push(lastWeekday(year, 4, 1));
+  add(lastWeekday(year, 4, 1));
   // July 4th + surrounding days
-  holidays.push(`${year}-07-03`, `${year}-07-04`, `${year}-07-05`);
+  add(`${year}-07-03`); add(`${year}-07-04`); add(`${year}-07-05`);
   // Labor Day — 1st Monday in September
-  holidays.push(nthWeekday(year, 8, 1, 1));
+  add(nthWeekday(year, 8, 1, 1));
   // Thanksgiving — 4th Thursday in November + Friday
   const tg = nthWeekday(year, 10, 4, 4);
-  holidays.push(tg);
-  const tgDate = new Date(tg + 'T12:00:00');
-  tgDate.setDate(tgDate.getDate() + 1);
-  holidays.push(tgDate.toISOString().split('T')[0]);
+  if (tg) {
+    add(tg);
+    const tgDate = new Date(tg + 'T12:00:00');
+    tgDate.setDate(tgDate.getDate() + 1);
+    add(tgDate.toISOString().split('T')[0]);
+  }
   // Christmas
-  holidays.push(`${year}-12-25`);
+  add(`${year}-12-25`);
   return holidays;
 }
 

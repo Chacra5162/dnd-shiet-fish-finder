@@ -4,13 +4,9 @@
  * Includes detailed lure specs: weight, size, color, rigging.
  */
 
-import { distanceMiles } from './api.js';
-
-function fetchWithTimeout(url, ms) {
-  const c = new AbortController();
-  const t = setTimeout(() => c.abort(), ms);
-  return fetch(url, { signal: c.signal }).finally(() => clearTimeout(t));
-}
+import { distanceMiles } from './utils/geo.js';
+import { fetchWithTimeout } from './utils/fetch.js';
+import { escapeHtml as _escapeHtml } from './utils/html.js';
 
 // ===== Weather via Open-Meteo =====
 
@@ -90,7 +86,7 @@ function getPressureTrend(msl) {
   return 'low';
 }
 
-function rateFishActivity(w) {
+function rateFishActivity(w, { hour: overrideHour } = {}) {
   // Base 40, max realistic ~85, bad days ~20-35
   let score = 40;
 
@@ -126,7 +122,7 @@ function rateFishActivity(w) {
   else score -= 5;
 
   // Time of day bonus
-  const hour = new Date().getHours();
+  const hour = overrideHour != null ? overrideHour : new Date().getHours();
   if ((hour >= 5 && hour <= 9) || (hour >= 17 && hour <= 21)) score += 6;
   else if (hour >= 11 && hour <= 14) score -= 4;
 
@@ -406,8 +402,8 @@ function getBestFishingTimes(weather, lat, lon, date) {
     let score = 25;
 
     // Dawn/dusk golden hours — the most reliable fishing pattern
-    if (h >= 5 && h <= 7) score += 20;         // prime dawn
-    else if (h >= 6 && h <= 9) score += 14;     // early morning
+    if (h >= 5 && h <= 7) score += 20;         // prime dawn (5-7)
+    else if (h >= 8 && h <= 9) score += 14;     // early morning (8-9)
     else if (h >= 17 && h <= 19) score += 18;    // prime dusk
     else if (h >= 19 && h <= 21) score += 12;    // late evening
     else if (h >= 11 && h <= 14) score -= 8;     // midday slump
@@ -649,11 +645,12 @@ async function fetchTidePredictions(stationId, date) {
 }
 
 function findHighsLows(predictions) {
+  if (predictions.length < 2) return [];
   const results = [];
-  for (let i = 1; i < predictions.length - 1; i++) {
-    const prev = predictions[i - 1].height;
+  for (let i = 0; i < predictions.length; i++) {
+    const prev = i > 0 ? predictions[i - 1].height : Infinity;
     const curr = predictions[i].height;
-    const next = predictions[i + 1].height;
+    const next = i < predictions.length - 1 ? predictions[i + 1].height : Infinity;
     if (curr > prev && curr > next) {
       results.push({ type: 'high', time: predictions[i].time, height: curr });
     } else if (curr < prev && curr < next) {
@@ -2159,10 +2156,10 @@ function getRecommendation(species, weather, waterTemp) {
   if (weather.precipitation > 0 && weather.precipitation < 0.15) tips.push('Light rain — excellent! Breaks surface tension, washes food in');
   else if (weather.precipitation >= 0.15) tips.push('Rain — muddy water likely, use brighter colors & rattling baits');
 
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour <= 8) tips.push('Early morning — prime feeding window');
-  else if (hour >= 17 && hour <= 20) tips.push('Evening — fish moving shallow to feed');
-  else if (hour >= 11 && hour <= 14) tips.push('Midday — fish often deeper or holding tight to structure');
+  const tipHour = new Date().getHours();
+  if (tipHour >= 5 && tipHour <= 8) tips.push('Early morning — prime feeding window');
+  else if (tipHour >= 17 && tipHour <= 20) tips.push('Evening — fish moving shallow to feed');
+  else if (tipHour >= 11 && tipHour <= 14) tips.push('Midday — fish often deeper or holding tight to structure');
 
   return { species, bracket, lures, baits: data.baits, depthTip, tips, activity: weather.fishActivity, clarity, troutStress };
 }
@@ -2199,7 +2196,7 @@ function getRecommendationHtml(rec) {
 
   return `
     <div class="detail-section tackle-rec">
-      <h3>Recommended for ${rec.species}</h3>
+      <h3>Recommended for ${_escapeHtml(rec.species)}</h3>
       ${stressHtml}
       <div class="clarity-badge">${clarityLabel[rec.clarity] || 'Clear Water'} — colors adjusted</div>
 
@@ -2207,11 +2204,11 @@ function getRecommendationHtml(rec) {
         <h4>Lures & Artificials — Tap for Details</h4>
         <div class="lure-list">
           ${rec.lures.map((l, i) => {
-            if (!l.detail) return `<div class="lure-item-simple"><span class="rec-tag lure-tag">${l.name}</span></div>`;
+            if (!l.detail) return `<div class="lure-item-simple"><span class="rec-tag lure-tag">${_escapeHtml(l.name)}</span></div>`;
             return `
               <div class="lure-card">
                 <div class="lure-card-header">
-                  <span class="lure-card-name">${l.name}</span>
+                  <span class="lure-card-name">${_escapeHtml(l.name)}</span>
                   <span class="lure-card-toggle">+</span>
                 </div>
                 <div class="lure-card-detail">
@@ -2221,7 +2218,7 @@ function getRecommendationHtml(rec) {
                   </div>
                   <div class="lure-spec-section">
                     <span class="lure-spec-label">Best Colors (${rec.clarity})</span>
-                    <div class="lure-colors">${l.colors.map(c => `<span class="color-chip">${c}</span>`).join('')}</div>
+                    <div class="lure-colors">${l.colors.map(c => `<span class="color-chip">${_escapeHtml(c)}</span>`).join('')}</div>
                   </div>
                   <div class="lure-spec-section">
                     <span class="lure-spec-label">How to Rig</span>
@@ -2240,17 +2237,17 @@ function getRecommendationHtml(rec) {
 
       <div class="rec-subsection">
         <h4>Live/Natural Bait</h4>
-        <div class="rec-tags">${rec.baits.map(b => `<span class="rec-tag bait-tag">${b}</span>`).join('')}</div>
+        <div class="rec-tags">${rec.baits.map(b => `<span class="rec-tag bait-tag">${_escapeHtml(b)}</span>`).join('')}</div>
       </div>
 
       <div class="rec-subsection">
         <h4>Depth & Approach</h4>
-        <p class="rec-depth-tip">${rec.depthTip}</p>
+        <p class="rec-depth-tip">${_escapeHtml(rec.depthTip)}</p>
       </div>
 
       <div class="rec-subsection">
         <h4>Conditions Tips</h4>
-        <ul class="rec-tips">${rec.tips.map(t => `<li>${t}</li>`).join('')}</ul>
+        <ul class="rec-tips">${rec.tips.map(t => `<li>${_escapeHtml(t)}</li>`).join('')}</ul>
       </div>
     </div>
   `;

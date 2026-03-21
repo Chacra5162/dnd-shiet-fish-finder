@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dnd-shiet-fish-finder-v31';
+const CACHE_NAME = 'dnd-shiet-fish-finder-v32';
 const TILE_CACHE = 'dnd-tiles-v2';
 const MAX_TILES = 1500;
 let tileWriteCount = 0;
@@ -15,6 +15,10 @@ const STATIC_ASSETS = [
   './js/tripPlan.js',
   './js/arsenal.js',
   './js/community.js',
+  './js/utils/fetch.js',
+  './js/utils/html.js',
+  './js/utils/geo.js',
+  './js/utils/upload.js',
   './manifest.json',
   './icons/favicon.svg',
 ];

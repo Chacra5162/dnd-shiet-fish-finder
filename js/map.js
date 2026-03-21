@@ -3,7 +3,7 @@
  * Uses canvas renderer + circleMarkers for performance with many markers.
  */
 
-import { distanceMiles } from './api.js';
+import { distanceMiles } from './utils/geo.js';
 
 let map = null;
 let canvasRenderer = null;
@@ -402,9 +402,13 @@ function setUserPlaceMarkers(places, onClickPlace) {
   }
 }
 
-// Find USGS sites near a given water body
+// Find USGS sites near a given water body (with bbox prefilter for performance)
 function findNearbyUSGS(lat, lon, maxMiles = 5) {
+  // Rough bbox prefilter: 1 deg lat ~ 69 mi, 1 deg lon ~ 55 mi at mid-latitudes
+  const latDeg = maxMiles / 69;
+  const lonDeg = maxMiles / 55;
   return allUSGSSites
+    .filter(s => Math.abs(s.lat - lat) <= latDeg && Math.abs(s.lon - lon) <= lonDeg)
     .map(site => ({
       ...site,
       dist: distanceMiles(lat, lon, site.lat, site.lon),

@@ -4,6 +4,7 @@
  */
 
 import { getClient, getSupabaseUrl } from './supabase.js';
+import { validatePhoto } from './utils/upload.js';
 const BUCKET = 'community-photos';
 
 function client() {
@@ -47,12 +48,7 @@ async function addCommunityPost(userId, displayName, waterBody, postData, photoF
   let photoPath = null;
 
   if (photoFile) {
-    if (photoFile.size > 10 * 1024 * 1024) throw new Error('Photo must be under 10 MB');
-    const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
-    if (!photoFile.type || !ALLOWED_MIME.includes(photoFile.type)) throw new Error('Invalid file type — use JPG, PNG, GIF, or WebP');
-    const ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
-    const rawExt = photoFile.name.split('.').pop().toLowerCase();
-    const ext = ALLOWED_EXTS.includes(rawExt) ? rawExt : 'jpg';
+    const { ext, contentType } = validatePhoto(photoFile);
     const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
     // Resize before upload (max 1200px wide)
@@ -60,7 +56,7 @@ async function addCommunityPost(userId, displayName, waterBody, postData, photoF
 
     const { error: uploadError } = await client()
       .storage.from(BUCKET)
-      .upload(fileName, resized, { contentType: 'image/jpeg', upsert: false });
+      .upload(fileName, resized, { contentType, upsert: false });
     if (uploadError) throw uploadError;
     photoPath = fileName;
   }
@@ -91,12 +87,14 @@ async function addCommunityPost(userId, displayName, waterBody, postData, photoF
 
 async function deleteCommunityPost(userId, postId, photoPath) {
   // Delete DB row FIRST to verify ownership, THEN delete storage
-  const { error } = await client()
+  const { data, error } = await client()
     .from('community_posts')
     .delete()
     .eq('id', postId)
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .select();
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error('Post not found or not owned by you');
   // Only delete storage after confirmed DB ownership
   if (photoPath) {
     await client().storage.from(BUCKET).remove([photoPath]).catch(() => {});

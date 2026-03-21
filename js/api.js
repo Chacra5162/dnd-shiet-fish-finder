@@ -4,6 +4,8 @@
  */
 
 import { STORES, getCached, setCache, setCacheBatch, getMultiCached, gridKey } from './cache.js';
+import { fetchWithTimeout } from './utils/fetch.js';
+import { distanceMiles, milesToDegrees, getBBox } from './utils/geo.js';
 
 // ===== Overpass API (Water Bodies) =====
 
@@ -1345,41 +1347,7 @@ function getSeasonalEvents(waterType, lat, lon, waterName) {
 }
 
 
-// ===== Bounding Box Utilities =====
-
-function milesToDegrees(miles, lat) {
-  const latDeg = miles / 69.0; // 1 degree lat ≈ 69 miles
-  const lonDeg = miles / (69.0 * Math.cos(lat * Math.PI / 180));
-  return { latDeg, lonDeg };
-}
-
-function getBBox(lat, lon, radiusMiles) {
-  const { latDeg, lonDeg } = milesToDegrees(radiusMiles, lat);
-  return {
-    south: lat - latDeg,
-    north: lat + latDeg,
-    west: lon - lonDeg,
-    east: lon + lonDeg,
-  };
-}
-
-function distanceMiles(lat1, lon1, lat2, lon2) {
-  const R = 3959; // Earth radius in miles
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-// ===== Timeout Helper (compat with iOS Safari <16) =====
-
-function fetchWithTimeout(url, ms = 8000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
-  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer));
-}
+// Geo and fetch utilities imported from ./utils/geo.js and ./utils/fetch.js
 
 // ===== USGS Flood Stage & Forecast =====
 
@@ -2058,8 +2026,6 @@ export {
 
   getCommonSpecies,
   getSeasonalEvents,
-  getBBox,
-  distanceMiles,
   assessPrivateProperty,
   fetchNWSGaugeData,
   extractFloodStage,

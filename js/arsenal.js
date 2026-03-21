@@ -5,6 +5,7 @@
  */
 
 import { getClient, getSupabaseUrl } from './supabase.js';
+import { validatePhoto } from './utils/upload.js';
 
 const CATEGORIES = {
   crankbait: 'Crankbait',
@@ -44,16 +45,11 @@ async function addArsenalItem(userId, item, photoFile) {
 
   // Upload photo if provided
   if (photoFile) {
-    if (photoFile.size > 10 * 1024 * 1024) throw new Error('Photo must be under 10 MB');
-    const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
-    if (!photoFile.type || !ALLOWED_MIME.includes(photoFile.type)) throw new Error('Invalid file type — use JPG, PNG, GIF, or WebP');
-    const ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
-    const rawExt = photoFile.name.split('.').pop().toLowerCase();
-    const ext = ALLOWED_EXTS.includes(rawExt) ? rawExt : 'jpg';
+    const { ext, contentType } = validatePhoto(photoFile);
     const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const { error: uploadError } = await client()
       .storage.from('arsenal-photos')
-      .upload(fileName, photoFile, { contentType: photoFile.type, upsert: false });
+      .upload(fileName, photoFile, { contentType, upsert: false });
     if (uploadError) throw uploadError;
     photoPath = fileName;
   }
@@ -79,17 +75,12 @@ async function addArsenalItem(userId, item, photoFile) {
 
 async function updateArsenalItem(userId, itemId, updates, newPhotoFile, oldPhotoPath) {
   if (newPhotoFile) {
-    if (newPhotoFile.size > 10 * 1024 * 1024) throw new Error('Photo must be under 10 MB');
-    const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
-    if (!newPhotoFile.type || !ALLOWED_MIME.includes(newPhotoFile.type)) throw new Error('Invalid file type — use JPG, PNG, GIF, or WebP');
+    const { ext, contentType } = validatePhoto(newPhotoFile);
     // Upload new photo first (don't delete old until DB update succeeds)
-    const ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
-    const rawExt = newPhotoFile.name.split('.').pop().toLowerCase();
-    const ext = ALLOWED_EXTS.includes(rawExt) ? rawExt : 'jpg';
     const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const { error: uploadError } = await client()
       .storage.from('arsenal-photos')
-      .upload(fileName, newPhotoFile, { contentType: 'image/jpeg', upsert: false });
+      .upload(fileName, newPhotoFile, { contentType, upsert: false });
     if (uploadError) throw uploadError;
     updates.photo_path = fileName;
   }

@@ -4,7 +4,9 @@
  * Focused on Virginia & North Carolina. Supabase auth + user places.
  */
 
-import { fetchWaterBodies, fetchUSGSSites, fetchFishAttractors, getFishingLinks, getCommonSpecies, getSeasonalEvents, getBBox, distanceMiles, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml, fetchWaterTempHistory, getWaterTempChartHtml, fetchNOAAWaterTemp, fetchWaterDepth, findUSACEReservoir, fetchReservoirLevel } from './api.js';
+import { fetchWaterBodies, fetchUSGSSites, fetchFishAttractors, getFishingLinks, getCommonSpecies, getSeasonalEvents, assessPrivateProperty, fetchNWSGaugeData, extractFloodStage, fetchRecentUSGSData, extractNWSForecast, analyzeTrend, getFloodStageHtml, getTrendHtml, fetchWaterTempHistory, getWaterTempChartHtml, fetchNOAAWaterTemp, fetchWaterDepth, findUSACEReservoir, fetchReservoirLevel } from './api.js';
+import { getBBox, distanceMiles } from './utils/geo.js';
+import { escapeHtml, escapeAttr } from './utils/html.js';
 import { initMap, setMarkers, updateFilters, updateRadius, recenter, panTo, findNearbyUSGS, setUserPlaceMarkers, setAttractors, highlightMarker, clearHighlight } from './map.js';
 import { initAuth, signUp, signIn, signOut, getUser, getUserPlacesNear, savePlace, removePlace, updatePlaceNotes, saveTripPlan, getUserTripPlans, updateTripPlan, deleteTripPlan, fetchAllRegulations, getRegulationsForWater, getUserGaugeAlerts, saveGaugeAlert, deleteGaugeAlert } from './supabase.js';
 import { fetchWeather, getRecommendation, getWeatherCardHtml, getRecommendationHtml, SPECIES_DATA, rateFishActivity, rateSpotActivity, getWaterClarity, calculateSolunarPeriods, getBestFishingTimes, getBestTimesHtml, isTidalWater, findNearestTideStation, fetchTidePredictions, getTideHtml, getHatchCalendarHtml } from './fishing.js';
@@ -400,16 +402,16 @@ async function loadHotSpots() {
       </div>
     `).join('');
 
-    // Click to fly to spot and show detail
-    list.querySelectorAll('.hotspot-item').forEach(el => {
-      el.addEventListener('click', () => {
-        const idx = parseInt(el.dataset.idx);
-        const wb = top[idx];
-        panTo(wb.lat, wb.lon, 14);
-        showWaterDetail(wb, wb.dist);
-        $('#hotspots-panel').classList.add('hidden');
-      });
-    });
+    // Event delegation — single listener instead of per-item
+    list.onclick = (e) => {
+      const el = e.target.closest('.hotspot-item');
+      if (!el) return;
+      const idx = parseInt(el.dataset.idx);
+      const wb = top[idx];
+      panTo(wb.lat, wb.lon, 14);
+      showWaterDetail(wb, wb.dist);
+      $('#hotspots-panel').classList.add('hidden');
+    };
 
   } catch (err) {
     console.error('Hot spots error:', err);
@@ -653,6 +655,12 @@ function getShadRunHtml(wb) {
 
 // ===== Access Info (Fishing / Bank-Pier / Boat) =====
 
+// Pre-compiled keyword regexes for assessAccess (avoids repeated .some/.includes per call)
+const _publicRe = /state park|national|wildlife|management area|wma|public|county park|city park|memorial|recreation|reservoir|army corps|national forest|game land|state forest|conservation|refuge|sportsman|access area|public landing|boat access|fish hatchery|stocking|community lake|municipal|town lake|city lake|county lake/;
+const _privateRe = /estate|ranch|private|country club|golf|subdivision|hoa|homeowner|community pond|retention|stormwater|sewage|treatment|cooling|industrial/;
+const _boatRe = /boat ramp|boat landing|boat launch|launch ramp|slipway|marina|boat access|public landing|landing|ramp/;
+const _pierRe = /pier|dock|jetty|wharf|boardwalk|fishing platform|observation deck|overlook/;
+
 // Determine access for fishing, bank/pier, and boat with deep heuristics.
 // Returns { fishing, bankPier, boat } each as 'yes' | 'likely' | 'no' | 'unlikely' | 'unknown'
 function assessAccess(wb) {
@@ -675,35 +683,12 @@ function assessAccess(wb) {
   const isResidential = tags.landuse === 'residential' || tags.landuse === 'farmland' || tags.landuse === 'farmyard';
   const isCommercial = tags.landuse === 'commercial' || tags.landuse === 'industrial';
 
-  // Name-based signals — comprehensive keyword matching
-  const publicNames = [
-    'state park', 'national', 'wildlife', 'management area', 'wma', 'public',
-    'county park', 'city park', 'memorial', 'recreation', 'reservoir',
-    'army corps', 'national forest', 'game land', 'state forest',
-    'conservation', 'refuge', 'sportsman', 'access area', 'public landing',
-    'boat access', 'fish hatchery', 'stocking', 'community lake',
-    'municipal', 'town lake', 'city lake', 'county lake',
-  ];
-  const privateNames = [
-    'estate', 'ranch', 'private', 'country club', 'golf',
-    'subdivision', 'hoa', 'homeowner', 'community pond', 'retention',
-    'stormwater', 'sewage', 'treatment', 'cooling', 'industrial',
-  ];
-  // "farm" checked separately with word-boundary to avoid matching "Farmville", "Farmer's Mill" etc.
+  // Name-based signals — compiled regexes for performance
+  const hasPublicName = _publicRe.test(name);
   const hasFarmWord = /\bfarm\b/.test(name) && !name.includes('farmville') && !name.includes('farmer');
-  const boatNames = [
-    'boat ramp', 'boat landing', 'boat launch', 'launch ramp', 'slipway',
-    'marina', 'boat access', 'public landing', 'landing', 'ramp',
-  ];
-  const pierNames = [
-    'pier', 'dock', 'jetty', 'wharf', 'boardwalk', 'fishing platform',
-    'observation deck', 'overlook',
-  ];
-
-  const hasPublicName = publicNames.some(p => name.includes(p));
-  const hasPrivateName = privateNames.some(p => name.includes(p)) || hasFarmWord;
-  const hasBoatName = boatNames.some(p => name.includes(p));
-  const hasPierName = pierNames.some(p => name.includes(p));
+  const hasPrivateName = _privateRe.test(name) || hasFarmWord;
+  const hasBoatName = _boatRe.test(name);
+  const hasPierName = _pierRe.test(name);
 
   // VA/NC major managed reservoirs and rivers (almost always have full public access + boat ramps)
   const majorWaters = [
@@ -1358,8 +1343,9 @@ function renderCommunityPosts(posts, container) {
 
 function getCommunityFormHtml(wb) {
   const species = getCommonSpecies(wb.type, wb.lat, wb.lon, wb.name);
+  // Store wb reference as data attrs so submit uses the correct wb even if user navigates away
   return `
-    <div class="community-form">
+    <div class="community-form" data-wb-name="${escapeAttr(wb.name)}" data-wb-lat="${wb.lat}" data-wb-lon="${wb.lon}" data-wb-type="${escapeAttr(wb.type)}">
       <div class="community-tab-bar">
         <button class="community-tab active" data-type="comment" onclick="window._setCommunityTab(this)">Comment</button>
         <button class="community-tab" data-type="catch" onclick="window._setCommunityTab(this)">Catch Report</button>
@@ -1404,7 +1390,15 @@ window._communityPhotoSelected = function(input) {
 window._submitCommunityPost = async function() {
   const user = getUser();
   if (!user) { document.dispatchEvent(new CustomEvent('require-auth')); return; }
-  if (!communityCurrentWb) return;
+  // Read wb from the form data attributes (captured at render time) to avoid stale global
+  const form = document.querySelector('.community-form');
+  const formWb = form ? {
+    name: form.dataset.wbName,
+    lat: parseFloat(form.dataset.wbLat),
+    lon: parseFloat(form.dataset.wbLon),
+    type: form.dataset.wbType,
+  } : communityCurrentWb;
+  if (!formWb) return;
 
   const body = document.getElementById('community-body')?.value?.trim() || '';
   const species = document.getElementById('community-species')?.value || '';
@@ -1423,7 +1417,7 @@ window._submitCommunityPost = async function() {
 
   try {
     const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Angler';
-    await addCommunityPost(user.id, displayName, communityCurrentWb, {
+    await addCommunityPost(user.id, displayName, formWb, {
       type: communityPostType,
       body,
       species: communityPostType === 'catch' ? species : null,
@@ -1434,7 +1428,7 @@ window._submitCommunityPost = async function() {
     communityPhotoFile = null;
     toast('Posted!');
     // Reload board
-    loadCommunityBoard(communityCurrentWb);
+    loadCommunityBoard(formWb);
   } catch (e) {
     console.error('Post error:', e);
     toast(`Error: ${e.message}`, true);
@@ -2642,6 +2636,8 @@ function setupEventListeners() {
 
   // Auth modal
   let isSignUp = false;
+  let authFailCount = 0;
+  let authCooldownTimer = null;
   $('#btn-close-auth').addEventListener('click', () => authModal.classList.add('hidden'));
   authModal.addEventListener('click', (e) => {
     if (e.target === authModal) authModal.classList.add('hidden');
@@ -2694,13 +2690,20 @@ function setupEventListeners() {
         toast('Signed in!');
       }
     } catch (err) {
-      errorEl.textContent = isSignUp ? (err.message || 'Sign up failed') : 'Incorrect email or password';
+      authFailCount++;
+      if (authFailCount >= 5) {
+        errorEl.textContent = 'Too many attempts. Please wait 30 seconds.';
+        submitBtn.disabled = true;
+        authCooldownTimer = setTimeout(() => { submitBtn.disabled = false; authFailCount = 0; }, 30000);
+      } else {
+        errorEl.textContent = isSignUp ? (err.message || 'Sign up failed') : 'Incorrect email or password';
+      }
       errorEl.style.background = '';
       errorEl.style.borderColor = '';
       errorEl.style.color = '';
       errorEl.classList.remove('hidden');
     } finally {
-      submitBtn.disabled = false;
+      if (authFailCount < 5) submitBtn.disabled = false;
       submitBtn.textContent = isSignUp ? 'Sign Up' : 'Sign In';
     }
   });
@@ -2980,15 +2983,7 @@ function showUnnamedSuggestion(count) {
   setTimeout(() => { if (el.parentNode) el.remove(); }, 10000);
 }
 
-// ===== Utilities =====
-
-function escapeHtml(str) {
-  return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function escapeAttr(str) {
-  return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+// escapeHtml and escapeAttr imported from ./utils/html.js
 
 // In-app confirm dialog — replaces window.confirm() which is broken on iOS PWA
 function showInlineConfirm(message, actionLabel, onConfirm) {
