@@ -72,6 +72,7 @@ function classifyWaterBody(tags) {
   if (water === 'lake' || water === 'reservoir' || name.includes('lake') || name.includes('reservoir')) return 'lake';
   if (water === 'pond' || name.includes('pond')) return 'pond';
   if (waterway === 'river' || water === 'river' || name.includes('river')) return 'river';
+  if (waterway === 'canal' || name.includes('canal')) return 'stream'; // canals classified as streams
   if (waterway === 'stream' || waterway === 'creek' || name.includes('stream') || name.includes('creek') || name.includes('branch') || name.includes('run')) return 'stream';
   if (natural === 'water') return 'lake'; // default natural=water to lake
 
@@ -182,10 +183,12 @@ async function fetchOverpass(query) {
         lastError = new Error(`Overpass ${response.status} from ${url}`);
         continue;
       }
-      // Verify we got JSON, not an HTML error page (Overpass returns HTML on rate limit)
+      // Verify we got JSON, not an HTML error page
       const text = await response.text();
       if (text.startsWith('<')) {
-        lastError = new Error(`Overpass returned HTML (rate limited?) from ${url}`);
+        const hint = response.status === 429 || response.status === 503 ? 'rate limited' : `HTTP ${response.status}`;
+        lastError = new Error(`Overpass returned HTML (${hint}) from ${url}`);
+        console.warn(`Overpass HTML response (${hint}):`, text.slice(0, 200));
         continue;
       }
       return JSON.parse(text);
@@ -339,8 +342,9 @@ async function fetchWaterBodies(south, west, north, east) {
           for (const rel of memberJson.elements) {
             const relName = relNames[rel.id];
             if (!relName || !rel.members) continue;
+            const unnamedWaySet = new Set(unnamedWayIds);
             for (const m of rel.members) {
-              if (m.type === 'way' && unnamedWayIds.includes(m.ref)) {
+              if (m.type === 'way' && unnamedWaySet.has(m.ref)) {
                 wayToName[m.ref] = relName;
               }
             }
@@ -550,7 +554,7 @@ async function fetchWaterBodies(south, west, north, east) {
   }
 
   const entries = Object.entries(gridMap).map(([key, data]) => ({ key, data }));
-  await setCacheBatch(STORES.waterBodies, entries);
+  try { await setCacheBatch(STORES.waterBodies, entries); } catch (e) { console.warn('Water body cache write failed:', e.message); }
 
   return { data: dedupeWaterBodies([...cached, ...waterBodies]), fromCache: false };
 }
@@ -920,10 +924,8 @@ async function fetchUSGSSites(south, west, north, east) {
     gridMap[key].push(site);
   }
 
-  for (const [key, items] of Object.entries(gridMap)) {
-    const [lat, lon] = key.split('_').map(Number);
-    await setCache(STORES.usgs, lat, lon, items);
-  }
+  const cacheEntries = Object.entries(gridMap).map(([key, data]) => ({ key, data }));
+  try { await setCacheBatch(STORES.usgs, cacheEntries); } catch (e) { console.warn('USGS cache write failed:', e.message); }
 
   return { data: allSites, fromCache: false };
 }
@@ -1000,7 +1002,12 @@ function parseUSGSResponse(json) {
     };
   }
 
-  return Array.from(siteMap.values()).filter(s => !isNaN(s.lat) && !isNaN(s.lon));
+  const allSites = Array.from(siteMap.values());
+  const validSites = allSites.filter(s => !isNaN(s.lat) && !isNaN(s.lon));
+  if (validSites.length < allSites.length) {
+    console.warn(`USGS: Dropped ${allSites.length - validSites.length} sites with invalid coordinates`);
+  }
+  return validSites;
 }
 
 
@@ -1024,7 +1031,8 @@ function getFishingLinks(lat, lon, waterType, waterName) {
       links.push({ label: 'VA DWR Tidewater/Eastern Fishing Report', url: 'https://dwr.virginia.gov/fishing/fishing-reports/' });
     }
     // Trout stocking schedule — only for mountain/trout areas
-    if (lon < -78.5 || waterName.toLowerCase().includes('trout') || waterName.toLowerCase().includes('stocked')) {
+    const wn = (waterName || '').toLowerCase();
+    if (lon < -78.5 || wn.includes('trout') || wn.includes('stocked')) {
       links.push({
         label: 'VA Trout Stocking Schedule — Check Recent Stockings',
         url: 'https://dwr.virginia.gov/fishing/trout-stocking-schedule/',
@@ -1540,7 +1548,7 @@ function analyzeTrend(recentData) {
       change6h: totalChange,
       ratePerHour,
       trend,
-      projected6h: Math.max(0, projected),
+      projected6h: key === 'flow' ? Math.max(0, projected) : projected,
       points: recent,
       unit: key === 'flow' ? 'ft³/s' : 'ft',
     };

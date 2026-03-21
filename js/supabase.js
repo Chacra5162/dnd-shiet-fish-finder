@@ -31,7 +31,15 @@ async function initAuth(onAuthChange) {
 
   // Check existing session
   const { data: { session }, error: sessError } = await client.auth.getSession();
-  if (sessError) console.warn('Session restore error:', sessError.message);
+  if (sessError) {
+    console.warn('Session restore error:', sessError.message);
+    // Surface to UI so user knows to re-authenticate
+    setTimeout(() => {
+      if (typeof window !== 'undefined' && typeof window.toast === 'function') {
+        window.toast('Session expired — please sign in again', true);
+      }
+    }, 1000);
+  }
   currentUser = session?.user || null;
   if (onAuthChangeCallback) onAuthChangeCallback(currentUser, 'INITIAL');
   return currentUser;
@@ -89,6 +97,13 @@ async function getUserPlacesNear(lat, lon, radiusDeg = 0.3) {
 
 async function savePlace(place, status, notes = '') {
   if (!currentUser) throw new Error('Not signed in');
+  if (typeof place.lat !== 'number' || typeof place.lon !== 'number' || isNaN(place.lat) || isNaN(place.lon)) {
+    throw new Error('Invalid coordinates');
+  }
+  const VALID_TYPES = ['lake', 'river', 'stream', 'pond', 'boat_landing', 'fishing_pier'];
+  if (!VALID_TYPES.includes(place.type)) {
+    throw new Error(`Invalid place type: ${place.type}`);
+  }
   const client = getClient();
 
   // Upsert based on unique constraint
@@ -187,10 +202,13 @@ async function getUserTripPlans(includeOld = false) {
 
 async function updateTripPlan(id, updates) {
   if (!currentUser) throw new Error('Not signed in');
+  const ALLOWED = ['status', 'notes', 'trip_date', 'time_window', 'forecast', 'species', 'gear_checklist', 'traffic_estimate', 'traffic_description'];
+  const safe = {};
+  for (const key of ALLOWED) { if (key in updates) safe[key] = updates[key]; }
   const client = getClient();
   const { data, error } = await client
     .from('trip_plans')
-    .update(updates)
+    .update(safe)
     .eq('id', id)
     .eq('user_id', currentUser.id)
     .select()
@@ -213,9 +231,10 @@ async function deleteTripPlan(id) {
 // ===== Fishing Regulations =====
 
 let _regulationsCache = null;
+let _regulationsCacheTime = 0;
 
 async function fetchAllRegulations() {
-  if (_regulationsCache) return _regulationsCache;
+  if (_regulationsCache && Date.now() - _regulationsCacheTime < 3600000) return _regulationsCache;
   const client = getClient();
   const { data, error } = await client
     .from('fishing_regulations')
@@ -223,6 +242,7 @@ async function fetchAllRegulations() {
     .eq('active', true);
   if (error) { console.warn('Regulations fetch error:', error); return []; }
   _regulationsCache = data || [];
+  _regulationsCacheTime = Date.now();
   return _regulationsCache;
 }
 
@@ -250,7 +270,16 @@ async function saveGaugeAlert(alert) {
   const client = getClient();
   const { data, error } = await client
     .from('gauge_alerts')
-    .insert({ ...alert, user_id: currentUser.id }) // user_id LAST — cannot be overwritten by spread
+    .insert({
+      user_id: currentUser.id,
+      site_code: alert.site_code,
+      site_name: alert.site_name,
+      parameter: alert.parameter,
+      condition: alert.condition,
+      threshold: alert.threshold,
+      unit: alert.unit,
+      enabled: alert.enabled ?? true,
+    })
     .select().single();
   if (error) throw error;
   return data;

@@ -151,7 +151,7 @@ function rateFishActivity(w) {
  * @param {object|null} usgs - nearest USGS data {data: {flow, gauge, temp}}
  * @param {number} usgsDist - distance to USGS station in miles
  */
-function rateSpotActivity(weather, wb, usgs, usgsDist) {
+function rateSpotActivity(weather, wb, usgs, usgsDist, preSolunar) {
   let score = rateFishActivity(weather);
 
   // --- Water body type modifiers ---
@@ -238,7 +238,7 @@ function rateSpotActivity(weather, wb, usgs, usgsDist) {
 
   // --- Solunar overlap bonus ---
   const now = new Date();
-  const solunar = calculateSolunarPeriods(wb.lat, wb.lon);
+  const solunar = preSolunar || calculateSolunarPeriods(wb.lat, wb.lon);
   const allPeriods = [
     ...(solunar.majorPeriods || []).map(p => ({ ...p, type: 'major' })),
     ...(solunar.minorPeriods || []).map(p => ({ ...p, type: 'minor' })),
@@ -2258,7 +2258,7 @@ function getRecommendationHtml(rec) {
 
 function degToCompass(deg) {
   const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
-  return dirs[Math.round(deg / 22.5) % 16];
+  return dirs[((Math.round(deg / 22.5) % 16) + 16) % 16];
 }
 
 // ===== Hatch Calendar — VA/NC Mountain Trout Streams =====

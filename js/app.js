@@ -205,6 +205,7 @@ async function loadUserPlaces() {
     refreshUserPlaceMarkers();
   } catch (e) {
     console.warn('Failed to load user places:', e);
+    toast('Could not load your saved places', true);
   }
 }
 
@@ -357,6 +358,9 @@ async function loadHotSpots() {
     // Get weather for user's location (cached if recent)
     const weather = await fetchWeather(userLat, userLon);
 
+    // Pre-compute solunar once for the user's location (all water bodies are nearby)
+    const solunar = calculateSolunarPeriods(userLat, userLon);
+
     // Score each water body individually using type, nearby USGS data, and solunar
     const scored = waterBodies.map(wb => {
       const dist = distanceMiles(userLat, userLon, wb.lat, wb.lon);
@@ -364,7 +368,7 @@ async function loadHotSpots() {
       const nearbyUSGS = findNearbyUSGS(wb.lat, wb.lon, 10);
       const nearestUSGS = nearbyUSGS.length > 0 ? nearbyUSGS[0] : null;
       const usgsDist = nearestUSGS ? nearestUSGS.dist : 99;
-      const score = rateSpotActivity(weather, wb, nearestUSGS, usgsDist);
+      const score = rateSpotActivity(weather, wb, nearestUSGS, usgsDist, solunar);
       return { ...wb, score, dist, hasUSGS: !!nearestUSGS };
     });
 
@@ -497,6 +501,8 @@ window._placeAction = async function(btn) {
     } else {
       // Save
       const saved = await savePlace(wb, action);
+      // Dedupe: remove any existing entry for same place/status before adding
+      userPlaces = userPlaces.filter(p => p.id !== saved.id);
       userPlaces.push(saved);
       btn.classList.add(`active-${action}`);
       toast(`Marked as ${action}`);
@@ -1004,6 +1010,10 @@ async function loadWaterConditions(wb, gen) {
 }
 
 async function showWaterDetail(wb, dist) {
+  // Clear stale weather from previous detail panel
+  window._currentWeather = null;
+  window._currentWeatherWb = null;
+
   // Highlight the selected marker on the map
   const style = { lake: '#2980b9', river: '#1abc9c', stream: '#27ae60', pond: '#8e44ad', boat_landing: '#e67e22', fishing_pier: '#9b59b6' };
   highlightMarker(wb.lat, wb.lon, style[wb.type] || '#f1c40f');
@@ -1215,6 +1225,7 @@ async function loadWeatherForDetail(lat, lon, waterType, gen) {
     if (gen !== detailGeneration) return; // stale
     area.innerHTML = getWeatherCardHtml(weather);
     window._currentWeather = weather;
+    window._currentWeatherWb = { lat, lon }; // track which location weather is for
 
     // Enable species chips now that weather is loaded
     document.querySelectorAll('#species-selector .species-chip').forEach(btn => btn.disabled = false);
@@ -1397,8 +1408,10 @@ window._submitCommunityPost = async function() {
 
   const body = document.getElementById('community-body')?.value?.trim() || '';
   const species = document.getElementById('community-species')?.value || '';
-  const weight = parseFloat(document.getElementById('community-weight')?.value) || null;
-  const length = parseFloat(document.getElementById('community-length')?.value) || null;
+  let weight = parseFloat(document.getElementById('community-weight')?.value) || null;
+  let length = parseFloat(document.getElementById('community-length')?.value) || null;
+  if (weight !== null && (weight < 0 || weight > 1500)) { toast('Weight must be 0-1500 lbs', true); return; }
+  if (length !== null && (length < 0 || length > 240)) { toast('Length must be 0-240 inches', true); return; }
 
   if (!body && !communityPhotoFile) {
     toast('Write something or add a photo', true);
@@ -1447,6 +1460,7 @@ window._deleteCommunityPost = function(el) {
 };
 
 window._viewPhoto = function(url) {
+  if (!url || !url.startsWith('https://')) return;
   const viewer = document.getElementById('photo-viewer');
   const img = document.getElementById('photo-viewer-img');
   if (viewer && img) {

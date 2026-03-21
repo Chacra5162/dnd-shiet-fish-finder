@@ -103,22 +103,37 @@ function getGridCells(south, west, north, east) {
 }
 
 // Get cached data for multiple grid cells, return { cached, missing }
-// Reads all cells in parallel for speed
+// Uses a single IndexedDB transaction for performance
 async function getMultiCached(storeName, south, west, north, east) {
   const cells = getGridCells(south, west, north, east);
   const cached = [];
   const missing = [];
+  const ttl = TTL[Object.keys(STORES).find(k => STORES[k] === storeName)] || TTL.waterBodies;
 
-  const results = await Promise.all(
-    cells.map(cell => getCached(storeName, cell.lat, cell.lon).then(data => ({ cell, data })))
-  );
+  try {
+    const db = await openDB();
+    const tx = db.transaction(storeName, 'readonly');
+    const store = tx.objectStore(storeName);
 
-  for (const { cell, data } of results) {
-    if (data) {
-      cached.push(...data);
-    } else {
-      missing.push(cell);
+    const results = await Promise.all(
+      cells.map(cell => new Promise(resolve => {
+        const req = store.get(cell.key);
+        req.onsuccess = () => resolve({ cell, record: req.result });
+        req.onerror = () => resolve({ cell, record: null });
+      }))
+    );
+
+    for (const { cell, record } of results) {
+      if (record && (Date.now() - record.timestamp <= ttl)) {
+        cached.push(...record.data);
+      } else {
+        missing.push(cell);
+      }
     }
+  } catch (e) {
+    // If IndexedDB fails, treat all cells as missing
+    console.warn('IndexedDB batch read failed:', e.message);
+    missing.push(...cells);
   }
 
   return { cached, missing, allCells: cells };

@@ -9,7 +9,7 @@ import {
 } from './fishing.js';
 
 function escapeHtml(str) {
-  return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function fetchWithTimeout(url, ms) {
@@ -53,6 +53,13 @@ async function fetchForecast(lat, lon, date, timeWindow) {
   const json = await res.json();
   const h = json.hourly;
   if (!h || !h.time) throw new Error('No hourly forecast data');
+  // Validate required arrays exist
+  const requiredArrays = ['temperature_2m', 'apparent_temperature', 'relative_humidity_2m', 'precipitation', 'cloud_cover', 'pressure_msl', 'wind_speed_10m', 'wind_gusts_10m', 'wind_direction_10m', 'weather_code'];
+  for (const key of requiredArrays) {
+    if (!h[key] || h[key].length !== h.time.length) {
+      console.warn(`Forecast missing or incomplete array: ${key}`);
+    }
+  }
 
   // Filter to time window hours
   const indices = [];
@@ -99,6 +106,7 @@ async function fetchForecast(lat, lon, date, timeWindow) {
 
 function formatDate(d) {
   const dt = d instanceof Date ? d : new Date(d + 'T12:00:00');
+  if (isNaN(dt.getTime())) throw new Error(`Invalid date: ${d}`);
   return dt.toISOString().split('T')[0];
 }
 

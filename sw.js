@@ -1,6 +1,7 @@
-const CACHE_NAME = 'dnd-shiet-fish-finder-v30';
+const CACHE_NAME = 'dnd-shiet-fish-finder-v31';
 const TILE_CACHE = 'dnd-tiles-v2';
 const MAX_TILES = 1500;
+let tileWriteCount = 0;
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -79,10 +80,12 @@ self.addEventListener('fetch', (event) => {
           const fetched = fetch(event.request).then(async (response) => {
             if (response.ok) {
               cache.put(event.request, response.clone());
-              // LRU eviction: delete oldest entry when over limit
-              const keys = await cache.keys();
-              if (keys.length > MAX_TILES) {
-                await cache.delete(keys[0]);
+              // LRU eviction: check every 50th write to reduce overhead
+              if (++tileWriteCount % 50 === 0) {
+                const keys = await cache.keys();
+                if (keys.length > MAX_TILES) {
+                  await cache.delete(keys[0]);
+                }
               }
             }
             return response;

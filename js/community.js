@@ -12,7 +12,9 @@ function client() {
 
 // Generate a stable key for a water body (same location = same board)
 function generateWaterBodyKey(name, lat, lon) {
-  return `${(name || '').toLowerCase().trim()}|${lat.toFixed(3)}|${lon.toFixed(3)}`;
+  const safeLat = typeof lat === 'number' && !isNaN(lat) ? lat.toFixed(3) : '0.000';
+  const safeLon = typeof lon === 'number' && !isNaN(lon) ? lon.toFixed(3) : '0.000';
+  return `${(name || '').toLowerCase().trim()}|${safeLat}|${safeLon}`;
 }
 
 // ===== CRUD =====
@@ -47,7 +49,7 @@ async function addCommunityPost(userId, displayName, waterBody, postData, photoF
   if (photoFile) {
     if (photoFile.size > 10 * 1024 * 1024) throw new Error('Photo must be under 10 MB');
     const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
-    if (photoFile.type && !ALLOWED_MIME.includes(photoFile.type)) throw new Error('Invalid file type — use JPG, PNG, GIF, or WebP');
+    if (!photoFile.type || !ALLOWED_MIME.includes(photoFile.type)) throw new Error('Invalid file type — use JPG, PNG, GIF, or WebP');
     const ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
     const rawExt = photoFile.name.split('.').pop().toLowerCase();
     const ext = ALLOWED_EXTS.includes(rawExt) ? rawExt : 'jpg';
@@ -75,7 +77,7 @@ async function addCommunityPost(userId, displayName, waterBody, postData, photoF
       water_body_lat: waterBody.lat,
       water_body_lon: waterBody.lon,
       post_type: postData.type || 'comment',
-      body: postData.body || '',
+      body: (postData.body || '').slice(0, 2000),
       photo_path: photoPath,
       species: postData.species || null,
       weight_lbs: postData.weight || null,
