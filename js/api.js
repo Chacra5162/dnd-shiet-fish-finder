@@ -1100,18 +1100,22 @@ function getFishingLinks(lat, lon, waterType, waterName) {
 function getCommonSpecies(waterType, lat, lon, waterName) {
   const eastern = lon > -78;
   const mountain = lon < -80;
-  const coastal = lon > -76.5;
-  const tidal = eastern && !mountain && lon > -77.8;
+  const coastal = lon > -76.4;
   const nameLower = (waterName || '').toLowerCase();
   const month = new Date().getMonth() + 1; // 1-12
+
+  // Fall line runs diagonally through VA — approximate with lat-adjusted longitude.
+  // Fall line cities: Fredericksburg (~-77.46), Richmond (~-77.44), Petersburg (~-77.40)
+  // Points east of the fall line on named tidal rivers get tidal species.
+  const fallLineLon = -77.5 + (lat - 37.5) * 0.05; // slight NE tilt
+  const belowFallLine = lon > fallLineLon;
 
   // Tidal rivers: James, Chickahominy, Rappahannock, York, etc.
   const tidalRiverNames = ['james', 'chickahominy', 'rappahannock', 'york',
     'mattaponi', 'pamunkey', 'appomattox', 'elizabeth', 'nansemond'];
-  const isTidalRiver = tidal &&
+  const isTidalRiver = belowFallLine &&
     (waterType === 'river' || waterType === 'boat_landing' || waterType === 'fishing_pier') &&
-    (tidalRiverNames.some(n => nameLower.includes(n)) ||
-     !nameLower || nameLower.startsWith('river #') || nameLower.startsWith('boat landing #'));
+    tidalRiverNames.some(n => nameLower.includes(n));
 
   if (isTidalRiver) {
     // Base tidal river species — top 10 year-round
@@ -1136,7 +1140,7 @@ function getCommonSpecies(waterType, lat, lon, waterName) {
     return base;
   }
 
-  // Coastal rivers and piers
+  // Coastal/brackish rivers and piers (east of ~-76.2, saltwater influence)
   if (coastal && (waterType === 'river' || waterType === 'boat_landing' || waterType === 'fishing_pier')) {
     const base = ['Striped Bass', 'Blue Catfish', 'Speckled Trout', 'Red Drum', 'Flounder',
       'White Perch', 'American Shad', 'Hickory Shad', 'Spot', 'Croaker'];
@@ -1144,12 +1148,18 @@ function getCommonSpecies(waterType, lat, lon, waterName) {
     return base;
   }
 
-  // Eastern non-coastal rivers
-  if (eastern && !coastal && (waterType === 'river' || waterType === 'boat_landing')) {
-    const base = ['Striped Bass', 'Blue Catfish', 'American Shad', 'Hickory Shad', 'White Perch',
-      'Largemouth Bass', 'Channel Catfish', 'Flathead Catfish', 'Snakehead', 'Longnose Gar'];
-    if (month >= 3 && month <= 5) base.push('Blueback Herring', 'Alewife');
-    else base.push('Carp', 'Herring');
+  // Piedmont rivers — below fall line but not coastal (freshwater tidal influence)
+  if (belowFallLine && !coastal && (waterType === 'river' || waterType === 'boat_landing')) {
+    const base = ['Largemouth Bass', 'Blue Catfish', 'Channel Catfish', 'Flathead Catfish',
+      'Striped Bass', 'White Perch', 'Snakehead', 'Carp', 'Longnose Gar', 'Bowfin'];
+    if (month >= 3 && month <= 5) base.push('American Shad', 'Hickory Shad', 'Blueback Herring');
+    return base;
+  }
+
+  // Piedmont/upper rivers — above fall line, east of mountains
+  if (eastern && !mountain && (waterType === 'river' || waterType === 'boat_landing')) {
+    const base = ['Smallmouth Bass', 'Largemouth Bass', 'Channel Catfish', 'Flathead Catfish',
+      'Spotted Bass', 'Bluegill', 'Redbreast Sunfish', 'Rock Bass', 'Carp', 'Fallfish'];
     return base;
   }
 
