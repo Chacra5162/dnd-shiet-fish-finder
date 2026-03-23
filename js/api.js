@@ -1163,15 +1163,26 @@ function getCommonSpecies(waterType, lat, lon, waterName) {
     return base;
   }
 
+  // Lakes: large reservoirs (names containing 'lake', 'reservoir', known names) get
+  // big-water species; everything else gets small-lake/pond species.
+  const bigLakeNames = ['smith mountain', 'kerr', 'buggs island', 'gaston', 'anna',
+    'chesdin', 'jordan', 'falls lake', 'high rock', 'badin', 'tillery',
+    'norman', 'wylie', 'james', 'moomaw', 'claytor', 'philpott',
+    'leesville', 'western branch', 'prince', 'chickahominy',
+    'briery creek', 'sandy river', 'motts run', 'burke'];
+  const isBigLake = waterType === 'lake' && bigLakeNames.some(n => nameLower.includes(n));
+
   const species = {
-    lake: eastern
-      ? ['Largemouth Bass', 'Blue Catfish', 'Channel Catfish', 'Bluegill', 'Crappie', 'Striped Bass', 'White Perch', 'Carp', 'Flathead Catfish', 'Bowfin']
-      : mountain
-        ? ['Smallmouth Bass', 'Largemouth Bass', 'Striped Bass', 'Muskie', 'Rainbow Trout', 'Brown Trout', 'Walleye', 'Bluegill', 'Crappie', 'Channel Catfish']
-        : ['Largemouth Bass', 'Striped Bass', 'Smallmouth Bass', 'Crappie', 'Bluegill', 'Channel Catfish', 'Carp', 'White Perch', 'Flathead Catfish', 'Walleye'],
+    lake: isBigLake
+      ? (belowFallLine
+        ? ['Largemouth Bass', 'Blue Catfish', 'Channel Catfish', 'Striped Bass', 'Crappie', 'Bluegill', 'White Perch', 'Flathead Catfish', 'Carp', 'Bowfin']
+        : mountain
+          ? ['Smallmouth Bass', 'Largemouth Bass', 'Striped Bass', 'Muskie', 'Walleye', 'Rainbow Trout', 'Brown Trout', 'Bluegill', 'Crappie', 'Channel Catfish']
+          : ['Largemouth Bass', 'Striped Bass', 'Smallmouth Bass', 'Crappie', 'Bluegill', 'Channel Catfish', 'Carp', 'Walleye', 'Flathead Catfish', 'White Perch'])
+      : ['Largemouth Bass', 'Bluegill', 'Crappie', 'Channel Catfish', 'Chain Pickerel', 'Carp', 'Bullhead', 'Green Sunfish', 'Pumpkinseed', 'Golden Shiner'],
     river: mountain
       ? ['Smallmouth Bass', 'Spotted Bass', 'Rainbow Trout', 'Brown Trout', 'Brook Trout', 'Muskie', 'Rock Bass', 'Fallfish', 'Redbreast Sunfish', 'Channel Catfish']
-      : ['Smallmouth Bass', 'Spotted Bass', 'Channel Catfish', 'Largemouth Bass', 'Striped Bass', 'Sunfish', 'Carp', 'Rock Bass', 'Redbreast Sunfish', 'Fallfish'],
+      : ['Smallmouth Bass', 'Spotted Bass', 'Channel Catfish', 'Largemouth Bass', 'Bluegill', 'Sunfish', 'Carp', 'Rock Bass', 'Redbreast Sunfish', 'Fallfish'],
     stream: mountain
       ? ['Brook Trout', 'Rainbow Trout', 'Brown Trout', 'Smallmouth Bass', 'Rock Bass', 'Creek Chub', 'Fallfish', 'Redbreast Sunfish', 'Sculpin', 'Dace']
       : (coastal
@@ -1180,7 +1191,7 @@ function getCommonSpecies(waterType, lat, lon, waterName) {
     pond: ['Largemouth Bass', 'Bluegill', 'Channel Catfish', 'Crappie', 'Carp', 'Green Sunfish', 'Pumpkinseed', 'Bullhead', 'Golden Shiner', 'Chain Pickerel'],
     fishing_pier: coastal
       ? ['Speckled Trout', 'Red Drum', 'Flounder', 'Spot', 'Croaker', 'Bluefish', 'Sheepshead', 'Cobia', 'Spanish Mackerel', 'Black Drum']
-      : eastern
+      : belowFallLine
         ? ['Striped Bass', 'Blue Catfish', 'White Perch', 'Channel Catfish', 'Crappie', 'Largemouth Bass', 'American Shad', 'Snakehead', 'Carp', 'Longnose Gar']
         : ['Largemouth Bass', 'Channel Catfish', 'Bluegill', 'Crappie', 'Smallmouth Bass', 'Rock Bass', 'Sunfish', 'Carp', 'Chain Pickerel', 'Fallfish'],
   };
