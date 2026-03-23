@@ -15,8 +15,8 @@ const WEATHER_TTL = 30 * 60 * 1000; // 30 min
 
 async function fetchWeather(lat, lon) {
   if (weatherCache &&
-    Math.abs(weatherCache.lat - lat) < 0.1 &&
-    Math.abs(weatherCache.lon - lon) < 0.1 &&
+    Math.abs(weatherCache.lat - lat) < 0.01 &&
+    Math.abs(weatherCache.lon - lon) < 0.01 &&
     Date.now() - weatherCache.timestamp < WEATHER_TTL) {
     return weatherCache.data;
   }
