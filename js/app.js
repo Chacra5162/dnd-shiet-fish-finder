@@ -167,6 +167,16 @@ async function init() {
     const hint = document.getElementById('header-hint');
     if (hint) hint.classList.remove('hidden');
   }
+  const hintBtn = document.getElementById('header-hint-dismiss');
+  if (hintBtn) {
+    const dismissHint = (e) => {
+      e.preventDefault();
+      document.getElementById('header-hint').classList.add('hidden');
+      localStorage.setItem('wwf_header_hint_seen', '1');
+    };
+    hintBtn.addEventListener('touchend', dismissHint);
+    hintBtn.addEventListener('click', dismissHint);
+  }
 
   await loadData();
 }
