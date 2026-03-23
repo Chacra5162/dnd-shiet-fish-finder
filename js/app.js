@@ -1078,7 +1078,7 @@ async function showWaterDetail(wb, dist) {
     <div class="detail-section">
       <h3>Species — Tap for What to Use</h3>
       <div class="species-selector" id="species-selector">
-        ${species.map((s, i) => `<button class="species-chip" data-species="${escapeAttr(s)}" data-lat="${wb.lat}" data-lon="${wb.lon}" onclick="window._selectSpecies(this)" disabled>${escapeHtml(s)}</button>`).join('')}
+        ${species.map((s, i) => `<button class="species-chip" data-species="${escapeAttr(s)}" data-lat="${wb.lat}" data-lon="${wb.lon}" onclick="window._selectSpecies(this)">${escapeHtml(s)}</button>`).join('')}
       </div>
     </div>
   `;
@@ -1221,9 +1221,6 @@ async function loadWeatherForDetail(lat, lon, waterType, gen) {
     area.innerHTML = getWeatherCardHtml(weather);
     window._currentWeather = weather;
     window._currentWeatherWb = { lat, lon }; // track which location weather is for
-
-    // Enable species chips now that weather is loaded
-    document.querySelectorAll('#species-selector .species-chip').forEach(btn => btn.disabled = false);
 
     // Best fishing times
     const timesArea = document.getElementById('best-times-area');
