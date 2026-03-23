@@ -1078,7 +1078,7 @@ async function showWaterDetail(wb, dist) {
     <div class="detail-section">
       <h3>Species — Tap for What to Use</h3>
       <div class="species-selector" id="species-selector">
-        ${species.map((s, i) => `<button class="species-chip" data-species="${escapeAttr(s)}" data-lat="${wb.lat}" data-lon="${wb.lon}" onclick="window._selectSpecies(this)">${escapeHtml(s)}</button>`).join('')}
+        ${species.map((s, i) => `<button class="species-chip" data-species="${escapeAttr(s)}" data-lat="${wb.lat}" data-lon="${wb.lon}">${escapeHtml(s)}</button>`).join('')}
       </div>
     </div>
   `;
@@ -2930,8 +2930,14 @@ function setupEventListeners() {
     e.preventDefault(); // prevent scroll during drag
   }, { passive: false });
 
-  // Event delegation for lure card expand/collapse and USGS item clicks
+  // Event delegation for species chips, lure cards, and USGS item clicks
   detailPanel.addEventListener('click', (e) => {
+    // Species chip click
+    const chip = e.target.closest('.species-chip');
+    if (chip) {
+      window._selectSpecies(chip);
+      return;
+    }
     // USGS nearby item click
     const usgsItem = e.target.closest('.nearby-usgs-item');
     if (usgsItem && usgsItem.dataset.siteCode) {
