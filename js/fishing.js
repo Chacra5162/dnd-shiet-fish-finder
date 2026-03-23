@@ -2086,6 +2086,200 @@ const SPECIES_DATA = {
     depthTips: { cold: 'Deep bluffs and ledges 12-25ft', mild: 'Rocky points and current breaks 6-15ft', warm: 'Current seams, rocky banks 3-10ft', hot: 'Deep ledges and shade 15-25ft, early morning topwater on shoals' },
     tips: ['Very common in New River, upper James, and Roanoke River', 'Prefer more current than largemouth — fish the flow', 'Smaller profile baits than largemouth — downsize everything', 'Often found mixed with smallmouth in rocky river sections'],
   },
+  'Snakehead': {
+    lures: {
+      cold: ['Jig tipped with bait', 'Swimbait (slow roll)'],
+      mild: ['Chatterbait', 'Spinnerbait', 'Swimbait', 'Soft Plastic Jerkbait'],
+      warm: ['Topwater Frog', 'Buzzbait', 'Chatterbait', 'Soft Plastic Fluke'],
+      hot: ['Topwater Frog', 'Buzzbait', 'Swim Jig', 'Popper'],
+    },
+    baits: ['Live Minnows', 'Nightcrawlers', 'Cut Bait', 'Live Bluegill (where legal)'],
+    depthTips: { cold: 'Deep slow pools 8-15ft, slow presentation near bottom', mild: 'Shallow cover, lily pads, wood 2-6ft', warm: 'Shallow vegetation mats, fry ball areas 1-4ft', hot: 'Thick cover, shade, vegetation mats 2-6ft' },
+  },
+  'Flathead Catfish': {
+    lures: {
+      cold: ['Jig tipped with bait'], mild: ['Jig tipped with bait'], warm: ['Jig tipped with bait'], hot: ['Jig tipped with bait'],
+    },
+    baits: ['Live Bluegill', 'Live Shad', 'Live Creek Chubs', 'Live Sunfish', 'Large Nightcrawlers'],
+    depthTips: { cold: 'Deep holes near logjams 15-30ft', mild: 'Log jams & undercut banks 8-20ft', warm: 'Near structure, logjams, bridge pilings 5-15ft, night fishing best', hot: 'Deep holes by day, shallow flats at night 3-15ft' },
+  },
+  'White Catfish': {
+    lures: {
+      cold: ['Jig tipped with bait'], mild: ['Jig tipped with bait'], warm: ['Jig tipped with bait'], hot: ['Jig tipped with bait'],
+    },
+    baits: ['Chicken Liver', 'Nightcrawlers', 'Cut Bait', 'Stink Bait', 'Shrimp'],
+    depthTips: { cold: 'Deep channels 10-20ft, slow bottom rigs', mild: 'Channel edges & structure 6-15ft', warm: 'Shallow flats at night, channels by day 4-12ft', hot: 'Deep channels, night fishing on flats' },
+  },
+  'Longnose Gar': {
+    lures: {
+      cold: ['Rope Lure'], mild: ['Rope Lure', 'Topwater Plug'], warm: ['Rope Lure', 'Cut Bait Float Rig'], hot: ['Rope Lure', 'Topwater Plug'],
+    },
+    baits: ['Cut Shad', 'Live Minnows', 'Cut Mullet', 'Chicken Liver'],
+    depthTips: { cold: 'Slow deep pools 8-15ft', mild: 'Near surface in slow current 2-6ft', warm: 'Surface & near surface 1-5ft, look for rolling fish', hot: 'Shallow backwaters 2-6ft, early morning surface' },
+  },
+  'Blueback Herring': {
+    lures: {
+      cold: ['Sabiki Rig', 'Small Spoon'], mild: ['Sabiki Rig', 'Shad Dart', 'Tiny Spoon'], warm: ['Sabiki Rig'], hot: ['Sabiki Rig'],
+    },
+    baits: ['Small pieces of shrimp', 'Fishbites'],
+    depthTips: { cold: 'Deep channels', mild: 'Spring spawning runs up rivers, mid-water', warm: 'Mid-water schools', hot: 'Deep schools' },
+  },
+  'Alewife': {
+    lures: {
+      cold: ['Sabiki Rig', 'Small Spoon'], mild: ['Sabiki Rig', 'Shad Dart'], warm: ['Sabiki Rig'], hot: ['Sabiki Rig'],
+    },
+    baits: ['Small pieces of shrimp', 'Fishbites'],
+    depthTips: { cold: 'Deep channels', mild: 'Spring runs below dams, mid-water', warm: 'Mid-water schools', hot: 'Deep schools' },
+  },
+  'Bowfin': {
+    lures: {
+      cold: ['Jig tipped with bait'], mild: ['Spinnerbait', 'Soft Plastic Crawfish', 'Chatterbait'],
+      warm: ['Topwater Frog', 'Chatterbait', 'Soft Plastic Crawfish', 'Spinnerbait'],
+      hot: ['Topwater Frog', 'Swim Jig', 'Soft Plastic'],
+    },
+    baits: ['Nightcrawlers', 'Cut Bait', 'Live Minnows', 'Crawfish'],
+    depthTips: { cold: 'Deep slow backwaters 8-15ft', mild: 'Shallow vegetation & stumps 3-8ft', warm: 'Thick vegetation, stumps, shallow cover 2-6ft', hot: 'Thick cover, shade, vegetation mats 2-6ft' },
+  },
+  'Bluefish': {
+    lures: {
+      cold: ['Metal Jig', 'Spoon'], mild: ['Casting Spoon', 'Gotcha Plug', 'Metal Jig'],
+      warm: ['Gotcha Plug', 'Casting Spoon', 'Topwater Popper', 'Metal Jig'],
+      hot: ['Topwater Popper', 'Gotcha Plug', 'Casting Spoon'],
+    },
+    baits: ['Cut Mullet', 'Cut Bunker', 'Live Finger Mullet', 'Fishbites'],
+    depthTips: { cold: 'Deeper channels 15-30ft, jigging', mild: 'Inlets & nearshore 5-15ft, follow bird activity', warm: 'Surface blitzes 0-10ft, cast into breaking fish', hot: 'Surface blitzes, nearshore structure 5-15ft' },
+  },
+  'Cobia': {
+    lures: {
+      cold: ['Not in range — cobia migrate south'], mild: ['Large Jig', 'Bucktail Jig', 'Swimbait'],
+      warm: ['Large Bucktail Jig', 'Swimbait', 'Sight-cast Eel Imitation'],
+      hot: ['Large Bucktail Jig', 'Live Eel Rig', 'Swimbait'],
+    },
+    baits: ['Live Eels', 'Live Spot', 'Live Croaker', 'Cut Bait'],
+    depthTips: { cold: 'Not present — cobia are offshore or migrated south', mild: 'Sight-cast near buoys, rays, structure 5-15ft', warm: 'Surface near buoys, CBBT pilings, following rays 0-15ft', hot: 'Near structure, buoys, wrecks 5-20ft' },
+  },
+  'Sheepshead': {
+    lures: {
+      cold: ['Small Jig tipped with bait'], mild: ['Small Jig tipped with bait'], warm: ['Small Jig tipped with bait'], hot: ['Small Jig tipped with bait'],
+    },
+    baits: ['Fiddler Crabs', 'Sand Fleas', 'Barnacle Scraping', 'Shrimp', 'Clam'],
+    depthTips: { cold: 'Bridge pilings & structure 10-20ft', mild: 'Pilings, docks, jetties 5-15ft', warm: 'Pilings, rocks, jetties 3-12ft, scrape barnacles to chum', hot: 'Deep pilings & structure 8-20ft' },
+  },
+  'Spot': {
+    lures: {
+      cold: ['Small Jig'], mild: ['Small Jig', 'Beetle Spin'], warm: ['Beetle Spin', 'Small Jig'], hot: ['Small Jig'],
+    },
+    baits: ['Bloodworms', 'Fishbites (bloodworm)', 'Shrimp pieces', 'Squid strips'],
+    depthTips: { cold: 'Offshore — spot migrate out in winter', mild: 'Shallow flats & piers 3-10ft', warm: 'Piers, bridges, sandy bottom 3-12ft, bottom rigs', hot: 'Channels & deeper structure 8-15ft' },
+  },
+  'Croaker': {
+    lures: {
+      cold: ['Small Jig'], mild: ['Small Jig', 'Beetle Spin'], warm: ['Beetle Spin', 'Small Jig'], hot: ['Small Jig'],
+    },
+    baits: ['Squid strips', 'Bloodworms', 'Shrimp', 'Fishbites', 'Peeler Crab'],
+    depthTips: { cold: 'Offshore — croaker migrate out', mild: 'Sandy bottom near channels 5-15ft', warm: 'Sandy/muddy bottom 3-12ft, near piers & bridges', hot: 'Deeper channels 8-20ft' },
+  },
+  'Fallfish': {
+    lures: {
+      cold: ['Micro Jig', 'Tiny Spoon'], mild: ['Small Inline Spinner', 'Micro Jig', 'Dry Fly'],
+      warm: ['Small Spinner', 'Dry Fly', 'Tiny Crankbait'], hot: ['Micro Jig', 'Small Spinner'],
+    },
+    baits: ['Nightcrawlers', 'Crickets', 'Bread', 'Corn'],
+    depthTips: { cold: 'Deeper pools 4-8ft', mild: 'Pools & runs 2-6ft', warm: 'Riffles, runs, below rapids 2-5ft', hot: 'Deeper shaded pools' },
+  },
+  'Redbreast Sunfish': {
+    lures: {
+      cold: ['Micro Jig', 'Tiny Grub'], mild: ['Small Spinner', 'Beetle Spin', 'Micro Jig', 'Small Popper'],
+      warm: ['Small Popper', 'Beetle Spin', 'Dry Fly'], hot: ['Small Jig under float', 'Tiny Grub'],
+    },
+    baits: ['Crickets', 'Worm pieces', 'Wax Worms', 'Small Grasshoppers'],
+    depthTips: { cold: 'Deeper pools near rocks 4-8ft', mild: 'Rocky runs & eddies 2-5ft', warm: 'Shallow rocky areas, near banks 1-4ft', hot: 'Shaded pools & undercuts 3-6ft' },
+  },
+  'Green Sunfish': {
+    lures: {
+      cold: ['Micro Jig'], mild: ['Tiny Spinner', 'Beetle Spin', 'Micro Jig'],
+      warm: ['Small Popper', 'Beetle Spin', 'Micro Jig'], hot: ['Small Jig under float'],
+    },
+    baits: ['Worm pieces', 'Crickets', 'Wax Worms', 'Bread'],
+    depthTips: { cold: 'Deeper pools 4-8ft', mild: 'Shallow cover, rocks, banks 2-5ft', warm: 'Near banks, brush, docks 1-4ft', hot: 'Shade & deeper cover 3-6ft' },
+  },
+  'Pumpkinseed': {
+    lures: {
+      cold: ['Micro Jig', 'Ice Fly'], mild: ['Tiny Spinner', 'Beetle Spin', 'Micro Jig'],
+      warm: ['Small Popper', 'Beetle Spin'], hot: ['Small Jig under float'],
+    },
+    baits: ['Worm pieces', 'Crickets', 'Wax Worms'],
+    depthTips: { cold: 'Deeper weed edges 6-10ft', mild: 'Shallow weedy areas 2-5ft', warm: 'Weedy shallows, docks 1-4ft', hot: 'Shade & weed edges 3-8ft' },
+  },
+  'Bullhead': {
+    lures: {
+      cold: ['Jig tipped with bait'], mild: ['Jig tipped with bait'], warm: ['Jig tipped with bait'], hot: ['Jig tipped with bait'],
+    },
+    baits: ['Nightcrawlers', 'Chicken Liver', 'Stink Bait', 'Hot Dogs', 'Corn'],
+    depthTips: { cold: 'Deep muddy bottom 8-15ft', mild: 'Muddy bottom near weeds 4-10ft', warm: 'Shallow muddy areas 2-6ft, night fishing best', hot: 'Deeper mud bottom 6-12ft, night fishing' },
+  },
+  'Golden Shiner': {
+    lures: {
+      cold: ['Micro Jig'], mild: ['Tiny Spinner', 'Micro Jig'], warm: ['Tiny Spinner', 'Micro Jig'], hot: ['Micro Jig'],
+    },
+    baits: ['Bread balls', 'Corn', 'Tiny worm pieces', 'Oatmeal dough'],
+    depthTips: { cold: 'Deeper weedy areas 6-10ft', mild: 'Near surface in weeds 2-5ft', warm: 'Shallow weedy coves 1-4ft', hot: 'Deeper weed edges 4-8ft' },
+  },
+  'Chain Pickerel': {
+    lures: {
+      cold: ['Jerkbait', 'Small Spoon', 'Blade Bait'],
+      mild: ['Spinnerbait', 'Jerkbait', 'Small Swimbait', 'Inline Spinner'],
+      warm: ['Topwater Plug', 'Spinnerbait', 'Soft Plastic Jerkbait', 'Buzzbait'],
+      hot: ['Spinnerbait', 'Swimbait', 'Weedless Spoon'],
+    },
+    baits: ['Live Minnows', 'Live Shiners', 'Nightcrawlers'],
+    depthTips: { cold: 'Weed edges & drop-offs 6-12ft, slow presentation', mild: 'Weed lines & shallow cover 3-8ft', warm: 'Weedy shallows 2-6ft, aggressive on topwater', hot: 'Deeper weed edges 6-10ft, shade pockets' },
+  },
+  'Dace': {
+    lures: {
+      cold: ['Micro Jig'], mild: ['Micro Jig', 'Tiny Dry Fly'], warm: ['Tiny Dry Fly', 'Micro Jig'], hot: ['Micro Jig'],
+    },
+    baits: ['Tiny worm pieces', 'Bread', 'Maggots'],
+    depthTips: { cold: 'Deeper pools 3-6ft', mild: 'Riffles & shallow runs 1-3ft', warm: 'Shallow riffles 1-2ft', hot: 'Shaded pools 2-4ft' },
+  },
+  'Mullet': {
+    lures: {
+      cold: ['Small Jig'], mild: ['Tiny Jig', 'Small Spoon'], warm: ['Small Jig', 'Cast Net (for bait)'], hot: ['Small Jig'],
+    },
+    baits: ['Bread balls', 'Oatmeal dough', 'Corn', 'Algae-covered hook'],
+    depthTips: { cold: 'Deeper channels 8-15ft', mild: 'Shallow flats & shorelines 2-6ft', warm: 'Shallow flats, inlets, near surface 1-4ft', hot: 'Shallow flats & channels 3-8ft' },
+  },
+  'Blue Crab': {
+    lures: {
+      cold: ['Crab Trap'], mild: ['Crab Trap', 'Hand Line'], warm: ['Crab Trap', 'Hand Line', 'Dip Net'], hot: ['Crab Trap', 'Hand Line'],
+    },
+    baits: ['Chicken Necks', 'Bull Lips', 'Razor Clams', 'Fish Heads', 'Turkey Legs'],
+    depthTips: { cold: 'Buried in mud — limited crabbing', mild: 'Shallow flats 2-6ft as crabs become active', warm: 'Shallow grass flats 1-5ft, pilings, docks', hot: 'Channels & grass flats 3-10ft' },
+  },
+  'Sculpin': {
+    lures: {
+      cold: ['Micro Jig', 'Tiny Nymph'], mild: ['Micro Jig', 'Tiny Nymph'], warm: ['Micro Jig'], hot: ['Micro Jig'],
+    },
+    baits: ['Tiny worm pieces', 'Maggots', 'Small insects'],
+    depthTips: { cold: 'Rocky bottom pools 2-5ft', mild: 'Rocky riffles & runs 1-3ft', warm: 'Rocky bottom in current 1-3ft', hot: 'Cold shaded riffles 1-3ft' },
+  },
+  'Spanish Mackerel': {
+    lures: {
+      cold: ['Not in range — mackerel migrate south'], mild: ['Gotcha Plug', 'Casting Spoon', 'Metal Jig'],
+      warm: ['Gotcha Plug', 'Clark Spoon (trolling)', 'Casting Spoon', 'Small Swimbait'],
+      hot: ['Gotcha Plug', 'Casting Spoon', 'Clark Spoon', 'Topwater Plug'],
+    },
+    baits: ['Live Finger Mullet', 'Live Shrimp', 'Cut Bait Strips'],
+    depthTips: { cold: 'Not present — offshore or migrated', mild: 'Nearshore 5-20ft, follow bird activity', warm: 'Surface blitzes, nearshore 0-15ft, fast retrieve', hot: 'Surface to mid-water, near inlets & piers 5-20ft' },
+  },
+  'Black Drum': {
+    lures: {
+      cold: ['Jig tipped with bait'], mild: ['Jig tipped with bait', 'Small Bucktail'],
+      warm: ['Small Bucktail Jig', 'Soft Plastic Crab'], hot: ['Jig tipped with bait'],
+    },
+    baits: ['Blue Crab (half)', 'Clam', 'Shrimp', 'Sand Fleas', 'Oyster'],
+    depthTips: { cold: 'Deep channels near structure 15-25ft', mild: 'Pilings, jetties, bridges 5-15ft', warm: 'Shallow flats, oyster bars 3-10ft', hot: 'Deeper structure, bridge pilings 8-20ft' },
+  },
 };
 
 // Accept optional waterTemp (from USGS) — use it when available, fall back to adjusted air temp.

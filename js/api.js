@@ -1158,7 +1158,7 @@ function getCommonSpecies(waterType, lat, lon, waterName) {
       ? ['Largemouth Bass', 'Blue Catfish', 'Channel Catfish', 'Bluegill', 'Crappie', 'Striped Bass', 'White Perch', 'Carp', 'Flathead Catfish', 'Bowfin']
       : mountain
         ? ['Smallmouth Bass', 'Largemouth Bass', 'Striped Bass', 'Muskie', 'Rainbow Trout', 'Brown Trout', 'Walleye', 'Bluegill', 'Crappie', 'Channel Catfish']
-        : ['Largemouth Bass', 'Striped Bass', 'Smallmouth Bass', 'Crappie', 'Bluegill', 'Channel Catfish', 'Carp', 'White Perch', 'Catfish', 'Walleye'],
+        : ['Largemouth Bass', 'Striped Bass', 'Smallmouth Bass', 'Crappie', 'Bluegill', 'Channel Catfish', 'Carp', 'White Perch', 'Flathead Catfish', 'Walleye'],
     river: mountain
       ? ['Smallmouth Bass', 'Spotted Bass', 'Rainbow Trout', 'Brown Trout', 'Brook Trout', 'Muskie', 'Rock Bass', 'Fallfish', 'Redbreast Sunfish', 'Channel Catfish']
       : ['Smallmouth Bass', 'Spotted Bass', 'Channel Catfish', 'Largemouth Bass', 'Striped Bass', 'Sunfish', 'Carp', 'Rock Bass', 'Redbreast Sunfish', 'Fallfish'],
