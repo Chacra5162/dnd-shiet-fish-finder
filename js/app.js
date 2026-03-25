@@ -1078,7 +1078,7 @@ async function showWaterDetail(wb, dist) {
     <div class="detail-section">
       <h3>Species — Tap for What to Use</h3>
       <div class="species-selector" id="species-selector">
-        ${species.map((s, i) => `<button class="species-chip" data-species="${escapeAttr(s)}" data-lat="${wb.lat}" data-lon="${wb.lon}" onclick="window._selectSpecies(this)">${escapeHtml(s)}</button>`).join('')}
+        ${species.map((s, i) => `<button class="species-chip" data-species="${escapeAttr(s)}" data-lat="${wb.lat}" data-lon="${wb.lon}">${escapeHtml(s)}</button>`).join('')}
       </div>
     </div>
   `;
