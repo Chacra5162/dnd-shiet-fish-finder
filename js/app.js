@@ -817,7 +817,7 @@ function assessAccess(wb) {
 function collapsibleSection(title, content, startExpanded = false) {
   return `
     <div class="detail-section">
-      <div class="collapsible-header" onclick="this.nextElementSibling.classList.toggle('expanded');this.querySelector('.collapsible-chevron').classList.toggle('expanded')">
+      <div class="collapsible-header" role="button" tabindex="0">
         <h3>${title}</h3>
         <span class="collapsible-chevron ${startExpanded ? 'expanded' : ''}">&#9660;</span>
       </div>
@@ -1173,7 +1173,7 @@ async function showWaterDetail(wb, dist) {
   `;
   html += `
     <div class="detail-section" id="community-section">
-      <div class="collapsible-header" onclick="this.nextElementSibling.classList.toggle('expanded');this.querySelector('.collapsible-chevron').classList.toggle('expanded')">
+      <div class="collapsible-header" role="button" tabindex="0">
         <h3>Community Board</h3>
         <span class="collapsible-chevron expanded">&#9660;</span>
       </div>
@@ -2930,8 +2930,15 @@ function setupEventListeners() {
     e.preventDefault(); // prevent scroll during drag
   }, { passive: false });
 
-  // Event delegation for species chips, lure cards, and USGS item clicks
+  // Event delegation for collapsible sections, species chips, lure cards, USGS items
   detailPanel.addEventListener('click', (e) => {
+    // Collapsible section toggle (replaces inline onclick for iOS compatibility)
+    const header = e.target.closest('.collapsible-header');
+    if (header) {
+      header.nextElementSibling.classList.toggle('expanded');
+      header.querySelector('.collapsible-chevron').classList.toggle('expanded');
+      return;
+    }
     // Species chip click
     const chip = e.target.closest('.species-chip');
     if (chip) {

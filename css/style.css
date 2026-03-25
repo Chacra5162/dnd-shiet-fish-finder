@@ -30,9 +30,9 @@ html, body {
   color: var(--text);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
-  /* Prevent page zoom on mobile — only map should zoom */
-  touch-action: pan-x pan-y;
-  -ms-touch-action: pan-x pan-y;
+  /* Prevent double-tap zoom on mobile — manipulation allows tap + pan */
+  touch-action: manipulation;
+  -ms-touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
 }
 
