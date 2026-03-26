@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dnd-shiet-fish-finder-v44';
+const CACHE_NAME = 'dnd-shiet-fish-finder-v45';
 const TILE_CACHE = 'dnd-tiles-v2';
 const MAX_TILES = 1500;
 let tileWriteCount = 0;
@@ -21,6 +21,7 @@ const STATIC_ASSETS = [
   './js/utils/upload.js',
   './manifest.json',
   './icons/favicon.svg',
+  './img/lures/chatterbait.jpg',
 ];
 
 // Install: cache static assets, then activate

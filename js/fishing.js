@@ -953,7 +953,7 @@ const _LURE_IMG = {
   rig:         `${_WM}/a/ae/FMIB_35640_Hook%2C_Sinker%2C_and_Line_Used_for_Catching_Small_Species_of_Fish_at_Key_West.jpeg/250px-FMIB_35640_Hook%2C_Sinker%2C_and_Line_Used_for_Catching_Small_Species_of_Fish_at_Key_West.jpeg`,
   blade:       `${_WM}/4/40/BKK_vib.jpg/250px-BKK_vib.jpg`,
   dart:        `${_WM}/5/5a/Bucktail.jpg/250px-Bucktail.jpg`,
-  chatterbait: `${_WM}/e/e2/SpinTailJig.JPG/250px-SpinTailJig.JPG`,
+  chatterbait: './img/lures/chatterbait.jpg',
 };
 
 // Map lure names → illustration category
