@@ -745,6 +745,253 @@ function getTideHtml(tideData, stationName) {
 }
 
 
+// ===== Lure Color & Icon System =====
+
+// Base color keywords → hex
+const _CB = {
+  chartreuse:'#7FFF00', green:'#228B22', black:'#222', blue:'#2980b9', white:'#f0f0f0',
+  orange:'#e67e22', red:'#c0392b', brown:'#6B4226', gold:'#DAA520', silver:'#C0C0C0',
+  chrome:'#D4D4D4', purple:'#6a0d6e', pink:'#e91e8b', yellow:'#f1c40f', olive:'#6B8E23',
+  copper:'#B87333', tan:'#D2B48C', gray:'#808080', bone:'#E3DAC9', pearl:'#F0D8E8',
+  smoke:'#708090', rust:'#8B3A00', glow:'#66ff66', shad:'#8faec0',
+};
+
+// Special fishing color patterns → CSS background
+const _CS = {
+  'firetiger':'linear-gradient(135deg,#228B22,#FFD700 50%,#FF4500)',
+  'junebug':'linear-gradient(135deg,#1a0a2e,#4a0e6e 60%,#1a3a2a)',
+  'green pumpkin':'#6B6B23',
+  'green pumpkin/orange':'linear-gradient(135deg,#6B6B23 60%,#e67e22)',
+  'green pumpkin/purple':'linear-gradient(135deg,#6B6B23 60%,#6a0d6e)',
+  'green pumpkin/brown':'linear-gradient(135deg,#6B6B23 60%,#6B4226)',
+  'green pumpkin/chart':'linear-gradient(135deg,#6B6B23 50%,#7FFF00)',
+  'green pumpkin/chartreuse tail':'linear-gradient(135deg,#6B6B23 65%,#7FFF00)',
+  'green pumpkin/shad':'linear-gradient(135deg,#6B6B23 60%,#8faec0)',
+  'sexy shad':'linear-gradient(135deg,#87CEEB,#C0C0C0 50%,#4682B4)',
+  'ghost minnow':'linear-gradient(135deg,#c8d8e4,#e8eff4,#b8c8d4)',
+  'ghost shad':'linear-gradient(135deg,#bdd0dc,#dce8f0)',
+  'ghost':'linear-gradient(135deg,#d0d0d0 0%,#e8e8e8 50%,#c0c0c0)',
+  'morning dawn':'linear-gradient(135deg,#F4A460,#FFB6C1 50%,#DDA0DD)',
+  'watermelon':'#4E8C3E',
+  'watermelon red flake':'linear-gradient(135deg,#4E8C3E 55%,#c0392b 60%,#4E8C3E 65%,#c0392b 70%,#4E8C3E)',
+  'watermelon candy':'linear-gradient(135deg,#4E8C3E 60%,#c0392b)',
+  'watermelon seed':'linear-gradient(135deg,#4E8C3E 65%,#222 70%,#4E8C3E)',
+  'dark watermelon':'#2d5a1e',
+  'pb&j':'linear-gradient(135deg,#4a0e6e 50%,#8B4513)',
+  'peanut butter & jelly':'linear-gradient(135deg,#4a0e6e 50%,#8B4513)',
+  'electric chicken':'linear-gradient(135deg,#7FFF00 50%,#FF69B4)',
+  'monkey milk':'linear-gradient(135deg,#FFE4C4,#FF69B4 50%,#f0f0f0)',
+  'mo glo monkey milk':'linear-gradient(135deg,#FFE4C4,#FF69B4 50%,#66ff66)',
+  'crawfish':'linear-gradient(135deg,#8B2500,#FF4500 50%,#A0522D)',
+  'natural crawfish':'linear-gradient(135deg,#8B2500,#CD853F 50%,#A0522D)',
+  'red crawfish':'linear-gradient(135deg,#c0392b,#FF4500 50%,#8B2500)',
+  'red craw':'linear-gradient(135deg,#c0392b 50%,#8B2500)',
+  'dark craw':'linear-gradient(135deg,#3d1a00 50%,#6B4226)',
+  'orange belly craw':'linear-gradient(135deg,#8B2500 40%,#e67e22 60%,#6B4226)',
+  'brown craw':'linear-gradient(135deg,#6B4226 50%,#8B2500)',
+  'baby bass':'linear-gradient(135deg,#228B22,#90EE90 50%,#f0f0f0)',
+  'bluegill':'linear-gradient(135deg,#1a5276,#f39c12 50%,#228B22)',
+  'bluegill flash':'linear-gradient(135deg,#1a5276,#FFD700 50%,#228B22)',
+  'rainbow trout':'linear-gradient(135deg,#228B22,#FF69B4 50%,#C0C0C0)',
+  'brook trout':'linear-gradient(135deg,#2d5a1e,#FF4500 50%,#FFD700)',
+  'natural trout':'linear-gradient(135deg,#6B8E23,#D2B48C 50%,#708090)',
+  'motor oil':'linear-gradient(135deg,#4a3728,#6B8E23 50%,#3d2b1f)',
+  'plum':'#6a0d45',
+  'clown':'linear-gradient(135deg,#FF4500,#FFD700 50%,#228B22)',
+  'bright clown':'linear-gradient(135deg,#FF6347,#FFFF00 50%,#00FF00)',
+  'redbug':'linear-gradient(135deg,#8B0000,#FF4500 60%,#222)',
+  'oxblood':'#4a0000',
+  'bama bug':'linear-gradient(135deg,#228B22,#FF4500 50%,#6B4226)',
+  'coppertreuse':'linear-gradient(135deg,#B87333 50%,#7FFF00)',
+  'tequila sunrise':'linear-gradient(135deg,#FF4500,#FFD700 50%,#FF6347)',
+  'perch':'linear-gradient(135deg,#228B22,#FFD700 50%,#222)',
+  'natural perch':'linear-gradient(135deg,#228B22,#FFD700 50%,#222)',
+  'hot perch':'linear-gradient(135deg,#00FF00,#FFD700 50%,#FF4500)',
+  'bright perch':'linear-gradient(135deg,#32CD32,#FFD700 50%,#1a1a1a)',
+  'ayu':'linear-gradient(135deg,#90EE90,#FFD700 50%,#C0C0C0)',
+  'hitch':'linear-gradient(135deg,#708090,#C0C0C0 50%,#87CEEB)',
+  'pumpkinseed':'linear-gradient(135deg,#DAA520,#e67e22 50%,#228B22)',
+  'red shad':'linear-gradient(135deg,#c0392b 50%,#8faec0)',
+  'citrus shad':'linear-gradient(135deg,#f1c40f,#7FFF00 50%,#8faec0)',
+  'chartreuse shad':'linear-gradient(135deg,#7FFF00 50%,#8faec0)',
+  'table rock shad':'linear-gradient(135deg,#4682B4,#C0C0C0 50%,#228B22)',
+  'tennessee shad':'linear-gradient(135deg,#4682B4,#C0C0C0)',
+  'natural shad':'linear-gradient(135deg,#708090,#C0C0C0)',
+  'gizzard shad':'linear-gradient(135deg,#708090,#87CEEB 50%,#C0C0C0)',
+  'smoke shad':'linear-gradient(135deg,#708090 50%,#8faec0)',
+  'french fry':'#D4A017',
+  'black grape':'linear-gradient(135deg,#222 50%,#4a0e6e)',
+  'dark grape':'linear-gradient(135deg,#1a1a1a 50%,#3d0a56)',
+  'natural sculpin':'linear-gradient(135deg,#6B4226,#8B7355 50%,#4a3728)',
+  'bold bluegill':'linear-gradient(135deg,#1a3a6e,#f39c12 50%,#228B22)',
+  "aaron's magic":'linear-gradient(135deg,#F4A460,#DDA0DD 50%,#8faec0)',
+  'mud minnow':'linear-gradient(135deg,#6B4226,#8B7355)',
+  'smokin smoke':'linear-gradient(135deg,#556070,#8899a8,#556070)',
+  'natural bunker':'linear-gradient(135deg,#4682B4,#C0C0C0 50%,#f0f0f0)',
+  'rayburn red':'linear-gradient(135deg,#8B0000 50%,#c0392b)',
+  'natural minnow':'linear-gradient(135deg,#708090,#C0C0C0 50%,#87CEEB)',
+  'natural sucker':'linear-gradient(135deg,#6B4226,#C0C0C0 50%,#8faec0)',
+  'shad flash':'linear-gradient(135deg,#C0C0C0,#f0f0f0 50%,#87CEEB)',
+  'natural brown':'#5C3317',
+  'dark sculpin':'#3d2b1f',
+  'pheasant tail':'#8B5A2B',
+  "hare's ear":'#A0855B',
+  'prince nymph':'linear-gradient(135deg,#4a0e6e,#228B22 50%,#B87333)',
+  'prince':'linear-gradient(135deg,#4a0e6e,#228B22 50%,#B87333)',
+  'copper john':'linear-gradient(135deg,#B87333,#228B22 50%,#8B0000)',
+  'bright copper john':'linear-gradient(135deg,#CD853F,#32CD32 50%,#c0392b)',
+  "pat's rubber legs":'linear-gradient(135deg,#6B4226,#222 50%,#6B4226)',
+  'stonefly':'#6B4226',
+  'black stonefly':'linear-gradient(135deg,#222 50%,#3d2b1f)',
+  'bright stonefly':'linear-gradient(135deg,#DAA520,#6B4226)',
+  'san juan worm':'#c0392b',
+  'san juan worm (red)':'#c0392b',
+  'egg pattern':'#FF8C00',
+  'elk hair caddis':'#D2B48C',
+  'elk hair caddis (tan)':'#D2B48C',
+  'adams':'#808080',
+  'parachute adams':'linear-gradient(135deg,#808080 60%,#f0f0f0)',
+  'blue wing olive':'linear-gradient(135deg,#556B2F 60%,#4682B4)',
+  'royal wulff':'linear-gradient(135deg,#c0392b,#228B22 50%,#6B4226)',
+  'stimulator (orange)':'linear-gradient(135deg,#e67e22 60%,#6B4226)',
+  'high-vis stimulator':'linear-gradient(135deg,#FF4500,#FFFF00)',
+  'chernobyl ant':'linear-gradient(135deg,#222,#7FFF00 50%,#222)',
+  "partridge & orange":'linear-gradient(135deg,#6B4226 50%,#e67e22)',
+  "partridge & yellow":'linear-gradient(135deg,#6B4226 50%,#f1c40f)',
+  "hare's ear soft hackle":'linear-gradient(135deg,#A0855B 50%,#6B4226)',
+  "starling & herl":'linear-gradient(135deg,#222 50%,#228B22)',
+  'zebra midge':'linear-gradient(90deg,#222 25%,#C0C0C0 25%,#C0C0C0 50%,#222 50%,#222 75%,#C0C0C0 75%)',
+  'rs2':'#808080',
+  'wd-40':'linear-gradient(135deg,#6B4226 50%,#6B8E23)',
+  'mercury midge':'#C0C0C0',
+  'black beauty':'linear-gradient(135deg,#222,#4a0e6e)',
+  'thread midge':'#444',
+  'glow white':'radial-gradient(circle,#eeffee,#ccffcc,#aaffaa)',
+  'glow chartreuse':'radial-gradient(circle,#ccff99,#99ff33,#66cc00)',
+  'glow perch':'radial-gradient(circle,#ccffcc,#228B22 50%,#FFD700)',
+  'glow tiger':'radial-gradient(circle,#ffff66,#FF4500 50%,#228B22)',
+  'natural bug':'#5C4033',
+  'hammered gold':'linear-gradient(135deg,#B8860B,#FFD700 40%,#DAA520 60%,#B8860B)',
+  'hammered silver':'linear-gradient(135deg,#909090,#e0e0e0 40%,#C0C0C0 60%,#909090)',
+  'blue ice':'linear-gradient(135deg,#87CEEB,#e0f0ff,#4682B4)',
+  'smoke sparkle':'linear-gradient(135deg,#708090,#b0c4de 50%,#708090)',
+  'chartreuse sparkle':'linear-gradient(135deg,#7FFF00,#ccff66 50%,#7FFF00)',
+  'smoke/sparkle':'linear-gradient(135deg,#708090,#b0c4de 50%,#708090)',
+  'smoke/silver':'linear-gradient(135deg,#708090 50%,#C0C0C0)',
+  'smoke/silver flake':'linear-gradient(135deg,#708090 50%,#e0e0e0 55%,#708090 60%,#C0C0C0)',
+  'white belly/green':'linear-gradient(to top,#f0f0f0 40%,#228B22)',
+  'black (silhouette)':'#111',
+  'white (max contrast)':'#f8f8f8',
+  'clear/silver':'linear-gradient(135deg,rgba(200,200,200,0.3),#C0C0C0)',
+  'natural green':'#2d7a2d',
+  'chartreuse frog':'linear-gradient(135deg,#7FFF00 60%,#228B22)',
+  'bright yellow':'#FFEA00',
+  'bright orange':'#FF5500',
+  'bright chartreuse':'#88FF00',
+  'bright pink':'#FF1493',
+  'bright red':'#FF0000',
+  'bright red midge':'#FF0000',
+  'chartreuse midge':'#7FFF00',
+  'fluorescent orange':'#FF4500',
+  'fluorescent pink':'#FF1493',
+  'fluorescent red/gold':'linear-gradient(135deg,#FF0000 50%,#DAA520)',
+  'fluorescent green':'#39FF14',
+  'hot pink':'#FF1493',
+  'hot chartreuse':'#88FF00',
+  'hot pink/chartreuse':'linear-gradient(135deg,#FF1493 50%,#7FFF00)',
+  'n/a':'#555',
+  'n/a — bait provides all attraction':'#555',
+  'n/a — live bait rig':'#555',
+  'n/a — live bait':'#555',
+  'any — bait is the attraction':'#555',
+  'chartreuse head helps visibility':'linear-gradient(135deg,#7FFF00 40%,#555)',
+  'chartreuse or glow head':'linear-gradient(135deg,#7FFF00 50%,#66ff66)',
+};
+
+// Resolve a fishing color name to a CSS background value
+function getColorCSS(name) {
+  const lower = name.toLowerCase().trim();
+  // Exact match on special colors
+  if (_CS[lower]) return _CS[lower];
+  // Exact match on base colors
+  if (_CB[lower]) return _CB[lower];
+  // Slash-compound → gradient
+  if (lower.includes('/')) {
+    const parts = lower.split('/').map(p => p.trim());
+    const cols = parts.map(p => _CS[p] || _CB[p] || _findBaseColor(p));
+    return `linear-gradient(135deg,${cols.join(',')})`;
+  }
+  // Fuzzy keyword match
+  return _findBaseColor(lower);
+}
+
+function _findBaseColor(name) {
+  // Try special patterns first (partial match)
+  for (const key in _CS) {
+    if (name.includes(key) && key.length > 3) return _CS[key];
+  }
+  // Try base color keywords
+  for (const key in _CB) {
+    if (name.includes(key)) return _CB[key];
+  }
+  return '#708090'; // neutral fallback
+}
+
+// ===== Lure Type Icons (inline SVG silhouettes) =====
+
+const _LURE_ICONS = {
+  crankbait: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><ellipse cx="20" cy="10" rx="9" ry="6.5"/><line x1="11" y1="12" x2="5" y2="16"/><circle cx="23" cy="8" r="1.5" fill="currentColor"/><path d="M29 10 Q33 8 35 10 Q33 12 29 10"/><line x1="17" y1="16" x2="17" y2="19" stroke-dasharray="1 1"/><line x1="23" y1="16" x2="23" y2="19" stroke-dasharray="1 1"/></svg>`,
+  jerkbait: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M4 10 Q8 5 18 7 Q28 5 32 10 Q28 15 18 13 Q8 15 4 10Z"/><circle cx="8" cy="9" r="1.5" fill="currentColor"/><path d="M32 10 Q35 7 36 10 Q35 13 32 10"/><line x1="14" y1="13" x2="14" y2="17" stroke-dasharray="1 1"/><line x1="24" y1="13" x2="24" y2="17" stroke-dasharray="1 1"/></svg>`,
+  softplastic: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 10 Q8 6 14 8 Q18 10 22 8 Q26 6 30 9 Q34 12 36 16"/><circle cx="4" cy="10" r="2" fill="currentColor" opacity="0.4"/></svg>`,
+  topwater: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M3 10 Q3 5 8 5 L10 5 L10 10 Q10 15 8 15 Q3 15 3 10Z"/><ellipse cx="22" cy="10" rx="11" ry="6"/><circle cx="28" cy="8" r="1.5" fill="currentColor"/><path d="M33 10 Q35 8 36 10 Q35 12 33 10"/></svg>`,
+  jig: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="10" cy="7" r="5" fill="currentColor" opacity="0.3"/><circle cx="8" cy="6" r="1" fill="currentColor"/><path d="M14 9 Q18 14 16 19"/><path d="M12 10 Q15 16 13 19"/><path d="M10 11 Q12 16 10 19"/><path d="M15 7 Q20 4 18 1"/></svg>`,
+  spinnerbait: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M10 12 L10 4 Q14 1 18 4"/><ellipse cx="20" cy="4" rx="4" ry="2.5" fill="currentColor" opacity="0.3"/><circle cx="10" cy="14" r="4" fill="currentColor" opacity="0.2"/><path d="M8 17 Q6 19 5 20"/><path d="M10 17 Q10 19 10 20"/><path d="M12 17 Q14 19 15 20"/></svg>`,
+  spoon: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M6 4 Q18 -1 30 4 Q32 10 30 16 Q18 21 6 16 Q4 10 6 4Z" fill="currentColor" opacity="0.15"/><path d="M10 6 Q18 3 26 6" opacity="0.5"/><circle cx="8" cy="10" r="1.5"/><line x1="30" y1="10" x2="34" y2="10"/></svg>`,
+  fly: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M8 14 Q4 18 2 16 Q4 12 8 14Z" fill="currentColor" opacity="0.3"/><path d="M8 14 Q14 10 20 6"/><path d="M14 8 Q18 4 22 2" opacity="0.6"/><path d="M14 8 Q16 12 20 14" opacity="0.6"/><path d="M14 8 Q10 6 8 3" opacity="0.6"/><circle cx="20" cy="6" r="1.5" fill="currentColor" opacity="0.5"/></svg>`,
+  swimbait: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M4 10 Q8 4 16 6 Q20 7 22 10 Q20 13 16 14 Q8 16 4 10Z" fill="currentColor" opacity="0.15"/><line x1="22" y1="10" x2="24" y2="10"/><path d="M24 10 Q28 4 32 6 Q34 8 34 10 Q34 12 32 14 Q28 16 24 10Z" fill="currentColor" opacity="0.15"/><circle cx="8" cy="9" r="1.5" fill="currentColor"/></svg>`,
+  rig: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><line x1="4" y1="4" x2="18" y2="4"/><ellipse cx="22" cy="4" rx="4" ry="2" fill="currentColor" opacity="0.3"/><line x1="26" y1="4" x2="30" y2="4"/><path d="M30 4 Q34 4 34 8 Q34 12 30 12 Q28 12 28 10"/><line x1="14" y1="4" x2="14" y2="10"/><ellipse cx="14" cy="12" rx="2.5" ry="2.5" fill="currentColor" opacity="0.25"/></svg>`,
+  blade: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M8 4 L28 4 L32 10 L28 16 L8 16 L4 10 Z" fill="currentColor" opacity="0.15"/><line x1="18" y1="2" x2="18" y2="4"/><line x1="18" y1="16" x2="18" y2="18" stroke-dasharray="1 1"/><circle cx="12" cy="10" r="1" fill="currentColor"/><circle cx="24" cy="10" r="1" fill="currentColor"/></svg>`,
+  dart: `<svg viewBox="0 0 36 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M4 10 L14 4 L14 16 Z" fill="currentColor" opacity="0.25"/><line x1="14" y1="10" x2="30" y2="10"/><path d="M30 10 Q34 7 34 10 Q34 13 30 10"/><path d="M22 10 Q26 6 28 8" opacity="0.5"/><path d="M22 10 Q26 14 28 12" opacity="0.5"/></svg>`,
+};
+
+// Map lure names → icon category
+function _getLureCategory(name) {
+  const n = name.toLowerCase();
+  if (n.includes('fly') || n.includes('nymph') || n.includes('streamer') || n.includes('bugger')
+      || n.includes('clouser') || n.includes('mouse') || n.includes('soft hackle')
+      || n.includes('spider') || n.includes('ice fly') || n.includes('midge')
+      || n.includes('shad pattern')) return 'fly';
+  if (n.includes('dart') || n.includes('shad rig')) return 'dart';
+  if (n.includes('swimbait') || n.includes('glide bait') || n.includes('bull dawg')
+      || n.includes('rubber bait')) return 'swimbait';
+  if (n.includes('crankbait') || n.includes('rattletrap') || n.includes('lipless')) return 'crankbait';
+  if (n.includes('jerkbait') || n.includes('suspending minnow') || n.includes('minnow bait')
+      || n.includes('jigging rap')) return 'jerkbait';
+  if (n.includes('topwater') || n.includes('buzzbait') || n.includes('popper')
+      || n.includes('frog') || n.includes('walking bait') || n.includes('prop bait')) return 'topwater';
+  if (n.includes('spinnerbait') || n.includes('chatterbait') || n.includes('beetle spin')
+      || n.includes('road runner') || n.includes('umbrella') || n.includes('bucktail spinner')
+      || n.includes('large bucktail') || n.includes('spinner rig') || n.includes('bottom bouncer')) return 'spinnerbait';
+  if (n.includes('inline spinner') || n.includes('small spinner') || n.includes('tiny spinner')
+      || n.includes('rooster tail')) return 'spinnerbait';
+  if (n.includes('spoon') || n.includes('flutter spoon') || n.includes('kastmaster')) return 'spoon';
+  if (n.includes('blade bait')) return 'blade';
+  if (n.includes('carolina') || n.includes('live bait') || n.includes('downline')
+      || n.includes('sucker rig') || n.includes('sabiki') || n.includes('float')
+      || n.includes('bottom rig')) return 'rig';
+  if (n.includes('ned rig') || n.includes('worm') || n.includes('drop shot')
+      || n.includes('finesse') || n.includes('tube') || n.includes('grub')
+      || n.includes('creature') || n.includes('senko') || n.includes('bobby garland')
+      || n.includes('tiny grub')) return 'softplastic';
+  if (n.includes('jig')) return 'jig';
+  return 'jig'; // default
+}
+
+function getLureIcon(name) {
+  const cat = _getLureCategory(name);
+  return _LURE_ICONS[cat] || _LURE_ICONS.jig;
+}
+
 // ===== Detailed Lure Database =====
 // Each lure: { name, weight, size, colors:{clear,stained,muddy}, rig, retrieve, hookSize? }
 // Colors keyed by water clarity for weather-aware color picks
@@ -2399,9 +2646,11 @@ function getRecommendationHtml(rec) {
         <div class="lure-list">
           ${rec.lures.map((l, i) => {
             if (!l.detail) return `<div class="lure-item-simple"><span class="rec-tag lure-tag">${_escapeHtml(l.name)}</span></div>`;
+            const icon = getLureIcon(l.name);
             return `
               <div class="lure-card">
                 <div class="lure-card-header">
+                  <span class="lure-type-icon">${icon}</span>
                   <span class="lure-card-name">${_escapeHtml(l.name)}</span>
                   <span class="lure-card-toggle">+</span>
                 </div>
@@ -2412,7 +2661,10 @@ function getRecommendationHtml(rec) {
                   </div>
                   <div class="lure-spec-section">
                     <span class="lure-spec-label">Best Colors (${rec.clarity})</span>
-                    <div class="lure-colors">${l.colors.map(c => `<span class="color-chip">${_escapeHtml(c)}</span>`).join('')}</div>
+                    <div class="lure-colors">${l.colors.map(c => {
+                      const bg = getColorCSS(c);
+                      return `<span class="color-chip"><span class="color-swatch" style="background:${bg}"></span>${_escapeHtml(c)}</span>`;
+                    }).join('')}</div>
                   </div>
                   <div class="lure-spec-section">
                     <span class="lure-spec-label">How to Rig</span>

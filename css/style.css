@@ -1946,14 +1946,26 @@ a { color: var(--accent); }
 }
 .lure-card-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   padding: 10px 12px;
+  gap: 8px;
+}
+.lure-type-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 20px;
+  color: var(--accent);
+  opacity: 0.8;
+}
+.lure-type-icon svg {
+  width: 100%;
+  height: 100%;
 }
 .lure-card-name {
   font-weight: 600;
   font-size: 0.88rem;
   color: #5dade2;
+  flex: 1;
 }
 .lure-card-toggle {
   color: var(--accent);
@@ -2008,12 +2020,24 @@ a { color: var(--accent); }
   margin-top: 4px;
 }
 .color-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 3px 8px;
   border-radius: 4px;
   font-size: 0.78rem;
   background: rgba(241,196,15,0.1);
   color: #f1c40f;
   border: 1px solid rgba(241,196,15,0.2);
+}
+.color-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.2);
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.3);
 }
 .lure-spec-text {
   font-size: 0.82rem;

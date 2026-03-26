@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dnd-shiet-fish-finder-v36';
+const CACHE_NAME = 'dnd-shiet-fish-finder-v37';
 const TILE_CACHE = 'dnd-tiles-v2';
 const MAX_TILES = 1500;
 let tileWriteCount = 0;
