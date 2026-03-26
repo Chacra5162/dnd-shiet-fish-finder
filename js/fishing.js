@@ -941,18 +941,18 @@ function _findBaseColor(name) {
 
 const _WM = 'https://upload.wikimedia.org/wikipedia/commons/thumb';
 const _LURE_IMG = {
-  crankbait:   `${_WM}/4/48/Verschiedene_Crankbaits.jpg/240px-Verschiedene_Crankbaits.jpg`,
-  jerkbait:    `${_WM}/a/ad/Verschiedene_Twitchbaits.jpg/240px-Verschiedene_Twitchbaits.jpg`,
-  softplastic: `${_WM}/3/39/Ein_Wurm_Imitat_aus_Gummi.jpg/240px-Ein_Wurm_Imitat_aus_Gummi.jpg`,
-  topwater:    `${_WM}/a/af/Scum_frog.jpg/240px-Scum_frog.jpg`,
-  jig:         `${_WM}/e/ef/Fishing_lure_jig.jpg/240px-Fishing_lure_jig.jpg`,
-  spinnerbait: `${_WM}/b/b2/Spinner_bait.jpg/240px-Spinner_bait.jpg`,
-  spoon:       `${_WM}/8/82/Spoons_rotierende_Formen.png/240px-Spoons_rotierende_Formen.png`,
-  fly:         `${_WM}/1/15/BlackandBrownBeadheadWoollyBugger.jpg/240px-BlackandBrownBeadheadWoollyBugger.jpg`,
-  swimbait:    `${_WM}/b/b2/Rainbow_Trout_Swimbait.JPG/240px-Rainbow_Trout_Swimbait.JPG`,
-  rig:         `${_WM}/a/ae/FMIB_35640_Hook%2C_Sinker%2C_and_Line_Used_for_Catching_Small_Species_of_Fish_at_Key_West.jpeg/240px-FMIB_35640_Hook%2C_Sinker%2C_and_Line_Used_for_Catching_Small_Species_of_Fish_at_Key_West.jpeg`,
-  blade:       `${_WM}/4/40/BKK_vib.jpg/240px-BKK_vib.jpg`,
-  dart:        `${_WM}/5/5a/Bucktail.jpg/240px-Bucktail.jpg`,
+  crankbait:   `${_WM}/4/48/Verschiedene_Crankbaits.jpg/250px-Verschiedene_Crankbaits.jpg`,
+  jerkbait:    `${_WM}/a/ad/Verschiedene_Twitchbaits.jpg/250px-Verschiedene_Twitchbaits.jpg`,
+  softplastic: `${_WM}/3/39/Ein_Wurm_Imitat_aus_Gummi.jpg/250px-Ein_Wurm_Imitat_aus_Gummi.jpg`,
+  topwater:    `${_WM}/a/af/Scum_frog.jpg/250px-Scum_frog.jpg`,
+  jig:         `${_WM}/e/ef/Fishing_lure_jig.jpg/250px-Fishing_lure_jig.jpg`,
+  spinnerbait: `${_WM}/b/b2/Spinner_bait.jpg/250px-Spinner_bait.jpg`,
+  spoon:       `${_WM}/8/82/Spoons_rotierende_Formen.png/250px-Spoons_rotierende_Formen.png`,
+  fly:         `${_WM}/1/15/BlackandBrownBeadheadWoollyBugger.jpg/250px-BlackandBrownBeadheadWoollyBugger.jpg`,
+  swimbait:    `${_WM}/b/b2/Rainbow_Trout_Swimbait.JPG/250px-Rainbow_Trout_Swimbait.JPG`,
+  rig:         `${_WM}/a/ae/FMIB_35640_Hook%2C_Sinker%2C_and_Line_Used_for_Catching_Small_Species_of_Fish_at_Key_West.jpeg/250px-FMIB_35640_Hook%2C_Sinker%2C_and_Line_Used_for_Catching_Small_Species_of_Fish_at_Key_West.jpeg`,
+  blade:       `${_WM}/4/40/BKK_vib.jpg/250px-BKK_vib.jpg`,
+  dart:        `${_WM}/5/5a/Bucktail.jpg/250px-Bucktail.jpg`,
 };
 
 // Map lure names → illustration category
