@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dnd-shiet-fish-finder-v40';
+const CACHE_NAME = 'dnd-shiet-fish-finder-v41';
 const TILE_CACHE = 'dnd-tiles-v2';
 const MAX_TILES = 1500;
 let tileWriteCount = 0;
@@ -62,7 +62,8 @@ self.addEventListener('fetch', (event) => {
     url.hostname === 'api.tidesandcurrents.noaa.gov' ||
     url.hostname.includes('arcgis.com') ||
     url.hostname === 'unpkg.com' ||
-    url.hostname === 'cdn.jsdelivr.net'
+    url.hostname === 'cdn.jsdelivr.net' ||
+    url.hostname === 'upload.wikimedia.org'
   ) {
     event.respondWith(
       fetch(event.request).catch(() => {

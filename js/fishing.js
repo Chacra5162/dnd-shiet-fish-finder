@@ -2654,7 +2654,7 @@ function getRecommendationHtml(rec) {
                   <span class="lure-card-toggle">+</span>
                 </div>
                 <div class="lure-card-detail">
-                  <div class="lure-illustration"><img src="${imgUrl}" alt="${_escapeHtml(l.name)}" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
+                  <div class="lure-illustration"><img src="${imgUrl}" alt="${_escapeHtml(l.name)}" crossorigin="anonymous" onerror="this.style.display='none'"></div>
                   <div class="lure-spec-grid">
                     <div class="lure-spec"><span class="lure-spec-label">Weight</span><span class="lure-spec-value">${l.detail.weight}</span></div>
                     <div class="lure-spec"><span class="lure-spec-label">Size</span><span class="lure-spec-value">${l.detail.size}</span></div>
