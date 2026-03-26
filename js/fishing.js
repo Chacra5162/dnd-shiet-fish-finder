@@ -953,6 +953,7 @@ const _LURE_IMG = {
   rig:         `${_WM}/a/ae/FMIB_35640_Hook%2C_Sinker%2C_and_Line_Used_for_Catching_Small_Species_of_Fish_at_Key_West.jpeg/250px-FMIB_35640_Hook%2C_Sinker%2C_and_Line_Used_for_Catching_Small_Species_of_Fish_at_Key_West.jpeg`,
   blade:       `${_WM}/4/40/BKK_vib.jpg/250px-BKK_vib.jpg`,
   dart:        `${_WM}/5/5a/Bucktail.jpg/250px-Bucktail.jpg`,
+  chatterbait: `${_WM}/e/e2/SpinTailJig.JPG/250px-SpinTailJig.JPG`,
 };
 
 // Map lure names → illustration category
@@ -970,7 +971,8 @@ function _getLureCategory(name) {
       || n.includes('jigging rap')) return 'jerkbait';
   if (n.includes('topwater') || n.includes('buzzbait') || n.includes('popper')
       || n.includes('frog') || n.includes('walking bait') || n.includes('prop bait')) return 'topwater';
-  if (n.includes('spinnerbait') || n.includes('chatterbait') || n.includes('beetle spin')
+  if (n.includes('chatterbait')) return 'chatterbait';
+  if (n.includes('spinnerbait') || n.includes('beetle spin')
       || n.includes('road runner') || n.includes('umbrella') || n.includes('bucktail spinner')
       || n.includes('large bucktail') || n.includes('spinner rig') || n.includes('bottom bouncer')) return 'spinnerbait';
   if (n.includes('inline spinner') || n.includes('small spinner') || n.includes('tiny spinner')
