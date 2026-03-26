@@ -482,6 +482,18 @@ function getPlaceStatusHtml(wb) {
   `;
 }
 
+// Lure image lightbox
+window._lureLightbox = function(img) {
+  const existing = document.getElementById('lure-lightbox');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'lure-lightbox';
+  overlay.className = 'lure-lightbox';
+  overlay.innerHTML = `<img src="${img.dataset.full}" alt="${img.alt}"><div class="lure-lightbox-caption">${img.alt}</div>`;
+  overlay.addEventListener('click', () => overlay.remove());
+  document.body.appendChild(overlay);
+};
+
 // Global handlers for inline onclick (needed since we use innerHTML)
 window._placeAction = async function(btn) {
   const user = getUser();
