@@ -2007,7 +2007,7 @@ a { color: var(--accent); }
   gap: 4px;
   margin-top: 4px;
 }
-/* Lure illustration in expanded card */
+/* Lure photo in expanded card */
 .lure-illustration {
   margin-bottom: 10px;
   background: rgba(0,0,0,0.25);
@@ -2016,10 +2016,11 @@ a { color: var(--accent); }
   display: flex;
   justify-content: center;
 }
-.lure-illustration svg {
-  width: 100%;
-  max-width: 220px;
-  height: auto;
+.lure-illustration img {
+  max-width: 100%;
+  max-height: 140px;
+  border-radius: 6px;
+  object-fit: contain;
 }
 /* Color blocks — large visual swatches */
 .lure-color-blocks {

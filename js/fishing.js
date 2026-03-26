@@ -937,171 +937,22 @@ function _findBaseColor(name) {
   return '#708090'; // neutral fallback
 }
 
-// ===== Lure Type Illustrations =====
-// Detailed inline SVGs for expanded lure card view (160x80 viewBox)
+// ===== Lure Type Images (Wikimedia Commons — public domain / CC) =====
 
+const _WM = 'https://upload.wikimedia.org/wikipedia/commons/thumb';
 const _LURE_IMG = {
-  crankbait: `<svg viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
-    <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5dade2"/><stop offset="100%" stop-color="#2471a3"/></linearGradient></defs>
-    <path d="M30 38 Q30 18 60 16 Q90 14 110 22 Q128 28 130 40 Q128 52 110 58 Q90 66 60 64 Q30 62 30 42Z" fill="url(#cg)" stroke="#1a5276" stroke-width="1.5"/>
-    <ellipse cx="118" cy="38" rx="5" ry="4" fill="#222" opacity="0.8"/><circle cx="116" cy="37" r="1.5" fill="#fff"/>
-    <path d="M30 42 L12 56 L16 48 L10 60" fill="none" stroke="#1a5276" stroke-width="2" stroke-linecap="round"/>
-    <path d="M130 40 Q140 34 148 38 Q140 42 130 40Z" fill="#5dade2" stroke="#1a5276" stroke-width="1"/>
-    <line x1="70" y1="60" x2="70" y2="72" stroke="#888" stroke-width="0.8"/>
-    <path d="M66 72 L70 66 L74 72 M67 72 L70 68 L73 72" stroke="#888" stroke-width="0.8" fill="none"/>
-    <line x1="100" y1="58" x2="100" y2="70" stroke="#888" stroke-width="0.8"/>
-    <path d="M96 70 L100 64 L104 70 M97 70 L100 66 L103 70" stroke="#888" stroke-width="0.8" fill="none"/>
-    <circle cx="30" cy="40" r="2" fill="#888"/><line x1="10" y1="30" x2="28" y2="39" stroke="#888" stroke-width="0.8"/>
-    <path d="M50 20 Q70 16 100 20" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>
-  </svg>`,
-
-  jerkbait: `<svg viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
-    <defs><linearGradient id="jg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#aab7b8"/><stop offset="50%" stop-color="#d5dbdb"/><stop offset="100%" stop-color="#85929e"/></linearGradient></defs>
-    <path d="M16 40 Q20 28 45 26 Q80 22 115 26 Q135 30 142 40 Q135 50 115 54 Q80 58 45 54 Q20 52 16 40Z" fill="url(#jg)" stroke="#5d6d7e" stroke-width="1.5"/>
-    <ellipse cx="130" cy="38" rx="4.5" ry="3.5" fill="#222" opacity="0.8"/><circle cx="128" cy="37" r="1.5" fill="#fff"/>
-    <path d="M16 40 L6 50 L10 44 L4 54" fill="none" stroke="#5d6d7e" stroke-width="1.8" stroke-linecap="round"/>
-    <path d="M142 40 Q150 36 155 40 Q150 44 142 40Z" fill="#aab7b8" stroke="#5d6d7e" stroke-width="1"/>
-    <line x1="55" y1="54" x2="55" y2="66" stroke="#888" stroke-width="0.8"/>
-    <path d="M51 66 L55 60 L59 66 M52 66 L55 62 L58 66" stroke="#888" stroke-width="0.8" fill="none"/>
-    <line x1="90" y1="56" x2="90" y2="68" stroke="#888" stroke-width="0.8"/>
-    <path d="M86 68 L90 62 L94 68 M87 68 L90 64 L93 68" stroke="#888" stroke-width="0.8" fill="none"/>
-    <line x1="120" y1="52" x2="120" y2="64" stroke="#888" stroke-width="0.8"/>
-    <path d="M116 64 L120 58 L124 64 M117 64 L120 60 L123 64" stroke="#888" stroke-width="0.8" fill="none"/>
-    <path d="M40 28 Q80 24 125 28" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
-  </svg>`,
-
-  softplastic: `<svg viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
-    <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6B6B23"/><stop offset="100%" stop-color="#4a4a18"/></linearGradient></defs>
-    <path d="M20 36 Q24 30 32 32 Q40 34 48 30 Q56 26 64 30 Q72 34 80 30 Q88 26 96 30 Q104 34 112 32 Q118 30 124 34 Q132 40 140 48 Q148 58 152 64 Q146 60 140 56 Q134 52 128 54 Q120 58 116 52" fill="url(#sg)" stroke="#4a4a18" stroke-width="1.8" stroke-linecap="round"/>
-    <path d="M24 32 Q32 28 48 30" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
-    <path d="M28 34 L28 42 M36 32 L36 40 M44 30 L44 38 M52 28 L52 36 M60 30 L60 38 M68 32 L68 40 M76 30 L76 38 M84 28 L84 36 M92 30 L92 38 M100 32 L100 40 M108 32 L108 40" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
-    <circle cx="20" cy="36" r="3" fill="#4a4a18" stroke="#6B6B23" stroke-width="1"/>
-  </svg>`,
-
-  topwater: `<svg viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
-    <defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#228B22"/><stop offset="100%" stop-color="#145214"/></linearGradient></defs>
-    <path d="M22 34 Q22 24 32 22 Q42 20 52 22 Q62 20 80 22 Q110 24 130 32 Q140 38 140 42 Q140 52 130 56 Q110 62 80 60 Q60 62 45 58 Q30 56 22 48Z" fill="url(#tg)" stroke="#145214" stroke-width="1.5"/>
-    <ellipse cx="44" cy="32" rx="6" ry="5" fill="#f1c40f" opacity="0.8"/><circle cx="42" cy="31" r="2.5" fill="#222"/><circle cx="41" cy="30" r="1" fill="#fff"/>
-    <ellipse cx="44" cy="52" rx="6" ry="5" fill="#f1c40f" opacity="0.8"/><circle cx="42" cy="51" r="2.5" fill="#222"/>
-    <path d="M140 42 Q150 38 155 42 Q150 46 140 42Z" fill="#228B22" stroke="#145214" stroke-width="1"/>
-    <path d="M135 52 Q142 60 138 68 Q136 64 132 60" fill="#145214" stroke="#0d3d0d" stroke-width="1"/>
-    <path d="M128 54 Q134 62 130 70 Q128 66 124 62" fill="#145214" stroke="#0d3d0d" stroke-width="1"/>
-    <line x1="80" y1="58" x2="80" y2="70" stroke="#888" stroke-width="0.8"/>
-    <path d="M76 70 L80 64 L84 70" stroke="#888" stroke-width="0.8" fill="none"/>
-    <path d="M40 24 Q70 20 120 28" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
-    <path d="M8 42 Q12 38 18 42 Q12 46 8 42Z" fill="#5dade2" opacity="0.3"/>
-    <path d="M2 42 Q4 40 6 42 Q4 44 2 42Z" fill="#5dade2" opacity="0.2"/>
-  </svg>`,
-
-  jig: `<svg viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
-    <defs><radialGradient id="jh"><stop offset="0%" stop-color="#666"/><stop offset="100%" stop-color="#333"/></radialGradient></defs>
-    <circle cx="42" cy="28" r="18" fill="url(#jh)" stroke="#222" stroke-width="1.5"/>
-    <ellipse cx="36" cy="24" rx="3" ry="2.5" fill="#222" opacity="0.6"/><circle cx="35" cy="23" r="1" fill="#888"/>
-    <path d="M56 34 Q80 50 76 72" fill="none" stroke="#666" stroke-width="2" stroke-linecap="round"/>
-    <path d="M58 32 Q72 42 78 56 Q84 48 90 58 Q82 50 88 62" fill="none" stroke="#8B4513" stroke-width="2.5" stroke-linecap="round" opacity="0.8"/>
-    <path d="M54 36 Q62 48 58 64" stroke="#c0392b" stroke-width="2" fill="none" opacity="0.7"/>
-    <path d="M52 38 Q56 50 50 66" stroke="#e67e22" stroke-width="2" fill="none" opacity="0.7"/>
-    <path d="M48 40 Q48 52 44 66" stroke="#c0392b" stroke-width="2" fill="none" opacity="0.6"/>
-    <path d="M44 40 Q40 54 38 66" stroke="#8B4513" stroke-width="2" fill="none" opacity="0.6"/>
-    <path d="M40 38 Q34 52 32 64" stroke="#e67e22" stroke-width="2" fill="none" opacity="0.5"/>
-    <path d="M60 28 Q80 16 72 6" fill="none" stroke="#666" stroke-width="1.8" stroke-linecap="round"/>
-    <circle cx="42" cy="28" r="2" fill="#888"/>
-    <line x1="20" y1="16" x2="38" y2="26" stroke="#888" stroke-width="0.8"/>
-  </svg>`,
-
-  spinnerbait: `<svg viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
-    <defs><linearGradient id="bl"><stop offset="0%" stop-color="#C0C0C0"/><stop offset="50%" stop-color="#f0f0f0"/><stop offset="100%" stop-color="#C0C0C0"/></linearGradient></defs>
-    <path d="M60 44 L60 18 Q70 8 90 14" fill="none" stroke="#888" stroke-width="2"/>
-    <ellipse cx="100" cy="14" rx="18" ry="8" fill="url(#bl)" stroke="#999" stroke-width="1" transform="rotate(-15 100 14)"/>
-    <path d="M96 12 Q100 8 104 12" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
-    <circle cx="60" cy="48" r="12" fill="#c0392b" opacity="0.3" stroke="#c0392b" stroke-width="1"/>
-    <path d="M54 58 Q50 66 48 74" stroke="#c0392b" stroke-width="2" fill="none" opacity="0.7"/>
-    <path d="M58 58 Q56 66 56 74" stroke="#f0f0f0" stroke-width="2" fill="none" opacity="0.6"/>
-    <path d="M62 58 Q64 66 66 74" stroke="#c0392b" stroke-width="2" fill="none" opacity="0.7"/>
-    <path d="M66 56 Q70 64 74 72" stroke="#f0f0f0" stroke-width="2" fill="none" opacity="0.5"/>
-    <path d="M68 50 Q86 42 80 28" fill="none" stroke="#888" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="40" y1="36" x2="58" y2="44" stroke="#888" stroke-width="0.8"/>
-  </svg>`,
-
-  spoon: `<svg viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
-    <defs><linearGradient id="spg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#DAA520"/><stop offset="40%" stop-color="#FFD700"/><stop offset="60%" stop-color="#DAA520"/><stop offset="100%" stop-color="#B8860B"/></linearGradient></defs>
-    <path d="M24 28 Q50 12 100 16 Q130 18 140 32 Q148 42 140 52 Q130 62 100 64 Q50 68 24 52 Q16 42 24 28Z" fill="url(#spg)" stroke="#8B6914" stroke-width="1.5"/>
-    <path d="M36 24 Q60 16 100 18 Q125 20 134 30" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>
-    <path d="M40 28 Q70 20 110 24" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
-    <circle cx="26" cy="40" r="3" fill="#8B6914"/><line x1="8" y1="32" x2="23" y2="39" stroke="#888" stroke-width="1"/>
-    <circle cx="140" cy="42" r="2.5" fill="#8B6914"/>
-    <path d="M142 42 Q150 38 154 42 Q152 48 146 46" fill="none" stroke="#888" stroke-width="1.2"/>
-    <path d="M150 38 L154 42 L150 46" fill="none" stroke="#888" stroke-width="0.8"/>
-  </svg>`,
-
-  fly: `<svg viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
-    <path d="M100 50 Q80 66 60 68 Q44 68 38 60 Q34 54 40 48 Q48 42 60 44" fill="none" stroke="#666" stroke-width="2.5" stroke-linecap="round"/>
-    <ellipse cx="56" cy="44" rx="12" ry="6" fill="#8B4513" stroke="#5C3317" stroke-width="1" transform="rotate(-10 56 44)"/>
-    <path d="M48 40 Q40 32 36 20 Q44 28 50 24 Q42 20 40 10" fill="none" stroke="#D2B48C" stroke-width="1.5" opacity="0.8"/>
-    <path d="M48 40 Q38 34 30 24 Q38 30 44 26 Q36 24 32 14" fill="none" stroke="#A0855B" stroke-width="1.5" opacity="0.7"/>
-    <path d="M48 40 Q36 38 26 32 Q34 36 38 30" fill="none" stroke="#D2B48C" stroke-width="1.2" opacity="0.6"/>
-    <path d="M64 44 Q76 36 88 30 Q100 24 110 22" fill="none" stroke="#D2B48C" stroke-width="1.5" opacity="0.5"/>
-    <path d="M64 44 Q78 34 92 28 Q104 22 114 18" fill="none" stroke="#A0855B" stroke-width="1.2" opacity="0.4"/>
-    <path d="M68 46 Q80 44 96 50 Q108 56 116 54" fill="none" stroke="#D2B48C" stroke-width="1.5" opacity="0.5"/>
-    <path d="M44 50 Q32 56 22 54 Q28 50 24 44" fill="none" stroke="#6B4226" stroke-width="1.2" opacity="0.6"/>
-    <circle cx="40" cy="58" r="1.5" fill="#666"/>
-    <path d="M52 44 L52 38 Q54 36 56 38 L56 44" fill="#DAA520" stroke="#B8860B" stroke-width="0.8"/>
-  </svg>`,
-
-  swimbait: `<svg viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
-    <defs><linearGradient id="swg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#228B22"/><stop offset="40%" stop-color="#90EE90"/><stop offset="60%" stop-color="#C0C0C0"/><stop offset="100%" stop-color="#f0f0f0"/></linearGradient></defs>
-    <path d="M20 40 Q30 22 55 20 Q75 18 90 26 Q100 32 102 40 Q100 48 90 54 Q75 62 55 60 Q30 58 20 40Z" fill="url(#swg)" stroke="#1a5276" stroke-width="1.5"/>
-    <line x1="102" y1="40" x2="108" y2="40" stroke="#1a5276" stroke-width="1.5"/>
-    <path d="M108 40 Q118 24 130 26 Q138 30 140 40 Q138 50 130 54 Q118 56 108 40Z" fill="url(#swg)" stroke="#1a5276" stroke-width="1.5"/>
-    <line x1="98" y1="26" x2="98" y2="54" stroke="#1a5276" stroke-width="0.8" opacity="0.5"/>
-    <ellipse cx="42" cy="36" rx="5" ry="4" fill="#222" opacity="0.8"/><circle cx="40" cy="35" r="2" fill="#fff" opacity="0.9"/><circle cx="39" cy="34" r="0.8" fill="#222"/>
-    <path d="M90 42 Q92 48 88 52" fill="none" stroke="#1a5276" stroke-width="1" opacity="0.5"/>
-    <path d="M80 44 Q82 50 78 54" fill="none" stroke="#1a5276" stroke-width="1" opacity="0.4"/>
-    <path d="M40 22 Q60 18 88 26" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>
-    <path d="M96 28 Q98 24 102 26" fill="#228B22" stroke="#1a5276" stroke-width="0.8" opacity="0.6"/>
-  </svg>`,
-
-  rig: `<svg viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
-    <line x1="10" y1="14" x2="60" y2="14" stroke="#888" stroke-width="1.2"/>
-    <ellipse cx="70" cy="14" rx="10" ry="6" fill="#666" stroke="#444" stroke-width="1.2"/>
-    <text x="70" y="17" text-anchor="middle" fill="#aaa" font-size="8" font-family="sans-serif">WT</text>
-    <line x1="80" y1="14" x2="100" y2="14" stroke="#888" stroke-width="1.2"/>
-    <circle cx="100" cy="14" r="3" fill="none" stroke="#888" stroke-width="1.2"/>
-    <line x1="100" y1="17" x2="100" y2="32" stroke="#888" stroke-width="1" stroke-dasharray="3 2"/>
-    <line x1="100" y1="32" x2="140" y2="32" stroke="#666" stroke-width="1"/>
-    <path d="M140 32 Q150 28 150 36 Q150 44 142 44 Q136 44 136 38" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round"/>
-    <path d="M146 30 L150 36 L146 42" fill="none" stroke="#888" stroke-width="0.8"/>
-    <text x="120" y="28" text-anchor="middle" fill="#aab7b8" font-size="7" font-family="sans-serif">leader</text>
-  </svg>`,
-
-  blade: `<svg viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
-    <defs><linearGradient id="blg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#C0C0C0"/><stop offset="50%" stop-color="#e8e8e8"/><stop offset="100%" stop-color="#909090"/></linearGradient></defs>
-    <path d="M30 20 L130 20 L145 40 L130 60 L30 60 L15 40Z" fill="url(#blg)" stroke="#666" stroke-width="1.5"/>
-    <path d="M40 24 L120 24 L130 36" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
-    <circle cx="60" cy="12" r="3" fill="none" stroke="#888" stroke-width="1.5"/>
-    <line x1="60" y1="15" x2="60" y2="20" stroke="#888" stroke-width="1.2"/>
-    <circle cx="80" cy="12" r="3" fill="none" stroke="#888" stroke-width="1.5"/>
-    <line x1="80" y1="15" x2="80" y2="20" stroke="#888" stroke-width="1.2"/>
-    <circle cx="100" cy="12" r="3" fill="none" stroke="#666" stroke-width="1"/>
-    <line x1="100" y1="15" x2="100" y2="20" stroke="#666" stroke-width="0.8"/>
-    <line x1="80" y1="60" x2="80" y2="70" stroke="#888" stroke-width="1"/>
-    <path d="M76 70 L80 64 L84 70 M77 70 L80 66 L83 70" stroke="#888" stroke-width="0.8" fill="none"/>
-    <line x1="30" y1="30" x2="10" y2="22" stroke="#888" stroke-width="0.8"/>
-  </svg>`,
-
-  dart: `<svg viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
-    <defs><radialGradient id="dh"><stop offset="0%" stop-color="#DAA520"/><stop offset="100%" stop-color="#8B6914"/></radialGradient></defs>
-    <path d="M20 40 L50 20 L50 60Z" fill="url(#dh)" stroke="#6B5210" stroke-width="1.5"/>
-    <path d="M30 36 L44 24" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>
-    <line x1="50" y1="40" x2="80" y2="40" stroke="#888" stroke-width="2"/>
-    <path d="M80 40 Q95 32 96 40 Q95 48 80 40Z" fill="none" stroke="#888" stroke-width="1.5"/>
-    <path d="M56 38 Q68 28 82 24 Q94 20 106 22" fill="none" stroke="#f0f0f0" stroke-width="2" opacity="0.7"/>
-    <path d="M56 40 Q70 30 84 28 Q98 24 110 26" fill="none" stroke="#D2B48C" stroke-width="1.8" opacity="0.6"/>
-    <path d="M56 42 Q68 32 82 30 Q96 28 108 30" fill="none" stroke="#f0f0f0" stroke-width="1.5" opacity="0.5"/>
-    <path d="M56 42 Q66 48 80 52 Q92 56 104 54" fill="none" stroke="#D2B48C" stroke-width="1.8" opacity="0.5"/>
-    <path d="M56 40 Q64 50 78 56 Q90 60 102 58" fill="none" stroke="#f0f0f0" stroke-width="1.5" opacity="0.4"/>
-    <line x1="10" y1="32" x2="22" y2="38" stroke="#888" stroke-width="0.8"/>
-  </svg>`,
+  crankbait:   `${_WM}/4/48/Verschiedene_Crankbaits.jpg/240px-Verschiedene_Crankbaits.jpg`,
+  jerkbait:    `${_WM}/a/ad/Verschiedene_Twitchbaits.jpg/240px-Verschiedene_Twitchbaits.jpg`,
+  softplastic: `${_WM}/3/39/Ein_Wurm_Imitat_aus_Gummi.jpg/240px-Ein_Wurm_Imitat_aus_Gummi.jpg`,
+  topwater:    `${_WM}/a/af/Scum_frog.jpg/240px-Scum_frog.jpg`,
+  jig:         `${_WM}/e/ef/Fishing_lure_jig.jpg/240px-Fishing_lure_jig.jpg`,
+  spinnerbait: `${_WM}/b/b2/Spinner_bait.jpg/240px-Spinner_bait.jpg`,
+  spoon:       `${_WM}/8/82/Spoons_rotierende_Formen.png/240px-Spoons_rotierende_Formen.png`,
+  fly:         `${_WM}/1/15/BlackandBrownBeadheadWoollyBugger.jpg/240px-BlackandBrownBeadheadWoollyBugger.jpg`,
+  swimbait:    `${_WM}/b/b2/Rainbow_Trout_Swimbait.JPG/240px-Rainbow_Trout_Swimbait.JPG`,
+  rig:         `${_WM}/a/ae/FMIB_35640_Hook%2C_Sinker%2C_and_Line_Used_for_Catching_Small_Species_of_Fish_at_Key_West.jpeg/240px-FMIB_35640_Hook%2C_Sinker%2C_and_Line_Used_for_Catching_Small_Species_of_Fish_at_Key_West.jpeg`,
+  blade:       `${_WM}/4/40/BKK_vib.jpg/240px-BKK_vib.jpg`,
+  dart:        `${_WM}/5/5a/Bucktail.jpg/240px-Bucktail.jpg`,
 };
 
 // Map lure names → illustration category
@@ -1137,7 +988,7 @@ function _getLureCategory(name) {
   return 'jig';
 }
 
-function getLureImage(name) {
+function getLureImageUrl(name) {
   return _LURE_IMG[_getLureCategory(name)] || _LURE_IMG.jig;
 }
 
@@ -2795,7 +2646,7 @@ function getRecommendationHtml(rec) {
         <div class="lure-list">
           ${rec.lures.map((l, i) => {
             if (!l.detail) return `<div class="lure-item-simple"><span class="rec-tag lure-tag">${_escapeHtml(l.name)}</span></div>`;
-            const img = getLureImage(l.name);
+            const imgUrl = getLureImageUrl(l.name);
             return `
               <div class="lure-card">
                 <div class="lure-card-header">
@@ -2803,7 +2654,7 @@ function getRecommendationHtml(rec) {
                   <span class="lure-card-toggle">+</span>
                 </div>
                 <div class="lure-card-detail">
-                  <div class="lure-illustration">${img}</div>
+                  <div class="lure-illustration"><img src="${imgUrl}" alt="${_escapeHtml(l.name)}" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
                   <div class="lure-spec-grid">
                     <div class="lure-spec"><span class="lure-spec-label">Weight</span><span class="lure-spec-value">${l.detail.weight}</span></div>
                     <div class="lure-spec"><span class="lure-spec-label">Size</span><span class="lure-spec-value">${l.detail.size}</span></div>
